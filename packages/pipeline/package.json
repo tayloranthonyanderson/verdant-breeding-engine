@@ -1,0 +1,25 @@
+{
+  "name": "@verdant/pipeline",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "M0 tracer-bullet pipeline: ingest G2F -> tables -> contract request -> R kernel -> persisted bundle.",
+  "exports": {
+    ".": "./src/pipeline.ts"
+  },
+  "scripts": {
+    "analyze": "tsx src/cli.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@verdant/contracts": "workspace:*",
+    "@verdant/db": "workspace:*",
+    "csv-parse": "^5.6.0",
+    "drizzle-orm": "^0.38.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

@@ -1,0 +1,6 @@
+# Verdant monorepo (ADR-0012). JS/TS workspace members only.
+# services/ holds non-JS workers (the R compute kernel, later the Python solver) — they are
+# read by the queue worker as subprocesses, not pnpm packages, so they are not globbed here.
+packages:
+  - 'apps/*'
+  - 'packages/*'

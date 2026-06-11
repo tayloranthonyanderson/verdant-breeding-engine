@@ -1,0 +1,27 @@
+{
+  "name": "@verdant/jobs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Durable job queue (graphile-worker behind a JobQueue port) + the analyze task + worker (ADR-0012).",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "worker": "tsx src/worker.ts",
+    "demo": "tsx src/demo.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@verdant/contracts": "workspace:*",
+    "@verdant/db": "workspace:*",
+    "@verdant/pipeline": "workspace:*",
+    "drizzle-orm": "^0.38.3",
+    "graphile-worker": "^0.16.6"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

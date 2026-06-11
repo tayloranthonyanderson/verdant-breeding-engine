@@ -33,3 +33,6 @@ dist/
 test-results/
 playwright-report/
 /Users/**/ms-playwright/
+
+# Large public G2F raw downloads (extract small per-env fixtures instead)
+/data/g2f/raw/

@@ -1,0 +1,31 @@
+{
+  "name": "@verdant/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The Verdant engine contract: versioned JSON Schemas (source of truth) + generated TS types + runtime validators for the analyze() request and the result bundle. See README.md.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schemas/analysis-request": "./v0/analysis-request.schema.json",
+    "./schemas/result-bundle": "./v0/result-bundle.schema.json"
+  },
+  "files": [
+    "v0",
+    "src"
+  ],
+  "scripts": {
+    "codegen": "node scripts/codegen.mjs",
+    "test": "node --import tsx --test test/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "json-schema-to-typescript": "^15.0.4",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

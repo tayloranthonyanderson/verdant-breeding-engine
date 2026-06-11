@@ -1,0 +1,212 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://verdant.bio/contracts/v0/result-bundle.schema.json",
+  "title": "Verdant Result Bundle (v0)",
+  "description": "The single object an analysis produces (CONTEXT.md 'result bundle'). The GUI renders it and the AI queries it; it is NEVER re-derived elsewhere — statistics live only in the kernel (ADR-0001/0002). Persisted whole as JSONB. The AI narrates this bundle and may cite only what is in it (groundedness; ADR-0002). See contracts/README.md and DOMAIN-MODEL §6.",
+  "type": "object",
+  "required": ["contract_version", "status", "intent", "chosen_model", "traits", "warnings", "provenance"],
+  "additionalProperties": false,
+  "properties": {
+    "contract_version": { "type": "string", "const": "v0" },
+    "analysis_request_id": { "type": ["string", "null"], "description": "Echo of the request's id, if supplied." },
+    "status": {
+      "type": "string",
+      "enum": ["ok", "partial", "error"],
+      "description": "ok = every requested trait fit; partial = some traits failed (see per-trait status + warnings); error = the run could not produce usable results (see warnings)."
+    },
+    "intent": { "type": "string", "enum": ["selection", "comparison", "prediction"], "description": "Echo of the request intent, for renderers/AI that read only the bundle." },
+    "chosen_model": {
+      "type": "object",
+      "description": "The kernel's record of WHAT model it chose and WHY (ADR-0002). This is what the AI narrates; the AI explains the choice and never makes it. The most load-bearing field for trust.",
+      "required": ["genotype_effect", "relationship", "rationale"],
+      "additionalProperties": false,
+      "properties": {
+        "description": { "type": "string", "description": "Plain-language one-liner, e.g. 'Spatial mixed model with AR1×AR1 errors; genotype random (BLUPs).'" },
+        "formula": { "type": ["string", "null"], "description": "The actual fitted model formula, for the curious/advanced view. Hidden by default (PRD §6 progressive disclosure)." },
+        "genotype_effect": { "type": "string", "enum": ["random", "fixed", "mixed"], "description": "random -> BLUPs (selection); fixed -> BLUEs (comparison); mixed where structure differs by trait." },
+        "spatial_method": { "type": ["string", "null"], "enum": ["none", "row_col", "ar1xar1", "spats", "splines", null], "description": "Which spatial correction the kernel applied (or 'none' if layout did not support one)." },
+        "relationship": { "type": "string", "enum": ["identity", "A", "G", "H"], "description": "Echo of the relationship structure actually used." },
+        "engine": { "type": ["string", "null"], "description": "Backend that produced the fit (e.g. 'lme4', 'sommer', 'SpATS'). Internal; not shown to breeders by default." },
+        "rationale": { "type": "string", "description": "Why this model fits this data + intent — the human-readable justification the AI surfaces ('your trial has spatial trend across rows, so…')." }
+      }
+    },
+    "traits": {
+      "type": "array",
+      "description": "One result per analyzed ObservationVariable.",
+      "items": {
+        "type": "object",
+        "required": ["variable_id", "status", "effects"],
+        "additionalProperties": false,
+        "properties": {
+          "variable_id": { "type": "string" },
+          "status": { "type": "string", "enum": ["ok", "error"], "description": "Whether this trait fit succeeded; on error see the trait's warnings." },
+          "genetic_sd": { "type": ["number", "null"], "description": "√Vg — the model's genetic standard deviation for this trait (from the genotype variance component). The standardization scale for the selection index: merit is expressed in genetic-sd units so traits are comparable and the client reproduces the kernel's index exactly. Model-based (not the empirical spread of the shrunken BLUPs), hence robust to outliers (ADR-0006)." },
+          "effects": {
+            "type": "array",
+            "description": "Per-genotype estimated values — the core output selection acts on.",
+            "items": {
+              "type": "object",
+              "required": ["germplasm_id", "value", "type"],
+              "additionalProperties": false,
+              "properties": {
+                "germplasm_id": { "type": "string" },
+                "value": { "type": ["number", "null"], "description": "The estimated genotype value (BLUP or BLUE), on the trait's scale." },
+                "type": { "type": "string", "enum": ["BLUP", "BLUE"], "description": "BLUP (genotype random) or BLUE (genotype fixed)." },
+                "std_error": { "type": ["number", "null"], "description": "Standard error / PEV-derived uncertainty. Mapped; may be omitted by the MVP kernel." },
+                "reliability": { "type": ["number", "null"], "description": "Per-genotype reliability (1 − PEV/Vg). Mapped; powers shrinkage/uncertainty views later." }
+              }
+            }
+          },
+          "heritability": {
+            "type": ["object", "null"],
+            "description": "Trait heritability. Cullis form preferred for unbalanced/spatial trials (ADR-0006). Null/absent for fixed-genotype (BLUE) fits where h² is undefined.",
+            "additionalProperties": false,
+            "required": ["method", "value"],
+            "properties": {
+              "method": { "type": "string", "enum": ["cullis", "standard", "line_mean"], "description": "Estimator used." },
+              "value": { "type": ["number", "null"], "minimum": 0, "maximum": 1 }
+            }
+          },
+          "varcomp": {
+            "type": "array",
+            "description": "Variance components from the fit.",
+            "items": {
+              "type": "object",
+              "required": ["component", "variance"],
+              "additionalProperties": false,
+              "properties": {
+                "component": { "type": "string", "description": "e.g. 'genotype', 'genotype:environment', 'residual', 'row', 'col'." },
+                "variance": { "type": ["number", "null"] },
+                "std_error": { "type": ["number", "null"], "description": "SE of the variance component, if available." }
+              }
+            }
+          },
+          "diagnostics": {
+            "type": ["object", "null"],
+            "description": "Model-fit diagnostics for the 'is this trustworthy?' view (ADR-0006). Mapped; MVP populates a subset.",
+            "additionalProperties": true,
+            "properties": {
+              "converged": { "type": ["boolean", "null"] },
+              "n_obs": { "type": ["integer", "null"] },
+              "n_genotypes": { "type": ["integer", "null"] },
+              "residual_summary": { "type": ["object", "null"], "description": "Residual distribution summary for outlier/assumption checks." }
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "description": "Trait-scoped warnings (e.g. boundary fit, few reps).",
+            "items": { "$ref": "#/$defs/warning" }
+          }
+        }
+      }
+    },
+    "genetic_correlations": {
+      "type": ["object", "null"],
+      "description": "Genetic-correlation matrix across analyzed traits (M1+). Null when not requested/estimable.",
+      "additionalProperties": false,
+      "properties": {
+        "variable_ids": { "type": "array", "items": { "type": "string" }, "description": "Row/column order of the matrix." },
+        "matrix": { "type": "array", "items": { "type": "array", "items": { "type": ["number", "null"] } }, "description": "Symmetric correlation matrix aligned to variable_ids." }
+      }
+    },
+    "gxe": {
+      "type": ["object", "null"],
+      "description": "MET genotype-by-environment / stability view (M1+; Finlay–Wilkinson / AMMI / GGE). Mapped; null in single-trial or when not requested.",
+      "additionalProperties": true
+    },
+    "indices": {
+      "type": "array",
+      "description": "Selection rankings. Both index kinds may appear so the GUI can show their DIVERGENCE as insight (ADR-0006). The transparent weighted index is also client-recomputable for live re-weighting (PRD §6).",
+      "items": {
+        "type": "object",
+        "required": ["kind", "ranking"],
+        "additionalProperties": false,
+        "properties": {
+          "kind": { "type": "string", "enum": ["weighted", "smith_hazel", "desired_gains"], "description": "weighted = transparent standardized-weighted index (alignment/communication tool, statistically naive); smith_hazel / desired_gains = genetically-aware optimal index." },
+          "segment_id": { "type": ["string", "null"], "description": "The Segment whose objective produced this ranking. Same data + different segment -> different ranking (DOMAIN-MODEL §2.2)." },
+          "ranking": {
+            "type": "array",
+            "description": "Genotypes ordered best-first by this index, with gate outcomes.",
+            "items": {
+              "type": "object",
+              "required": ["germplasm_id", "rank", "score"],
+              "additionalProperties": false,
+              "properties": {
+                "germplasm_id": { "type": "string" },
+                "rank": { "type": "integer", "minimum": 1 },
+                "score": { "type": ["number", "null"], "description": "The index score." },
+                "gated_out": { "type": "boolean", "default": false, "description": "True if the candidate failed one or more gates (excluded from selection regardless of score)." },
+                "gate_failures": { "type": "array", "items": { "type": "string" }, "description": "variable_ids of failed gates, for explanation." }
+              }
+            }
+          },
+          "weights_used": {
+            "type": ["array", "null"],
+            "description": "Echo of the selection modes + weights this ranking used, for transparency and client-side recompute. The kernel emits `mode` (and a consistent `direction`) so the live re-weighting UI reproduces the same merit each trait contributed.",
+            "items": {
+              "type": "object",
+              "required": ["variable_id", "weight"],
+              "additionalProperties": false,
+              "properties": {
+                "variable_id": { "type": "string" },
+                "mode": { "type": "string", "enum": ["max", "min", "target"], "description": "Resolved selection mode the kernel applied for this trait." },
+                "target": { "type": ["number", "null"], "description": "The optimum value used, for mode='target'; null/absent otherwise." },
+                "direction": { "type": "integer", "enum": [1, -1], "description": "Consistent legacy encoding of the mode (max/target→+1, min→−1) for older consumers." },
+                "weight": { "type": "number" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "divergence": {
+      "type": ["object", "null"],
+      "description": "Where the transparent and genetically-aware indices disagree — itself an insight the AI narrates (ADR-0006). Null when fewer than two indices are present.",
+      "additionalProperties": false,
+      "properties": {
+        "compared": { "type": "array", "items": { "type": "string" }, "description": "The index kinds compared, e.g. ['weighted','smith_hazel']." },
+        "rank_correlation": { "type": ["number", "null"], "description": "Spearman correlation between the two rankings." },
+        "notable_movers": {
+          "type": "array",
+          "description": "Genotypes whose rank differs most between the indices — the actionable disagreements.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "germplasm_id": { "type": "string" },
+              "rank_delta": { "type": "integer", "description": "Rank position difference between the two indices." }
+            }
+          }
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "description": "Run-level warnings and notes (design issues, convergence, data quality). Surfaced to the breeder in plain language.",
+      "items": { "$ref": "#/$defs/warning" }
+    },
+    "provenance": {
+      "type": "object",
+      "description": "How this bundle was produced — for reproducibility and audit (the formal audit layer is deferred; this is the seed).",
+      "required": ["contract_version"],
+      "additionalProperties": true,
+      "properties": {
+        "contract_version": { "type": "string", "const": "v0" },
+        "engine_versions": { "type": ["object", "null"], "description": "Versions of the kernel and key R packages used, e.g. {\"SpATS\":\"1.0-18\"}." },
+        "generated_at": { "type": ["string", "null"], "format": "date-time", "description": "ISO-8601 timestamp set by the kernel/worker when the bundle was produced." }
+      }
+    }
+  },
+  "$defs": {
+    "warning": {
+      "type": "object",
+      "required": ["message"],
+      "additionalProperties": false,
+      "properties": {
+        "code": { "type": ["string", "null"], "description": "Stable machine code for the warning class, for filtering/eval." },
+        "message": { "type": "string", "description": "Plain-language explanation for the breeder." },
+        "severity": { "type": "string", "enum": ["info", "warning", "error"], "default": "warning" }
+      }
+    }
+  }
+}

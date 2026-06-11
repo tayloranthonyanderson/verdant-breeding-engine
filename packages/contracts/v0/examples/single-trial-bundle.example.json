@@ -1,0 +1,106 @@
+{
+  "contract_version": "v0",
+  "analysis_request_id": "example-single-trial-001",
+  "status": "ok",
+  "intent": "selection",
+  "chosen_model": {
+    "description": "Replicated single-trial model; genotype random (BLUPs). No spatial trend detected.",
+    "formula": "value ~ rep + (1 | germplasm)",
+    "genotype_effect": "random",
+    "spatial_method": "none",
+    "relationship": "identity",
+    "engine": "lme4",
+    "rationale": "Two replicates of four entries at one location-season. Genotype fitted as random for selection (shrinkage improves ranking of unbalanced material). The 2x4 grid showed no row/column gradient, so no spatial term was added; a spatial model would be over-parameterized here."
+  },
+  "traits": [
+    {
+      "variable_id": "YIELD",
+      "status": "ok",
+      "effects": [
+        { "germplasm_id": "G4", "value": 5.45, "type": "BLUP", "std_error": 0.21, "reliability": 0.78 },
+        { "germplasm_id": "G1", "value": 5.05, "type": "BLUP", "std_error": 0.21, "reliability": 0.78 },
+        { "germplasm_id": "G2", "value": 4.65, "type": "BLUP", "std_error": 0.21, "reliability": 0.78 },
+        { "germplasm_id": "G3", "value": 3.75, "type": "BLUP", "std_error": 0.21, "reliability": 0.78 }
+      ],
+      "heritability": { "method": "cullis", "value": 0.72 },
+      "varcomp": [
+        { "component": "germplasm", "variance": 0.55, "std_error": 0.30 },
+        { "component": "residual", "variance": 0.12, "std_error": 0.06 }
+      ],
+      "diagnostics": { "converged": true, "n_obs": 8, "n_genotypes": 4 },
+      "warnings": []
+    },
+    {
+      "variable_id": "BRIX",
+      "status": "ok",
+      "effects": [
+        { "germplasm_id": "G3", "value": 5.50, "type": "BLUP", "std_error": 0.14, "reliability": 0.83 },
+        { "germplasm_id": "G2", "value": 5.15, "type": "BLUP", "std_error": 0.14, "reliability": 0.83 },
+        { "germplasm_id": "G1", "value": 4.60, "type": "BLUP", "std_error": 0.14, "reliability": 0.83 },
+        { "germplasm_id": "G4", "value": 4.10, "type": "BLUP", "std_error": 0.14, "reliability": 0.83 }
+      ],
+      "heritability": { "method": "cullis", "value": 0.81 },
+      "varcomp": [
+        { "component": "germplasm", "variance": 0.40, "std_error": 0.22 },
+        { "component": "residual", "variance": 0.05, "std_error": 0.03 }
+      ],
+      "diagnostics": { "converged": true, "n_obs": 8, "n_genotypes": 4 },
+      "warnings": []
+    }
+  ],
+  "genetic_correlations": {
+    "variable_ids": ["YIELD", "BRIX"],
+    "matrix": [
+      [1.0, -0.74],
+      [-0.74, 1.0]
+    ]
+  },
+  "gxe": null,
+  "indices": [
+    {
+      "kind": "weighted",
+      "segment_id": "fresh-market-us",
+      "ranking": [
+        { "germplasm_id": "G4", "rank": 1, "score": 0.14, "gated_out": false, "gate_failures": [] },
+        { "germplasm_id": "G2", "rank": 2, "score": 0.13, "gated_out": false, "gate_failures": [] },
+        { "germplasm_id": "G1", "rank": 3, "score": 0.12, "gated_out": false, "gate_failures": [] },
+        { "germplasm_id": "G3", "rank": 4, "score": -0.39, "gated_out": true, "gate_failures": ["YIELD"] }
+      ],
+      "weights_used": [
+        { "variable_id": "YIELD", "direction": 1, "weight": 0.6 },
+        { "variable_id": "BRIX", "direction": 1, "weight": 0.4 }
+      ]
+    },
+    {
+      "kind": "smith_hazel",
+      "segment_id": "fresh-market-us",
+      "ranking": [
+        { "germplasm_id": "G1", "rank": 1, "score": 1.85, "gated_out": false, "gate_failures": [] },
+        { "germplasm_id": "G4", "rank": 2, "score": 1.40, "gated_out": false, "gate_failures": [] },
+        { "germplasm_id": "G2", "rank": 3, "score": 0.95, "gated_out": false, "gate_failures": [] },
+        { "germplasm_id": "G3", "rank": 4, "score": -2.10, "gated_out": true, "gate_failures": ["YIELD"] }
+      ],
+      "weights_used": [
+        { "variable_id": "YIELD", "direction": 1, "weight": 0.6 },
+        { "variable_id": "BRIX", "direction": 1, "weight": 0.4 }
+      ]
+    }
+  ],
+  "divergence": {
+    "compared": ["weighted", "smith_hazel"],
+    "rank_correlation": 0.6,
+    "notable_movers": [
+      { "germplasm_id": "G1", "rank_delta": 2 },
+      { "germplasm_id": "G4", "rank_delta": 1 }
+    ]
+  },
+  "warnings": [
+    { "code": "single_environment", "message": "One location-season only: genotype-by-environment interaction and stability cannot be estimated. Selections reflect a single environment.", "severity": "info" },
+    { "code": "negative_genetic_correlation", "message": "Yield and Brix are negatively genetically correlated (-0.74) here: the highest-yielding entries tend to be lower in Brix. The two indices disagree most on G1 for this reason.", "severity": "info" }
+  ],
+  "provenance": {
+    "contract_version": "v0",
+    "engine_versions": { "lme4": "1.1-35" },
+    "generated_at": "2026-06-11T00:00:00Z"
+  }
+}

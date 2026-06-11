@@ -1,0 +1,14 @@
+{
+  "name": "verdant",
+  "private": true,
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=22"
+  },
+  "description": "Verdant — AI-native breeding management + analysis platform. Monorepo root (ADR-0012).",
+  "scripts": {
+    "contracts:codegen": "pnpm --filter @verdant/contracts codegen",
+    "contracts:test": "pnpm --filter @verdant/contracts test",
+    "contracts:typecheck": "pnpm --filter @verdant/contracts typecheck"
+  }
+}
