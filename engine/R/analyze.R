@@ -35,7 +35,7 @@ analyze_trial <- function(data, traits,
   list(
     traits       = traits,
     effects      = effects,
-    heritability = herit,
+    heritability = as.list(herit),   # named list -> JSON object {trait: h2}
     varcomp      = lapply(fits, function(f) f$varcomp),
     engine       = fits[[1]]$engine,
     warnings     = unlist(lapply(fits, function(f) f$warnings), use.names = FALSE),

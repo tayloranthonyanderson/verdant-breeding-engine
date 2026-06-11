@@ -14,7 +14,7 @@ op_summarize <- function(bundle) {
     n_traits     = length(bundle$traits),
     traits       = bundle$traits,
     n_genotypes  = n_geno,
-    heritability = as.list(round(bundle$heritability, 3)),
+    heritability = as.list(round(unlist(bundle$heritability), 3)),
     engine       = bundle$engine
   )
 }
@@ -52,7 +52,7 @@ op_describe_model <- function(bundle) {
   list(
     engine       = bundle$engine,
     traits       = bundle$traits,
-    heritability = as.list(round(bundle$heritability, 3)),
+    heritability = as.list(round(unlist(bundle$heritability), 3)),
     note = paste("Per-genotype values are BLUPs/BLUEs from a linear mixed model;",
                  "the selection index is a weighted sum of standardized BLUPs,",
                  "signed by each trait's higher/lower-is-better direction.")
