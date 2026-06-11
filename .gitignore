@@ -1,0 +1,30 @@
+# R
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.Rcheck/
+renv/library/
+renv/staging/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+npm-debug.log*
+.pnpm-debug.log*
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build / data outputs
+*.rds
+/tmp/
+dist/
