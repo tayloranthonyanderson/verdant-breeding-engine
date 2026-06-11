@@ -1,0 +1,20 @@
+# API image: R engine (breedeng) + plumber, with compiled-solver system deps.
+FROM rocker/r-ver:4.6.0
+
+# System libraries: libpq (RPostgres), libsodium (plumber), cmake (nloptr/lme4)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libpq-dev libsodium-dev cmake \
+    && rm -rf /var/lib/apt/lists/*
+
+# R package dependencies (pin via renv before shipping to production)
+RUN R -e "install.packages(c('DBI','RPostgres','plumber','httr2','jsonlite','lme4','rrBLUP'), repos='https://cloud.r-project.org')"
+
+WORKDIR /app
+COPY engine /app/engine
+COPY api /app/api
+RUN R CMD INSTALL --no-docs /app/engine
+
+ENV APP_ROOT=/app
+ENV PORT=8000
+EXPOSE 8000
+CMD ["Rscript", "api/entrypoint.R"]

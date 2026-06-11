@@ -1,43 +1,68 @@
-# Breeding Analysis Engine — MVP slice
+# Verdant — Breeding Analytics Platform
 
-A small, working vertical slice of the breeding analytics product: upload a
-trial, get correct mixed-model **BLUPs/BLUEs**, **heritability**, and a live
-**selection-index ranking**. Built in R/Shiny so it stays legible and extensible.
+An AI-native breeding **management + analysis** platform. The foundation slice:
+load a trial → correct mixed-model **BLUPs/BLUEs**, **heritability**, and a live,
+re-weightable **selection ranking** → ask an embedded **AI assistant** that can
+only answer from the computed results (never fabricated).
 
-See [PRODUCT.md](PRODUCT.md) for the why, [ROADMAP.md](ROADMAP.md) for what's
-next, and [docs/analysis-engine-workflow.md](docs/analysis-engine-workflow.md)
-for the workflow + data model this slice implements.
+Decoupled, professional, scale-ready architecture:
 
-## Run it
-
-```r
-# from this folder
-install.packages(c("lme4", "shiny", "rrBLUP"))   # once
-shiny::runApp("app.R")
+```
+Next.js + TypeScript frontend  ──HTTP──▶  plumber API (R)  ──▶  breedeng engine (lme4 / rrBLUP)
+   beautiful GUI + AI chat                 + Postgres backbone        BLUPF90/GCTA adapters later
 ```
 
-Then click **"Use synthetic tomato demo"** to load a simulated MET, pick traits,
-hit **Analyze**, and play with the selection-index weight sliders.
+See [PRODUCT.md](PRODUCT.md), [ROADMAP.md](ROADMAP.md), and
+[docs/analysis-engine-workflow.md](docs/analysis-engine-workflow.md).
 
 ## Layout
 
-| File | Purpose |
+| Path | Purpose |
 |---|---|
-| `app.R` | Shiny UI + glue |
-| `R/engine.R` | **Pluggable engine**: one `fit_genotype_values()` contract, with `lme4` (default) and `rrBLUP` two-step backends. A BLUPF90 adapter slots in here later behind the same signature. |
-| `R/selection_index.R` | Standardize → weight → rank traits into one index |
-| `R/simulate.R` | IP-clean synthetic tomato MET generator (no real germplasm) |
-| `data/` | Generated demo CSV |
+| `engine/` | **`breedeng`** R package — `fit_genotype_values()` contract (lme4 + rrBLUP), `analyze_trial()`, selection index, IP-clean simulator, tool-safe AI ops. `testthat` suite proves BLUPs recover true genetic values. |
+| `api/` | plumber REST API (`db.R`, `assistant.R`, `plumber.R`, `entrypoint.R`) |
+| `db/migrations/` | Postgres schema (programs, trials, observations, results) |
+| `frontend/` | Next.js + TypeScript + Tailwind app (analysis UI + AI chat) |
+| `infra/` | Dockerfiles + `docker-compose.yml` |
+| `scripts/dev.sh` | one-command native dev runner |
+| `prototype/` | the original Shiny spike (internal only, not shipped) |
+
+## Run it
+
+**Native (fastest on the dev machine):**
+
+```bash
+./scripts/dev.sh          # starts Postgres, the API (:8000), and the frontend (:3000)
+```
+Open http://localhost:3000 and click **Load demo trial**.
+
+**Portable (Docker):**
+
+```bash
+docker compose -f infra/docker-compose.yml up --build
+```
+
+Set `ANTHROPIC_API_KEY` (in `.env`, see `.env.example`) to enable the AI chat;
+without it the analysis works fully and the assistant reports it isn't configured.
+
+## Tests
+
+```bash
+R CMD INSTALL --no-docs engine
+Rscript -e 'library(breedeng); testthat::test_dir("engine/tests/testthat")'
+```
 
 ## Engine strategy
 
-`lme4` for fast, reliable everyday fits. `rrBLUP` two-step for the genomic path
-(pass a genomic relationship matrix `K` later for true GBLUP). Heavy/at-scale
-genomic jobs will route to compiled **BLUPF90** binaries behind the same
-interface — verify commercial licensing before shipping. Deliberately avoiding
-sommer (scale crashes), ASReml (cost/support), and INLA-as-core (memory).
+`lme4` for fast, reliable everyday fits; `rrBLUP` two-step for the genomic path
+(pass a relationship matrix `K` later for true GBLUP). Heavy/at-scale genomic jobs
+route to compiled **BLUPF90/GCTA** behind the same `fit_genotype_values()` contract
+— verify commercial licensing before shipping. Deliberately avoiding sommer (scale
+crashes), ASReml (cost/support), and INLA-as-core (memory).
 
 ## Status
 
-Phase 0 — proof the workflow on synthetic data. Not yet: persistence, accounts,
-multi-trait genetic correlations in the index, NL Q&A. Those are roadmap.
+Foundation slice complete: engine + correctness tests, Postgres backbone, plumber
+API, beautiful frontend, embedded AI assistant, Docker artifacts. Roadmap:
+persistence-in-UI, trial designer, genomics at scale, mobile capture, image
+phenotyping, multi-tenancy/auth. See [ROADMAP.md](ROADMAP.md).
