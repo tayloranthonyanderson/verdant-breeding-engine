@@ -34,6 +34,30 @@ const toNum = (x: string | undefined): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
+/** Parse a multi-environment G2F CSV into the generic plot record (ADR-0015). This is the ONLY
+ *  place G2F column names (Hybrid, Env, Range, Pass, Replicate, Block) are referenced for the MET
+ *  path — the engine and the two-stage pipeline never see them. `traitColumns` are the trait headers
+ *  to extract, in the order the engine reports its matrices. */
+export function parseG2fMet(
+  path: string,
+  traitColumns: string[],
+): { variableIds: string[]; records: import('./stage1').PlotRecord[] } {
+  const records = parse(readFileSync(path), { columns: true, skip_empty_lines: true }) as Record<
+    string,
+    string
+  >[];
+  if (records.length === 0) throw new Error(`No rows in ${path}`);
+  const out = records.map((r) => ({
+    genotype: r.Hybrid,
+    environment: r.Env,
+    row: toNum(r.Range), // G2F Range → generic field row
+    col: toNum(r.Pass), //  G2F Pass  → generic field col
+    rep: r.Replicate || null,
+    values: traitColumns.map((c) => toNum(r[c])),
+  }));
+  return { variableIds: traitColumns, records: out };
+}
+
 export function parseG2fCsv(path: string, traits: TraitSpec[]): ParsedStudy {
   const records = parse(readFileSync(path), { columns: true, skip_empty_lines: true }) as Record<
     string,

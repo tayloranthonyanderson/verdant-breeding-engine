@@ -6,13 +6,14 @@
 //
 // The transparent index is computed inline here as the seed (the client recomputes it live, and the
 // rigorous Smith–Hazel index is added later in R). Engine-agnostic apart from the column mapping.
-import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { db, program, study, analysisRun, resultBundle } from '@verdant/db';
 import { validateResultBundle, type ResultBundle, type AnalysisRequest } from '@verdant/contracts';
 import { estimateGeneticCovariance } from './blupf90';
+import { parseG2fMet } from './g2f';
+import { spatialStage1 } from './stage1';
 
 const TRAITS = ['Plant_Height_cm', 'Ear_Height_cm', 'Yield_Mg_ha', 'Grain_Moisture'];
 // Objective for the seed transparent index (mode + relative weight per trait).
@@ -22,23 +23,6 @@ const WEIGHTS = [
   { variable_id: 'Plant_Height_cm', mode: 'max' as const, weight: 0.2 },
   { variable_id: 'Ear_Height_cm', mode: 'min' as const, weight: 0.15 },
 ];
-
-function parseFixture() {
-  const csv = resolve(import.meta.dirname, '../../../data/g2f/MET_2019.csv');
-  const lines = readFileSync(csv, 'utf8').trim().split('\n');
-  const h = lines[0].split(',');
-  const ci = (n: string) => h.indexOf(n);
-  const ENV = ci('Env'), GENO = ci('Hybrid'), ix = TRAITS.map(ci);
-  const rows = lines.slice(1).map((l) => {
-    const f = l.split(',');
-    return {
-      genotype: f[GENO],
-      environment: f[ENV],
-      values: ix.map((i) => (f[i] === 'NA' || f[i] === '' ? null : Number(f[i]))),
-    };
-  });
-  return rows;
-}
 
 /** Transparent weighted index (ADR-0013): z-standardize each trait, merit by mode, normalize each
  *  merit column to unit spread, weight, sum. Seed only — the client recomputes live. */
@@ -99,11 +83,23 @@ function geneticIndex(
 }
 
 async function main() {
-  const rows = parseFixture();
-  console.log(`parsed ${rows.length} plot rows, ${new Set(rows.map((r) => r.genotype)).size} genotypes, ${new Set(rows.map((r) => r.environment)).size} environments`);
+  // Ingestion (the ONLY place G2F column names live) → generic plot records.
+  const csv = resolve(import.meta.dirname, '../../../data/g2f/MET_2019.csv');
+  const { variableIds, records } = parseG2fMet(csv, TRAITS);
+  console.log(`parsed ${records.length} plot rows, ${new Set(records.map((r) => r.genotype)).size} genotypes, ${new Set(records.map((r) => r.environment)).size} environments`);
 
-  console.log('running BLUPF90 multi-trait AI-REML ...');
-  const g = estimateGeneticCovariance({ variableIds: TRAITS, rows });
+  // Stage 1: within-environment spatial de-trending → spatially-adjusted entry means (BLUEs).
+  console.log('Stage 1: within-environment spatial de-trending (SpATS) ...');
+  const s1 = spatialStage1(variableIds, records);
+  const nSpats = s1.stage1.filter((p) => p.method === 'spats').length;
+  console.log(`Stage 1 done: ${s1.adjusted.length} adjusted entry×env means; ${nSpats}/${s1.stage1.length} env×trait fits used a spatial spline`);
+
+  // Stage 2: multi-trait AI-REML across environments on the de-trended means → genetic covariance.
+  console.log('Stage 2: multi-trait AI-REML (BLUPF90) on adjusted means ...');
+  const g = estimateGeneticCovariance({
+    variableIds: TRAITS,
+    rows: s1.adjusted.map((a) => ({ genotype: a.genotype, environment: a.environment, values: a.values })),
+  });
   console.log(`converged in ${g.rounds} rounds; ${g.blups.length} genotype BLUPs`);
 
   const genoBlups = new Map(g.blups.map((b) => [b.genotype, b.values]));
@@ -133,19 +129,19 @@ async function main() {
     status: 'ok',
     intent: 'selection',
     chosen_model: {
-      description: 'Multi-trait mixed model across 8 environments; genotype random (BLUPs), genetic correlations estimated.',
-      formula: 'trait ~ environment + genotype(random)',
+      description: 'Two-stage MET: Stage 1 removes within-environment field trend (SpATS 2D P-spline per environment × trait, genotype fixed → adjusted entry means); Stage 2 fits multi-trait AI-REML across 8 environments (genotype random) for the genetic covariance and BLUPs.',
+      formula: 'stage 1: trait ~ PSANOVA(col,row) + genotype(fixed)  [per env];  stage 2: adjusted_mean ~ environment + genotype(random)',
       genotype_effect: 'random',
-      spatial_method: 'none',
+      spatial_method: 'spats',
       relationship: 'identity',
-      engine: 'blupf90+',
-      rationale: 'Multi-environment, multi-trait AI-REML (BLUPF90) estimates the genetic covariance matrix across traits — the basis for genetic correlations and the genetically-aware Smith–Hazel index.',
+      engine: 'SpATS + blupf90+',
+      rationale: 'Spatial de-trending stops field heterogeneity from contaminating the genetic correlations and heritabilities; the multi-trait AI-REML then estimates the across-environment genetic covariance G — the basis for genetic correlations and the genetically-aware Smith–Hazel index.',
     },
     traits,
     genetic_correlations: { variable_ids: TRAITS, matrix: g.geneticCorrelation },
     indices: [transIdx, gi.index],
     divergence: gi.divergence,
-    warnings: [{ code: 'met_simple_model', message: 'Genotype main-effect MET model (no GxE or spatial term yet); genetic correlations are preliminary.', severity: 'info' }],
+    warnings: [{ code: 'met_gxe_in_residual', message: 'Within-environment spatial trend is removed (Stage 1), so genetic correlations are no longer contaminated by field heterogeneity. Genotype×environment is not separated from residual error: the trial is largely unreplicated within environment, so a distinct GxE variance is not identifiable without replicated trials (or a weighted two-stage with fixed residual). GxE is folded into the residual here.', severity: 'info' }],
     provenance: { contract_version: 'v0', engine_versions: { blupf90: 'blupf90+' } },
   };
 
@@ -166,7 +162,7 @@ async function main() {
   };
   const [run] = await db.insert(analysisRun).values({ programId: prog.id, studyId: s.id, intent: 'selection', status: 'ok', contractVersion: 'v0', request, finishedAt: new Date() }).returning({ id: analysisRun.id });
   await db.insert(resultBundle).values({ analysisRunId: run.id, contractVersion: 'v0', bundle: validated });
-  console.log(`persisted MET bundle (analysis_run=${run.id}); genetic corr height-yield=${g.geneticCorrelation[0][1].toFixed(3)}`);
+  console.log(`persisted MET bundle (analysis_run=${run.id}); genetic corr height-ear=${g.geneticCorrelation[0][1].toFixed(3)}`);
   await db.$client.end();
 }
 
