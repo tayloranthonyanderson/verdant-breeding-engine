@@ -32,6 +32,21 @@ the entire value proposition of relationship-based prediction, shown starkly.
 (Absolute LR bias is not meaningful here because GEBVs are centered at 0 while phenotypes are on their
 raw mean; dispersion is the calibration metric.)
 
+## Single-step (ssGBLUP) — recovering un-genotyped lines
+
+The point of single-step is predicting individuals with **no markers** by blending pedigree (A) and
+genomic (G) into H (Legarra–Aguilar–Misztal). Tested on the **44 MET hybrids that have a phenotype but
+no genotype** (leave-one-out predictive ability):
+
+| Model | predictive ability (un-genotyped lines) |
+|---|---:|
+| genomic G | — (cannot predict — no markers) |
+| pedigree A | 0.043 |
+| **single-step H** | **0.077** |
+
+H nearly doubles pedigree-only ability for the un-genotyped lines by borrowing marker information from
+their genotyped relatives — the lines genomic-alone simply cannot touch. `services/kernel/genomic-ssgblup.R`.
+
 ## Reproduce
 
 ```
