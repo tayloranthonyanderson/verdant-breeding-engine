@@ -145,6 +145,9 @@ export default function IndexExplorer({
 
   // Weights already sum to 100 by construction; keep a guarded total against float drift.
   const totalW = traitIds.reduce((a, id) => a + Math.abs(weights[id] ?? 0), 0) || 1;
+  // Integer percentages that actually sum to 100. Rounding each row independently can read 101%
+  // (25.5 → 26 while the rest floor to 25); largest-remainder apportionment keeps the panel honest.
+  const displayPcts = useMemo(() => roundTo100(weights, traitIds), [weights, traitIds]);
   const hasTarget = traitIds.some((id) => modes[id] === "target");
 
   const ranking = useMemo(() => {
@@ -264,7 +267,7 @@ export default function IndexExplorer({
         </div>
         <div className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
           {traitIds.map((id) => {
-            const pct = Math.round((Math.abs(weights[id] ?? 0) / totalW) * 100);
+            const pct = displayPcts[id] ?? 0;
             const mode = modes[id];
             return (
               <div key={id} className={mode === "target" ? "sm:col-span-2" : ""}>
@@ -494,6 +497,24 @@ function ContributionTooltip({
       </div>
     </div>
   );
+}
+
+// Largest-remainder (Hamilton) apportionment: normalize the weights to 100, floor each, then hand
+// the leftover whole points to the largest fractional parts. Guarantees the displayed integers
+// sum to exactly 100 — independent per-row Math.round does not.
+function roundTo100(weights: Record<string, number>, ids: string[]): Record<string, number> {
+  const total = ids.reduce((a, id) => a + Math.max(0, weights[id] ?? 0), 0) || 1;
+  const parts = ids.map((id) => {
+    const exact = (Math.max(0, weights[id] ?? 0) / total) * 100;
+    const floor = Math.floor(exact);
+    return { id, floor, rem: exact - floor };
+  });
+  let leftover = 100 - parts.reduce((a, p) => a + p.floor, 0);
+  const byRem = [...parts].sort((a, b) => b.rem - a.rem);
+  const out: Record<string, number> = {};
+  for (const p of parts) out[p.id] = p.floor;
+  for (let i = 0; i < byRem.length && leftover > 0; i++, leftover--) out[byRem[i].id] += 1;
+  return out;
 }
 
 // Mode toggle: cycles max → min → target. Icon + color encode the current selection intent.
