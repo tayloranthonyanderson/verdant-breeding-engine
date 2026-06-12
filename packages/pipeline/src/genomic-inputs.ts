@@ -14,8 +14,9 @@ export const MET_FIXTURE = metFixture();
 
 export interface GenomicCohort {
   traits: string[];
-  /** every parsed genotype (filtered to phenotyped on trait[0] when requirePhenotyped), parse order. */
-  hybrids: string[];
+  /** every parsed genotype (filtered to phenotyped on trait[0] when requirePhenotyped), parse order.
+   *  Crop-agnostic: a "genotype" is whatever the program tests — an inbred line, a hybrid, or a clone. */
+  genotypes: string[];
   /** the genotyped subset (those with a CallSet), in cohort order. */
   matched: string[];
   export: DosageExport;
@@ -47,9 +48,9 @@ export async function buildGenomicInputs(opts: GenomicInputsOpts): Promise<Genom
   let parsed = parseG2fHybrids(opts.csvPath ?? MET_FIXTURE, traits);
   if (opts.requirePhenotyped) parsed = parsed.filter((hy) => hy.n[0] > 0);
   const byGeno = new Map(parsed.map((hy) => [hy.genotype, hy]));
-  const hybrids = parsed.map((hy) => hy.genotype);
+  const genotypes = parsed.map((hy) => hy.genotype);
 
-  const exp = await exportCohortDosages(hybrids, binPath, metaPath, {
+  const exp = await exportCohortDosages(genotypes, binPath, metaPath, {
     mafMin: opts.mafMin ?? 0.05,
     maxMarkers: opts.maxMarkers ?? 50000,
     snpPath: opts.snpPath,
@@ -77,5 +78,5 @@ export async function buildGenomicInputs(opts: GenomicInputsOpts): Promise<Genom
     return out;
   };
 
-  return { traits, hybrids, matched: exp.matched, export: exp, mean, parents, pedigree, phenoByTrait };
+  return { traits, genotypes, matched: exp.matched, export: exp, mean, parents, pedigree, phenoByTrait };
 }

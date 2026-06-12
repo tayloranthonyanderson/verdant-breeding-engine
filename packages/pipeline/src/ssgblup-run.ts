@@ -30,7 +30,7 @@ export async function runSsGblup(): Promise<SsGblupResult> {
     maxMarkers: 50000,
     requirePhenotyped: true,
   });
-  const allHybrids = cohort.hybrids; // all phenotyped (genotyped + un-genotyped)
+  const allHybrids = cohort.genotypes; // all phenotyped (genotyped + un-genotyped)
   const genotyped = cohort.matched;
   console.log(`all phenotyped: ${allHybrids.length}; genotyped: ${genotyped.length}; un-genotyped: ${allHybrids.length - genotyped.length}`);
 

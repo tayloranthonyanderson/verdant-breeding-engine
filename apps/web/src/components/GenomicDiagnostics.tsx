@@ -103,7 +103,7 @@ export default function GenomicDiagnostics({ bundle }: { bundle: ResultBundle })
           <Chip
             label="raw diagonal"
             value={fmt(s.raw_diag_mean)}
-            hint="hybrid/testcross heterozygosity signal"
+            hint="mean self-relationship before scaling (heterozygosity / inbreeding signal)"
           />
           <Chip label="off-diag spread" value={fmt(s.offdiag_sd)} hint="SD of off-diagonal relatedness" />
         </div>

@@ -1,7 +1,7 @@
 "use client";
 
 // Genomic relationship matrix (GRM) heatmap — the realized covariance structure markers reveal.
-// Clustered so family / heterotic-group blocks light up on the diagonal. Rendered to a <canvas>
+// Clustered so related-group (family / sub-population) blocks light up on the diagonal. Rendered to a <canvas>
 // (one pixel-block per cell) because a ~100×100 grid of divs is too heavy. Diverging scale:
 // ~0 → slate/white, related (+) → emerald, unrelated/negative (−) → rose.
 import { useEffect, useRef } from "react";
@@ -72,8 +72,8 @@ export default function GrmHeatmap({ bundle }: { bundle: ResultBundle }) {
       <h3 className="text-sm font-semibold text-slate-700">Genomic relationship matrix</h3>
       <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
         The realized relatedness the markers reveal — not the pedigree you assumed. Clustered so
-        bright blocks on the diagonal are families / heterotic groups: lines that share a lot of
-        their genome. This covariance structure is what genomic BLUP borrows strength across.
+        bright blocks on the diagonal are related groups (families / sub-populations): genotypes that
+        share a lot of their genome. This covariance structure is what genomic BLUP borrows strength across.
       </p>
 
       <div className="mt-4 flex flex-col items-start gap-4 sm:flex-row sm:items-end">
@@ -101,9 +101,9 @@ export default function GrmHeatmap({ bundle }: { bundle: ResultBundle }) {
       </div>
 
       <p className="mt-3 text-[11px] leading-relaxed text-slate-400">
-        Clustered genomic relationship matrix; the diagonal is each line with itself (~1–2, the
-        hybrid/testcross heterozygosity signal). Down-sampled to ~{n} representative lines for
-        display.
+        Clustered genomic relationship matrix; the diagonal is each genotype with itself (the
+        self-relationship — heterozygosity / inbreeding signal). Down-sampled to ~{n} representative
+        genotypes for display.
       </p>
     </section>
   );

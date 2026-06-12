@@ -146,7 +146,7 @@ export default function GenomicComparison({ bundle }: { bundle: ResultBundle }) 
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-400">
         {genomic?.cohort_n != null && genomic?.n_markers != null && (
           <span>
-            <span className="tnum text-slate-500">{genomic.cohort_n.toLocaleString()}</span> hybrids ×{" "}
+            <span className="tnum text-slate-500">{genomic.cohort_n.toLocaleString()}</span> genotypes ×{" "}
             <span className="tnum text-slate-500">{genomic.n_markers.toLocaleString()}</span> markers
           </span>
         )}

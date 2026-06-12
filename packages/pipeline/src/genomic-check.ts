@@ -32,8 +32,8 @@ export async function checkRelationship(): Promise<RelationshipResult> {
     metaPath: meta,
     requirePhenotyped: true,
   });
-  console.log(`MET cohort: ${cohort.hybrids.length} hybrids with yield`);
-  console.log(`genotyped: ${cohort.matched.length}/${cohort.hybrids.length} hybrids × ${cohort.export.nMarkers} markers`);
+  console.log(`cohort: ${cohort.genotypes.length} genotypes with a phenotype`);
+  console.log(`genotyped: ${cohort.matched.length}/${cohort.genotypes.length} × ${cohort.export.nMarkers} markers`);
 
   console.log('building G + rrBLUP GBLUP ...');
   const pheno = { names: cohort.matched, y: cohort.phenoByTrait()['Yield_Mg_ha'] };

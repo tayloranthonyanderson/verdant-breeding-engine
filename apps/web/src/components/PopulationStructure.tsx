@@ -1,10 +1,10 @@
 "use client";
 
 // Population structure recovered from markers (M6): PC1 vs PC2 of the genomic relationship matrix,
-// each point a genotype, colored by family (the non-tester parent). Clusters = families / heterotic
-// groups; a dominant PC1 means one axis of structure dominates (often a shared tester). This is the
-// "what does my germplasm actually look like" teaching panel. The contract types `genomic` loosely;
-// we cast to the known runtime shape.
+// each point a genotype, colored by family/group (the kernel's grouping label, e.g. a shared parent).
+// Clusters = related groups (families / sub-populations); a dominant PC1 means one axis of relatedness
+// dominates (e.g. a shared parent or a major population split). Crop-agnostic — works for any program's
+// germplasm. The contract types `genomic` loosely; we cast to the known runtime shape.
 import { useMemo } from "react";
 import { Network } from "lucide-react";
 import {
@@ -99,11 +99,11 @@ export default function PopulationStructure({ bundle }: { bundle: ResultBundle }
         <h3 className="text-sm font-semibold text-slate-700">Population structure</h3>
       </div>
       <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
-        The first two principal components of the genomic relationship matrix — the family and
+        The first two principal components of the genomic relationship matrix — the relatedness and
         population structure of your germplasm, recovered purely from markers. Tight clusters are
-        families or heterotic groups.{" "}
+        related groups (families or sub-populations).{" "}
         {dominant
-          ? "A dominant PC1 here means one axis of relatedness explains most of the structure — often a shared tester or a strong heterotic split."
+          ? "A dominant PC1 here means one axis of relatedness explains most of the structure — often a shared parent or a major population split."
           : "No single axis dominates, so relatedness is spread across several directions."}
       </p>
 

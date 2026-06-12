@@ -250,7 +250,7 @@ export async function runMetAnalysis(opts: RunMetOptions = {}): Promise<RunMetRe
   // Genomic block (CV comparison + per-model GEBVs) when markers are present.
   let genomic: GenomicBlock | null = null;
   if (genomicInputs && genomicReadiness.markers_present) {
-    console.log(`genomic-analyze: ${genomicInputs.matched.length} hybrids × ${genomicInputs.export.nMarkers} markers ...`);
+    console.log(`genomic-analyze: ${genomicInputs.matched.length} genotyped × ${genomicInputs.export.nMarkers} markers ...`);
     genomic = runRKernel<GenomicBlock>('genomic-analyze.R', {
       bin: join(tmpdir(), 'verdant-met.bin'), meta: join(tmpdir(), 'verdant-met.meta.json'),
       pedigree: genomicInputs.pedigree(), pheno: { names: genomicInputs.matched, traits: genomicInputs.phenoByTrait() },
@@ -260,7 +260,7 @@ export async function runMetAnalysis(opts: RunMetOptions = {}): Promise<RunMetRe
 
     // Single-step H GEBVs over ALL phenotyped lines (genotyped + un-genotyped), so the index can rank
     // the un-genotyped lines through the pedigree link. Its own (larger) cohort.
-    const hCohort = genomicInputs.hybrids;
+    const hCohort = genomicInputs.genotypes;
     if (hCohort.length > genomicInputs.matched.length) {
       console.log(`genomic-h: single-step H over ${hCohort.length} phenotyped lines (${hCohort.length - genomicInputs.matched.length} un-genotyped) ...`);
       const h = runRKernel<{ cohort: string[]; gebv: Record<string, { values: number[] }> }>('genomic-h.R', {

@@ -223,7 +223,7 @@ make_plan <- function(readiness, intent = "selection", relationship = "identity"
     eng_refuse <- if (!is.null(ov_eng) && ov_eng == "blupf90" && !bl_feasible)
       "Native BLUPF90 GBLUP is wired for the genomic relationship (G); pedigree-A / single-step-H run on rrBLUP." else NULL
     eng_feasible <- is.null(ov_eng) || ov_eng == "rrblup" || (ov_eng == "blupf90" && bl_feasible)
-    rec_eng_reason <- sprintf("rrBLUP computes the GEBVs (fast, the workhorse at this scale); native BLUPF90/preGSf90 GBLUP is the scale engine, cross-engine concordance-validated r≈0.97 (docs/validation/cross-engine-concordance.md). Variance components fit on %s.", pheno_engine)
+    rec_eng_reason <- sprintf("rrBLUP computes the GEBVs (fast, the default at this scale); native BLUPF90/preGSf90 GBLUP is the scale engine for large cohorts. The two are cross-engine validated to give equivalent GEBVs. Variance components fit on %s.", pheno_engine)
     genomic_engine <- resolve("engine", "rrblup", ov_eng, eng_feasible, eng_refuse, rec_eng_reason, NULL)
     add_overridable("engine", list(
       opt("rrblup", TRUE),

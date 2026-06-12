@@ -35,7 +35,7 @@ export async function crossValidateRelationships(): Promise<ValidationResult> {
   const meta = join(tmpdir(), 'verdant-val.meta.json');
   console.log('exporting dosages (MAF≥0.05, ≤50k) ...');
   const cohort = await buildGenomicInputs({ traits: TRAITS, binPath: bin, metaPath: meta, mafMin: 0.05, maxMarkers: 50000 });
-  console.log(`MET: ${cohort.hybrids.length} hybrids`);
+  console.log(`cohort: ${cohort.genotypes.length} genotypes`);
   const hybrids = cohort.matched;
   console.log(`genotyped cohort: ${cohort.export.nSamples} hybrids × ${cohort.export.nMarkers} markers`);
   console.log(`pedigree: ${cohort.parents().length} parents + ${hybrids.length} hybrids; running 5-fold × 2-rep CV (identity/A/G × ${TRAITS.length} traits) ...`);
