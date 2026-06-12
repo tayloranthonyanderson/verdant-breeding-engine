@@ -62,7 +62,16 @@ crashes), ASReml (cost/support), and INLA-as-core (memory).
 
 ## Status
 
-Foundation slice complete: engine + correctness tests, Postgres backbone, plumber
-API, beautiful frontend, embedded AI assistant, Docker artifacts. Roadmap:
-persistence-in-UI, trial designer, genomics at scale, mobile capture, image
-phenotyping, multi-tenancy/auth. See [ROADMAP.md](ROADMAP.md).
+The Phase-1 analysis engine is largely built and validated on the G2F maize MET, and
+early genomic work is underway. **Done:** two-stage MET (SpATS spatial de-trending →
+multi-trait AI-REML, validated vs lme4 to 3 sig figs); a **deterministic Model Planner**
+that gates spatial / genotype-effect / GxE / staging / engine on data readiness and
+explains each choice in a UI panel (ADR-0016); **crop-agnostic MET seams** (ADR-0015);
+and **genotype storage + ingestion** — 437,214 SNPs × 4,928 hybrids packed into BrAPI
+genotyping tables (ADR-0017). **In progress (branch `feat/genomic-prediction`):** genomic
+prediction — VanRaden **G** built and validated (PSD, GBLUP h²≈0.20, GEBVs cluster by
+family), rrBLUP as the CV engine; native BLUPF90 genomic path, the validation suite,
+pedigree **A** / single-step **H** (ssGBLUP), and the genomic UI are next.
+
+Still ahead: persistence-in-UI, trial designer, mobile capture, image phenotyping,
+multi-tenancy/auth. See [ROADMAP.md](ROADMAP.md) and [docs/MVP-PLAN.md](docs/MVP-PLAN.md).

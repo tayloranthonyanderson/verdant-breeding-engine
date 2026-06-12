@@ -61,8 +61,17 @@ See [PRODUCT.md](PRODUCT.md), [ROADMAP.md](ROADMAP.md), [docs/MVP-PLAN.md](docs/
   the **transparent weighted index** (a communication/alignment instrument) and the
   **genetically-aware index** (Smith–Hazel / desired-gains; the statistically optimal decision).
   Their **divergence** is itself an insight (ADR-0006).
-- **Genomic prediction / GBLUP** — predicting breeding values from markers (parked for a later
-  stage; see ROADMAP).
+- **Genomic prediction / GBLUP** — predicting breeding values (GEBVs) from markers. *In progress*
+  (branch `feat/genomic-prediction`): the genotype panel is stored as packed CallSets (ADR-0017);
+  the kernel builds a **relationship matrix** from it and drives GBLUP. The native BLUPF90 path,
+  ssGBLUP, and the genomic UI are next (see ROADMAP Phase 7 / MVP-PLAN M6).
+- **Relationship matrix (G / A / H)** — the genotype×genotype kinship the mixed model uses in place
+  of identity. **G** (genomic): VanRaden marker relationship, scaled to mean-diagonal 1 so genotype
+  variance is interpretable additive variance and G sits on A's scale. **A** (pedigree): numerator
+  relationship from `parent1`/`parent2`. **H** (single-step): blends A + G natively via preGSf90, so
+  ungenotyped lines re-enter via pedigree. The planner picks the default by data availability;
+  **cross-validation** picks the measured winner on demand. The `relationship: A/G/H` contract field
+  selects it; relationship matrices are cached out of the JSONB bundle (ADR-0017 packing style).
 - **Data readiness** — deterministic diagnostics the kernel computes from the generic plot record to
   gate every model choice: per-environment **grid** (row/col density → spatial-capable?), per-environment
   **replication** (within-env entry replication → residual identifiable?), cross-environment

@@ -76,6 +76,20 @@ Effort is relative (S/M/L/XL) at ~8–12 hrs/wk, not a date.
 - **Analysis depth (ADR-0006):** spatial models (row–col / AR1×AR1 / `SpATS`); MET + **GxE**;
   **Cullis heritability**; genetic-correlation matrix; **diagnostics** (residuals, reliability/PEV,
   convergence, "why this model"). Engine selects the model deterministically (ADR-0002).
+  - ✅ **Two-stage MET** built: SpATS within-environment spatial de-trending (Stage 1) →
+    multi-trait AI-REML / BLUPF90 (Stage 2) for genetic covariance + correlations; validated
+    vs lme4 to 3 sig figs.
+  - ✅ **Deterministic Model Planner (ADR-0016):** shared data-readiness diagnostics
+    (grid / replication / connectivity / scale) gate spatial / genotype-effect / GxE /
+    single-vs-two-stage / engine, each decision carrying its reason + triggering diagnostic;
+    a "Model & data readiness" UI panel narrates the choice and what would unlock more. The
+    **engine registry** matches engines to the plan's required capabilities (ADR-0016).
+    *Established empirically:* GxE is identifiable only in a one-stage plot-level fit
+    (two-stage-on-means is non-identifiable) and is compute-bound at full G2F scale — so G2F
+    routes to two-stage genotype-main and "GxE needs a one-stage fit on a higher-memory host"
+    surfaces as an unlock.
+  - ✅ **Crop-agnostic MET seams (ADR-0015):** generic plot record; dataset column names
+    (G2F's `Range`/`Pass`/`Hybrid`…) live only in ingestion, never in the kernel/adapter.
 - **As-planted layout (ADR-0006):** the **visual field-map editor** (gaps, obstacles, non-contiguous
   ranges); coordinate-import as the fast path; layout as a first-class object.
 - **Ingestion (ADR-0007):** **AI-assisted column mapping + design detection + validation report**, with
@@ -113,10 +127,25 @@ design; feeds the as-planted layout object. (ROADMAP Phase 3.)
 Germplasm catalog, pedigree → A-matrix, cross-cycle lineage, realized-gain dashboards, cross/parent planner
 (usefulness / optimal contribution). Program memory. (ROADMAP Phase 4/7.)
 
-### Milestone 6 — Genomics at scale · **XL**
+### Milestone 6 — Genomics at scale · **XL** · *(in progress)*
 GBLUP (G-matrix), CV accuracy, single-step (H-matrix), marker ingestion/QC; heavy jobs to **BLUPF90/GCTA**
 behind the contract (verify licensing). **Real genotypes + simulated phenotypes** for the showcase (ADR-0008);
 the tomato library powers the demo. (ROADMAP Phase 7.)
+- ✅ **Marker ingestion + storage (ADR-0017):** BrAPI VariantSet / Variant / Sample / CallSet
+  with packed dosage `bytea`; G2F panel ingested — 437,214 SNPs × 4,928 hybrids (~501 MB
+  compressed; per-marker MAF + call-rate computed at ingest); 1,153/1,198 MET hybrids genotyped.
+- 🔄 **Genomic prediction foundation (branch `feat/genomic-prediction`):** `grm.ts` decodes
+  packed CallSets → dosage matrix (MAF QC + marker thinning); `relationship.R` builds VanRaden
+  **G** scaled to mean-diagonal 1 (so it is on A's scale for ssGBLUP); `genomic-check.ts` drives
+  it. **G validated on G2F** (PSD; diag scaled to 1, raw 0.67 recorded as the hybrid/testcross
+  heterozygosity signal; GBLUP h²≈0.20 for hybrid-mean yield; top GEBVs cluster within a family).
+  **rrBLUP** installed as the fast cross-validation engine.
+- **Next:** native preGSf90/postGSf90 BLUPF90 genomic path + **cross-engine concordance**;
+  full **validation suite** (k-fold CV identity/A/G, LR accuracy/bias/dispersion, GRM sanity,
+  structure recovery — committed report, CV gates the UI); **pedigree A + single-step H**
+  (ssGBLUP, recovering the 45 ungenotyped hybrids); **genomic UI** (GRM heatmap, PCA,
+  diagnostics, the Identity·A·G·H relationship lens, phenotypic-vs-genomic teaching insight).
+  Model selection: **heuristic default + cross-validation on demand**.
 
 ### Milestone 7 — Mobile capture & image phenotyping · **XL**
 **Integrate Field Book via BrAPI** (don't rebuild, ADR-0009); offline capture against the plot plan; a Python
