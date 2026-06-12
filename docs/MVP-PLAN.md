@@ -127,25 +127,24 @@ design; feeds the as-planted layout object. (ROADMAP Phase 3.)
 Germplasm catalog, pedigree → A-matrix, cross-cycle lineage, realized-gain dashboards, cross/parent planner
 (usefulness / optimal contribution). Program memory. (ROADMAP Phase 4/7.)
 
-### Milestone 6 — Genomics at scale · **XL** · *(in progress)*
-GBLUP (G-matrix), CV accuracy, single-step (H-matrix), marker ingestion/QC; heavy jobs to **BLUPF90/GCTA**
-behind the contract (verify licensing). **Real genotypes + simulated phenotypes** for the showcase (ADR-0008);
-the tomato library powers the demo. (ROADMAP Phase 7.)
+### Milestone 6 — Genomics at scale · **XL** · *(built)*
+GBLUP (G-matrix), CV accuracy, single-step (H-matrix), marker ingestion/QC; heavy jobs to **BLUPF90**
+behind the contract (verify licensing). (ROADMAP Phase 7.)
 - ✅ **Marker ingestion + storage (ADR-0017):** BrAPI VariantSet / Variant / Sample / CallSet
-  with packed dosage `bytea`; G2F panel ingested — 437,214 SNPs × 4,928 hybrids (~501 MB
-  compressed; per-marker MAF + call-rate computed at ingest); 1,153/1,198 MET hybrids genotyped.
-- 🔄 **Genomic prediction foundation (branch `feat/genomic-prediction`):** `grm.ts` decodes
-  packed CallSets → dosage matrix (MAF QC + marker thinning); `relationship.R` builds VanRaden
-  **G** scaled to mean-diagonal 1 (so it is on A's scale for ssGBLUP); `genomic-check.ts` drives
-  it. **G validated on G2F** (PSD; diag scaled to 1, raw 0.67 recorded as the hybrid/testcross
-  heterozygosity signal; GBLUP h²≈0.20 for hybrid-mean yield; top GEBVs cluster within a family).
-  **rrBLUP** installed as the fast cross-validation engine.
-- **Next:** native preGSf90/postGSf90 BLUPF90 genomic path + **cross-engine concordance**;
-  full **validation suite** (k-fold CV identity/A/G, LR accuracy/bias/dispersion, GRM sanity,
-  structure recovery — committed report, CV gates the UI); **pedigree A + single-step H**
-  (ssGBLUP, recovering the 45 ungenotyped hybrids); **genomic UI** (GRM heatmap, PCA,
-  diagnostics, the Identity·A·G·H relationship lens, phenotypic-vs-genomic teaching insight).
-  Model selection: **heuristic default + cross-validation on demand**.
+  with packed dosage `bytea`; G2F panel ingested — 437,214 SNPs × 4,928 genotypes (~501 MB
+  compressed; per-marker MAF + call-rate at ingest); 1,153/1,198 MET genotypes genotyped.
+- ✅ **Relationship matrices + GEBVs:** `genomic-core.R` builds VanRaden **G** (scaled to mean-diag 1),
+  pedigree **A**, and single-step **H** (Legarra blend) so **all phenotyped lines rank — incl. the 45
+  un-genotyped, via the pedigree link**. `grm.ts` decodes CallSets → dosage matrix + fixed-width SNP export.
+- ✅ **Two engines, cross-validated:** **rrBLUP** (fast CV / default) + **native BLUPF90/preGSf90 GBLUP**
+  (scale); GEBV concordance r≈0.97 (`docs/validation/cross-engine-concordance.md`). 5-fold×2-rep CV shows
+  **G > A > identity** on every trait + LR bias/dispersion (`docs/validation/genomic-prediction.md`).
+- ✅ **Genomic UI + Model Studio (ADR-0018):** GRM heatmap, PCA / population structure, deployment
+  diagnostics, field-BLUP-vs-genomic-GEBV divergence, and the relationship + engine selector — the planner
+  recommends the CV winner, the breeder overrides any decision and re-runs, the kernel validates + refuses
+  infeasible ones. Relationship/engine toggles re-point from precomputed GEBVs in seconds.
+- **Next:** a `relationship_set` cache table (big GRMs out of the JSONB bundle); `sample.germplasm_id`
+  mapping; native BLUPF90 ssGBLUP (H) at scale; forward-year predictive validation (train N → predict N+1).
 
 ### Milestone 7 — Mobile capture & image phenotyping · **XL**
 **Integrate Field Book via BrAPI** (don't rebuild, ADR-0009); offline capture against the plot plan; a Python

@@ -61,10 +61,11 @@ See [PRODUCT.md](PRODUCT.md), [ROADMAP.md](ROADMAP.md), [docs/MVP-PLAN.md](docs/
   the **transparent weighted index** (a communication/alignment instrument) and the
   **genetically-aware index** (Smith–Hazel / desired-gains; the statistically optimal decision).
   Their **divergence** is itself an insight (ADR-0006).
-- **Genomic prediction / GBLUP** — predicting breeding values (GEBVs) from markers. *In progress*
+- **Genomic prediction / GBLUP** — predicting breeding values (GEBVs) from markers. *Built*
   (branch `feat/genomic-prediction`): the genotype panel is stored as packed CallSets (ADR-0017);
-  the kernel builds a **relationship matrix** from it and drives GBLUP. The native BLUPF90 path,
-  ssGBLUP, and the genomic UI are next (see ROADMAP Phase 7 / MVP-PLAN M6).
+  the kernel builds **G / A / H** relationship matrices and drives GBLUP / ssGBLUP via **rrBLUP** (CV
+  default) and **native BLUPF90/preGSf90** (scale), cross-engine validated; the genomic UI + Model
+  Studio selector ship (ADR-0018). Remaining: a `relationship_set` cache table + forward-year validation.
 - **Relationship matrix (G / A / H)** — the genotype×genotype kinship the mixed model uses in place
   of identity. **G** (genomic): VanRaden marker relationship, scaled to mean-diagonal 1 so genotype
   variance is interpretable additive variance and G sits on A's scale. **A** (pedigree): numerator
@@ -82,11 +83,24 @@ See [PRODUCT.md](PRODUCT.md), [ROADMAP.md](ROADMAP.md), [docs/MVP-PLAN.md](docs/
   two-stage), engine, relationship. Each decision carries a **reason** and the **diagnostic value** that
   triggered it. One-stage is the default; weighted two-stage is the deliberate scale fallback; GxE fires
   only when **data readiness** says it is identifiable (ADR-0016).
-- **Engine registry** — engines (lme4, SpATS, BLUPF90, future rrBLUP/BGLR) as adapters behind a uniform
+- **Engine registry** — engines (lme4, SpATS, BLUPF90, rrBLUP) as adapters behind a uniform
   `plan → result` interface plus a **capability descriptor** (multiTrait, gxe, spatial methods,
   relationship support, genomic, scale tier). The planner selects an engine by matching the **Model
   Plan**'s required capabilities, tie-broken by ADR-0014 scale tiering; new engines plug in by
   capability, not by rewrite (ADR-0016).
+- **Model Studio / breeder override** — the planner *recommends* every Model-Plan decision; the breeder
+  may *override* any of them (relationship / spatial / staging / GxE / engine) and re-run. R still owns
+  the science: each override is an *intent*, validated against **data readiness**, and the kernel
+  **refuses** an infeasible one (e.g. force GxE without connectivity, force G without markers) with a
+  reason — keeping its recommendation. Overrides are first-class, **visible, and reversible** (ADR-0018,
+  evolving ADR-0002 from "kernel owns, human can't author" to "AI proposes / human overrides / kernel
+  guards"). Each decision carries `source` (recommended/overridden), `recommended`, `feasible`,
+  `refused_reason`; the bundle's `overridable[]` map drives which options the UI greys out before a re-run.
+- **Genomic engine (rrBLUP vs BLUPF90)** — the GEBVs can be computed by **rrBLUP** (fast, the default and
+  the CV workhorse) or by **native BLUPF90/preGSf90 GBLUP** (the scale engine for large cohorts). The two
+  are **cross-engine validated** to give equivalent GEBVs (concordance). Precomputed together so the engine
+  choice is an instant re-point, not a refit. **Single-step H** ranks *all* phenotyped lines — including
+  un-genotyped ones, which borrow through the pedigree link to genotyped relatives.
 
 ## Program organization vocabulary (the two axes — see [DOMAIN-MODEL.md](docs/DOMAIN-MODEL.md))
 - **Stage** — a candidate's position on the program's *ordered* advancement ladder (e.g.

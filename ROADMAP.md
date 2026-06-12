@@ -3,17 +3,21 @@
 Captured so nothing is lost — but only Phase 1 is "now." Everything below it is
 deliberately deferred until the slice above it is real and validated.
 
-> **Status (2026-06-11).** The Phase-1 analysis engine is largely built and
-> validated on G2F, and we have crossed early into the genomic work (Phase 7).
-> **Done:** two-stage MET (SpATS spatial de-trending → multi-trait AI-REML,
-> validated vs lme4 to 3 sig figs); the **deterministic Model Planner** with
-> data-readiness gating and a "Model & data readiness" UI panel (ADR-0016);
-> **crop-agnostic MET seams** (ADR-0015); **genotype storage + ingestion** —
-> 437,214 SNPs × 4,928 hybrids packed into the BrAPI genotyping tables (ADR-0017).
-> **In progress:** genomic prediction — VanRaden **G** built and validated
-> (PSD, GBLUP h²≈0.20, GEBVs cluster by family), rrBLUP as the CV engine; the
-> native BLUPF90 genomic path, the validation suite, pedigree **A** / single-step
-> **H**, and the genomic UI are next (see Phase 7).
+> **Status (2026-06-12).** The Phase-1 analysis engine is built + validated on G2F,
+> and Phase-7 genomic prediction is now built end-to-end with a full model-selection
+> UI. **Done:** two-stage MET (SpATS → multi-trait AI-REML, validated vs lme4 to 3
+> sig figs); the **deterministic Model Planner** + data-readiness gating (ADR-0016);
+> **crop-agnostic seams** (ADR-0015); **genotype storage + ingestion** (ADR-0017,
+> 437k SNPs × 4,928 genotypes); **genomic prediction** — VanRaden **G**, pedigree
+> **A**, single-step **H** GEBVs (all phenotyped lines, incl. un-genotyped via the
+> pedigree link); **rrBLUP** (fast CV engine) + **native BLUPF90/preGSf90 GBLUP**
+> (scale engine), cross-engine validated (GEBV r≈0.97); the full genomic UI; and
+> **AI-recommended model selection with full breeder override** — the planner
+> recommends every decision (relationship / spatial / staging / GxE / engine), the
+> breeder overrides any of them and re-runs, the kernel validates + refuses
+> infeasible ones (**Model Studio**, ADR-0018). **Next:** the natural-language Q&A
+> layer (Phase 2); a `relationship_set` cache table + `sample.germplasm_id` mapping;
+> forward-year predictive validation.
 
 ## Phase 0 — Plan + thin slice  *(current)*
 - Product brief, this roadmap, analysis-engine workflow map.
@@ -39,6 +43,14 @@ deliberately deferred until the slice above it is real and validated.
   GxE / single-vs-two-stage / engine, each decision explained, with a "Model &
   data readiness" UI panel. **Crop-agnostic seams** (ADR-0015): generic plot
   record; dataset column names confined to ingestion.
+- ✅ **AI-recommended model selection + full breeder override** (ADR-0018,
+  "Model Studio"): the planner *recommends* every decision; the breeder can
+  *override* any of them (relationship / spatial / staging / GxE / engine) and
+  re-run synchronously; the kernel validates each override against readiness and
+  *refuses* infeasible ones with a reason (R still owns the science). Relationship
+  / engine changes re-point from precomputed GEBVs in seconds; structural changes
+  refit. The whole option menu is always shown — locked options explain what data
+  would unlock them.
 - Engines: `lme4` / `SpATS` / `statgenSTA` / `statgenGxE` for trial-scale fits;
   **BLUPF90** (AIREMLF90 multi-trait REML; ssGBLUP) for multi-trait variance
   components & genomic scale, selected via the **engine registry** capability
@@ -66,31 +78,28 @@ deliberately deferred until the slice above it is real and validated.
 - Extract traits from images (fruit count/size/color, disease scoring).
 - Likely a Python service; start with one or two high-value traits.
 
-## Phase 7 — Genomics & cross planning  *(genomic prediction in progress)*
+## Phase 7 — Genomics & cross planning  *(genomic prediction built)*
 - ✅ **Genotype storage + ingestion (ADR-0017):** BrAPI VariantSet / Variant /
   Sample / CallSet tables with packed dosage `bytea`; the G2F genotype panel
-  ingested — 437,214 SNPs × 4,928 hybrids (~501 MB compressed); 1,153/1,198 MET
-  hybrids genotyped.
-- 🔄 **Genomic prediction foundation (branch `feat/genomic-prediction`):**
-  `grm.ts` decodes packed CallSets → dosage matrix; `relationship.R` builds
-  VanRaden **G** scaled to mean-diagonal 1; `genomic-check.ts` drives it. G
-  validated on G2F (PSD, GBLUP h²≈0.20 for hybrid-mean yield, GEBVs cluster by
-  family); **rrBLUP** installed as the cross-validation engine.
-- **Next (genomic prediction):**
-  - Native **preGSf90 / postGSf90** BLUPF90 genomic path + **cross-engine
-    concordance** (rrBLUP vs BLUPF90 GEBVs correlate ~1.0).
-  - **Validation suite:** k-fold CV predictive ability (identity / A / G), LR
-    accuracy / bias / dispersion, GRM sanity, known-structure recovery —
-    committed report; CV gates the UI.
-  - **Pedigree A + single-step H (ssGBLUP)** — native preGSf90 H; brings the 45
-    ungenotyped hybrids back via pedigree.
-  - **Genomic UI:** GRM canvas heatmap, PCA / population structure, deployment
-    diagnostics, a relationship "lens" workspace (Identity · A · G · H) with
-    heuristic-default + cross-validation-on-demand, and the phenotypic-BLUP-vs-
-    genomic-GEBV teaching insight.
-  - Model selection: **heuristic default + cross-validation on demand**.
-- Genomic prediction via **rrBLUP two-step** (fast/reliable) → **BLUPF90** for
-  scale; tomato variant library used for demo insights and showcase predictions.
+  ingested — 437,214 SNPs × 4,928 genotypes (~501 MB compressed); 1,153/1,198 MET
+  genotypes genotyped.
+- ✅ **Relationship matrices + GEBVs:** `grm.ts` decodes packed CallSets → dosage
+  matrix (+ fixed-width SNP export); `genomic-core.R` builds VanRaden **G** (scaled
+  to mean-diag 1), pedigree **A**, and single-step **H** is blended (Legarra) so
+  **all phenotyped lines are ranked, incl. the un-genotyped via the pedigree link**.
+- ✅ **Two engines, cross-validated:** **rrBLUP** is the fast CV / default engine;
+  **native BLUPF90 / preGSf90 GBLUP** is the scale engine. Cross-engine concordance
+  committed (GEBV r≈0.97 rrBLUP vs BLUPF90; `docs/validation/cross-engine-concordance.md`).
+- ✅ **Validation:** 5-fold × 2-rep CV predictive ability per model (identity / A /
+  G) + LR bias/dispersion + GRM sanity + structure recovery; G > A > identity on
+  every trait, committed report (`docs/validation/genomic-prediction.md`).
+- ✅ **Genomic UI:** GRM canvas heatmap, PCA / population structure, deployment
+  diagnostics (reliability / QC / distribution), the field-BLUP-vs-genomic-GEBV
+  teaching divergence, and the **Model Studio** relationship + engine selector
+  (ADR-0018) — the planner recommends, the breeder overrides + re-runs.
+- **Next (genomic):** a `relationship_set` cache table (keep big GRMs out of the
+  JSONB bundle); `sample.germplasm_id` mapping; native BLUPF90 ssGBLUP (H) at
+  scale; forward-year predictive validation (train year N, predict N+1).
 - AI-assisted **cross/parent planner**: given data + goals, recommend crosses
   (optimize genetic gain vs. inbreeding/diversity).
 
