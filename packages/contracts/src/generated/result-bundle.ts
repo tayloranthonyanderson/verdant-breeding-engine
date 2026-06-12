@@ -160,6 +160,52 @@ export interface ResultBundle {
     [k: string]: unknown;
   } | null;
   /**
+   * Genomic/pedigree prediction view (M6): relationship-model cross-validation comparison (identity/A/G predictive ability), population-structure PCA, per-genotype GEBVs + reliability, the clustered covariance (GRM) heatmap, and the relationship distribution. Null when no markers/pedigree. The full GRM is NOT inlined (cache table, ADR-0017); this carries viz-ready derived data.
+   */
+  genomic?: {
+    cohort_n?: number | null;
+    n_markers?: number | null;
+    /**
+     * G structural checks: scaled/raw diagonal mean, off-diagonal spread, PD/rank.
+     */
+    sanity?: {
+      [k: string]: unknown;
+    } | null;
+    /**
+     * Per trait × model {identity,pedigree_A,genomic_G}: cross-validated predictive_ability + dispersion.
+     */
+    model_comparison?:
+      | {
+          [k: string]: unknown;
+        }[]
+      | null;
+    /**
+     * Per trait: genomic breeding values + per-genotype reliability (1−PEV/Vg) + Vg/Ve.
+     */
+    gebv?: {
+      [k: string]: unknown;
+    } | null;
+    /**
+     * Population structure: variance explained + per-genotype PC coordinates (family-colored).
+     */
+    pca?: {
+      [k: string]: unknown;
+    } | null;
+    /**
+     * Clustered, down-sampled genotype×genotype relationship block for the covariance heatmap.
+     */
+    heatmap?: {
+      [k: string]: unknown;
+    } | null;
+    /**
+     * Histograms of off-diagonal relatedness + diagonal (genomic inbreeding).
+     */
+    distribution?: {
+      [k: string]: unknown;
+    } | null;
+    [k: string]: unknown;
+  } | null;
+  /**
    * Deterministic structural diagnostics that gated the model choices (grid, replication, cross-environment connectivity, scale), plus what additional data would unlock richer models (ADR-0016). Surfaced to the breeder as the 'why this model / what would unlock more' panel.
    */
   data_readiness?: {

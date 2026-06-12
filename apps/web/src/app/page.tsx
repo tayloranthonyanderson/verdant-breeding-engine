@@ -5,6 +5,7 @@ import ModelReadiness from "@/components/ModelReadiness";
 import HeritabilityCards from "@/components/HeritabilityCards";
 import GeneticCorrelations from "@/components/GeneticCorrelations";
 import SelectionWorkspace from "@/components/SelectionWorkspace";
+import GenomicWorkspace from "@/components/GenomicWorkspace";
 
 // Always read the freshest persisted result from Postgres.
 export const dynamic = "force-dynamic";
@@ -49,6 +50,8 @@ export default async function Home() {
             <GeneticCorrelations bundle={result.bundle} />
 
             <SelectionWorkspace bundle={result.bundle} />
+
+            <GenomicWorkspace bundle={result.bundle} />
           </div>
         )}
       </main>
