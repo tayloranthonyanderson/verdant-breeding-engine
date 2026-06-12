@@ -14,30 +14,17 @@ suppressWarnings(suppressPackageStartupMessages({
 }))
 
 readJSON <- function(path) jsonlite::fromJSON(paste(readLines(path, warn = FALSE), collapse = "\n"))
+.self <- { a <- commandArgs(FALSE); f <- sub("^--file=", "", a[grep("^--file=", a)]); if (length(f)) dirname(normalizePath(f)) else "." }
+source(file.path(.self, "genomic-core.R"))   # read_dosage / build_G / build_A
 cfg <- readJSON(commandArgs(trailingOnly = TRUE)[1])
 meta <- readJSON(cfg$meta)
 n <- meta$nSamples; m <- meta$nMarkers
 
-## dosage matrix (sample-major Uint8; 255 = missing → NA)
-con <- file(cfg$bin, "rb")
-raw <- readBin(con, what = "integer", n = n * m, size = 1, signed = FALSE)
-close(con)
-M <- matrix(raw, nrow = n, ncol = m, byrow = TRUE)
-M[M == meta$missing] <- NA_integer_
-storage.mode(M) <- "double"
-
-## VanRaden G: p = allele freq; Z = centered dosages (missing → column mean); G = ZZ' / 2Σp(1-p)
-p <- colMeans(M, na.rm = TRUE) / 2
-for (j in which(colSums(is.na(M)) > 0)) M[is.na(M[, j]), j] <- 2 * p[j]
-Z <- sweep(M, 2, 2 * p)
-denom <- 2 * sum(p * (1 - p))
-G <- tcrossprod(Z) / denom
-## Scale to mean-diagonal 1 so the genotype variance component is interpretable as additive genetic
-## variance (and so G is on A's scale for ssGBLUP). Record the raw mean diagonal — for a hybrid
-## testcross panel it runs < 1 (excess heterozygosity / shared tester), a real structural signal.
-raw_diag_mean <- mean(diag(G))
-G <- G / raw_diag_mean
-rownames(G) <- colnames(G) <- meta$samples
+## genomic relationship matrix (shared core): VanRaden, scaled to mean-diagonal 1. The raw mean
+## diagonal (attr) runs < 1 for a hybrid testcross panel (excess heterozygosity / shared tester).
+M <- read_dosage(cfg$bin, n, m, meta$missing)
+G <- build_G(M, meta$samples)
+raw_diag_mean <- attr(G, "raw_diag_mean")
 
 ## sanity diagnostics
 ev <- eigen(G, symmetric = TRUE, only.values = TRUE)$values

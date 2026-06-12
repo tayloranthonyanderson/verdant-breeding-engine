@@ -11,29 +11,17 @@
 ##   config = { bin, meta, pedigree:{id,sire,dam}, pheno:{names, y}, genotyped:[names] }
 suppressWarnings(suppressPackageStartupMessages({ library(jsonlite); library(rrBLUP) }))
 readJSON <- function(p) jsonlite::fromJSON(paste(readLines(p, warn = FALSE), collapse = "\n"))
+.self <- { a <- commandArgs(FALSE); f <- sub("^--file=", "", a[grep("^--file=", a)]); if (length(f)) dirname(normalizePath(f)) else "." }
+source(file.path(.self, "genomic-core.R"))   # read_dosage / build_G / build_A
 cfg <- readJSON(commandArgs(trailingOnly = TRUE)[1]); meta <- readJSON(cfg$meta)
 
 gids <- meta$samples; ng <- length(gids); m <- meta$nMarkers      # genotyped
 allIds <- as.character(cfg$pheno$names)                            # all phenotyped hybrids
 ungen <- setdiff(allIds, gids)
 
-## G over genotyped (VanRaden, mean-diag 1)
-con <- file(cfg$bin, "rb"); raw <- readBin(con, "integer", ng * m, size = 1, signed = FALSE); close(con)
-M <- matrix(raw, ng, m, byrow = TRUE); M[M == meta$missing] <- NA_real_; storage.mode(M) <- "double"
-p <- colMeans(M, na.rm = TRUE) / 2
-for (j in which(colSums(is.na(M)) > 0)) M[is.na(M[, j]), j] <- 2 * p[j]
-Z <- sweep(M, 2, 2 * p); G <- tcrossprod(Z) / (2 * sum(p * (1 - p))); G <- G / mean(diag(G))
-rownames(G) <- colnames(G) <- gids
-
-## A over all phenotyped hybrids (+ founders), then subset
-ped <- cfg$pedigree; pid <- as.character(ped$id); np <- length(pid); pp <- setNames(seq_len(np), pid)
-sire <- ifelse(as.character(ped$sire) %in% pid, pp[as.character(ped$sire)], 0L)
-dam <- ifelse(as.character(ped$dam) %in% pid, pp[as.character(ped$dam)], 0L)
-Af <- matrix(0, np, np)
-for (i in seq_len(np)) { si <- sire[i]; di <- dam[i]
-  if (i > 1) { pr <- seq_len(i - 1); ai <- 0.5 * ((if (si > 0) Af[si, pr] else 0) + (if (di > 0) Af[di, pr] else 0)); Af[i, pr] <- ai; Af[pr, i] <- ai }
-  Af[i, i] <- 1 + if (si > 0 && di > 0) 0.5 * Af[si, di] else 0 }
-rownames(Af) <- colnames(Af) <- pid
+## G over genotyped + full pedigree A (shared core)
+G <- build_G(read_dosage(cfg$bin, ng, m, meta$missing), gids)
+Af <- build_A(cfg$pedigree$id, cfg$pedigree$sire, cfg$pedigree$dam)
 
 ord <- c(gids, ungen)                                # genotyped block first
 A <- Af[ord, ord]

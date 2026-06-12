@@ -12,6 +12,8 @@
 ##   config = { bin, meta, pedigree:{id,sire,dam}, pheno:{names, traits:{TRAIT:[...]}}, folds, reps }
 suppressWarnings(suppressPackageStartupMessages({ library(jsonlite); library(rrBLUP) }))
 readJSON <- function(p) jsonlite::fromJSON(paste(readLines(p, warn = FALSE), collapse = "\n"))
+.self <- { a <- commandArgs(FALSE); f <- sub("^--file=", "", a[grep("^--file=", a)]); if (length(f)) dirname(normalizePath(f)) else "." }
+source(file.path(.self, "genomic-core.R"))   # read_dosage / build_G / build_A
 
 cfg <- readJSON(commandArgs(trailingOnly = TRUE)[1])
 meta <- readJSON(cfg$meta)
@@ -19,32 +21,9 @@ ids <- meta$samples; n <- length(ids); m <- meta$nMarkers
 K_FOLDS <- if (!is.null(cfg$folds)) cfg$folds else 5L
 REPS <- if (!is.null(cfg$reps)) cfg$reps else 2L
 
-## ---- G (genomic, VanRaden scaled to mean-diag 1) ----------------------------------------------
-con <- file(cfg$bin, "rb"); raw <- readBin(con, "integer", n * m, size = 1, signed = FALSE); close(con)
-M <- matrix(raw, n, m, byrow = TRUE); M[M == meta$missing] <- NA_real_; storage.mode(M) <- "double"
-p <- colMeans(M, na.rm = TRUE) / 2
-for (j in which(colSums(is.na(M)) > 0)) M[is.na(M[, j]), j] <- 2 * p[j]
-Z <- sweep(M, 2, 2 * p); G <- tcrossprod(Z) / (2 * sum(p * (1 - p)))
-G <- G / mean(diag(G)); rownames(G) <- colnames(G) <- ids
-G <- G + diag(1e-4, n) # tiny ridge → invertible / stable kin.blup
-
-## ---- A (pedigree numerator relationship; founders first, vectorized recursion) ----------------
-ped <- cfg$pedigree
-pid <- as.character(ped$id); np <- length(pid); ppos <- setNames(seq_len(np), pid)
-sire <- ifelse(as.character(ped$sire) %in% pid, ppos[as.character(ped$sire)], 0L)
-dam <- ifelse(as.character(ped$dam) %in% pid, ppos[as.character(ped$dam)], 0L)
-Afull <- matrix(0, np, np)
-for (i in seq_len(np)) {
-  si <- sire[i]; di <- dam[i]
-  if (i > 1) {
-    prev <- seq_len(i - 1)
-    ai <- 0.5 * ((if (si > 0) Afull[si, prev] else 0) + (if (di > 0) Afull[di, prev] else 0))
-    Afull[i, prev] <- ai; Afull[prev, i] <- ai
-  }
-  Afull[i, i] <- 1 + if (si > 0 && di > 0) 0.5 * Afull[si, di] else 0
-}
-rownames(Afull) <- colnames(Afull) <- pid
-A <- Afull[ids, ids] + diag(1e-4, n) # subset to cohort + ridge
+## ---- relationship matrices (shared core), with a tiny ridge for stable kin.blup ---------------
+G <- build_G(read_dosage(cfg$bin, n, m, meta$missing), ids) + diag(1e-4, n)
+A <- build_A(cfg$pedigree$id, cfg$pedigree$sire, cfg$pedigree$dam, subset = ids) + diag(1e-4, n)
 I <- diag(1, n); rownames(I) <- colnames(I) <- ids
 
 models <- list(identity = I, pedigree_A = A, genomic_G = G)

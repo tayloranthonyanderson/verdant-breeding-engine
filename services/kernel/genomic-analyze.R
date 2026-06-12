@@ -11,6 +11,8 @@
 ##             folds, reps, heatmap_n }
 suppressWarnings(suppressPackageStartupMessages({ library(jsonlite); library(rrBLUP) }))
 readJSON <- function(p) jsonlite::fromJSON(paste(readLines(p, warn = FALSE), collapse = "\n"))
+.self <- { a <- commandArgs(FALSE); f <- sub("^--file=", "", a[grep("^--file=", a)]); if (length(f)) dirname(normalizePath(f)) else "." }
+source(file.path(.self, "genomic-core.R"))   # read_dosage / build_G / build_A
 
 cfg <- readJSON(commandArgs(trailingOnly = TRUE)[1])
 meta <- readJSON(cfg$meta)
@@ -19,30 +21,11 @@ K_FOLDS <- if (!is.null(cfg$folds)) cfg$folds else 5L
 REPS <- if (!is.null(cfg$reps)) cfg$reps else 2L
 HEAT_N <- if (!is.null(cfg$heatmap_n)) cfg$heatmap_n else 100L
 
-## ---- G (VanRaden, mean-diag 1) ----------------------------------------------------------------
-con <- file(cfg$bin, "rb"); raw <- readBin(con, "integer", n * m, size = 1, signed = FALSE); close(con)
-M <- matrix(raw, n, m, byrow = TRUE); M[M == meta$missing] <- NA_real_; storage.mode(M) <- "double"
-p <- colMeans(M, na.rm = TRUE) / 2
-for (j in which(colSums(is.na(M)) > 0)) M[is.na(M[, j]), j] <- 2 * p[j]
-Z <- sweep(M, 2, 2 * p); G <- tcrossprod(Z) / (2 * sum(p * (1 - p)))
-raw_diag_mean <- mean(diag(G)); G <- G / raw_diag_mean
-rownames(G) <- colnames(G) <- ids
+## ---- relationship matrices (shared core) ------------------------------------------------------
+M <- read_dosage(cfg$bin, n, m, meta$missing)
+G <- build_G(M, ids); raw_diag_mean <- attr(G, "raw_diag_mean")
 Gr <- G + diag(1e-4, n)
-
-## ---- A (pedigree) -----------------------------------------------------------------------------
-ped <- cfg$pedigree; pid <- as.character(ped$id); np <- length(pid); ppos <- setNames(seq_len(np), pid)
-sire <- ifelse(as.character(ped$sire) %in% pid, ppos[as.character(ped$sire)], 0L)
-dam <- ifelse(as.character(ped$dam) %in% pid, ppos[as.character(ped$dam)], 0L)
-Af <- matrix(0, np, np)
-for (i in seq_len(np)) {
-  si <- sire[i]; di <- dam[i]
-  if (i > 1) { pr <- seq_len(i - 1)
-    ai <- 0.5 * ((if (si > 0) Af[si, pr] else 0) + (if (di > 0) Af[di, pr] else 0))
-    Af[i, pr] <- ai; Af[pr, i] <- ai }
-  Af[i, i] <- 1 + if (si > 0 && di > 0) 0.5 * Af[si, di] else 0
-}
-rownames(Af) <- colnames(Af) <- pid
-A <- Af[ids, ids] + diag(1e-4, n)
+A <- build_A(cfg$pedigree$id, cfg$pedigree$sire, cfg$pedigree$dam, subset = ids) + diag(1e-4, n)
 I <- diag(1, n); rownames(I) <- colnames(I) <- ids
 models <- list(identity = I, pedigree_A = A, genomic_G = Gr)
 
