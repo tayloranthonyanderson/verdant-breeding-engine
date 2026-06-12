@@ -4,6 +4,7 @@ import InsightBanner from "@/components/InsightBanner";
 import HeritabilityCards from "@/components/HeritabilityCards";
 import GeneticCorrelations from "@/components/GeneticCorrelations";
 import IndexExplorer from "@/components/IndexExplorer";
+import IndexDivergence from "@/components/IndexDivergence";
 
 // Always read the freshest persisted result from Postgres.
 export const dynamic = "force-dynamic";
@@ -46,6 +47,8 @@ export default async function Home() {
             <GeneticCorrelations bundle={result.bundle} />
 
             <IndexExplorer bundle={result.bundle} />
+
+            <IndexDivergence bundle={result.bundle} />
           </div>
         )}
       </main>

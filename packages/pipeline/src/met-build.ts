@@ -7,6 +7,7 @@
 // The transparent index is computed inline here as the seed (the client recomputes it live, and the
 // rigorous Smith–Hazel index is added later in R). Engine-agnostic apart from the column mapping.
 import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { db, program, study, analysisRun, resultBundle } from '@verdant/db';
@@ -71,6 +72,28 @@ function transparentIndex(genoBlups: Map<string, Array<number | null>>) {
   };
 }
 
+/** Genetically-aware desired-gains index + divergence, computed in R (science layer). Default gains
+ *  (genetic-sd units): yield +1, moisture −1, height neutral. */
+function geneticIndex(
+  G: number[][],
+  germplasmIds: string[],
+  blups: Array<Array<number | null>>,
+  transparentRanking: Array<{ germplasm_id: string; rank: number }>,
+) {
+  const input = {
+    variable_ids: TRAITS,
+    genetic_covariance: G,
+    germplasm_ids: germplasmIds,
+    blups,
+    desired_gains: [0, 1, -1], // [Plant_Height_cm, Yield_Mg_ha, Grain_Moisture] in genetic-sd units
+    transparent_ranking: transparentRanking.map((r) => ({ germplasm_id: r.germplasm_id, rank: r.rank })),
+  };
+  const script = resolve(import.meta.dirname, '../../../services/kernel/select-index.R');
+  const proc = spawnSync('Rscript', [script], { input: JSON.stringify(input), encoding: 'utf8', maxBuffer: 1 << 28 });
+  if (proc.status !== 0) throw new Error(`select-index.R failed:\n${proc.stderr}`);
+  return JSON.parse(proc.stdout) as { index: NonNullable<ResultBundle['indices']>[number]; divergence: ResultBundle['divergence'] };
+}
+
 async function main() {
   const rows = parseFixture();
   console.log(`parsed ${rows.length} plot rows, ${new Set(rows.map((r) => r.genotype)).size} genotypes, ${new Set(rows.map((r) => r.environment)).size} environments`);
@@ -81,6 +104,11 @@ async function main() {
 
   const genoBlups = new Map(g.blups.map((b) => [b.genotype, b.values]));
   const Ve = g.residualCovariance.map((r, i) => r[i]);
+
+  // Transparent index (seed) + genetically-aware desired-gains index + their divergence.
+  const transIdx = transparentIndex(genoBlups);
+  const gi = geneticIndex(g.geneticCovariance, g.blups.map((b) => b.genotype), g.blups.map((b) => b.values), transIdx.ranking);
+  console.log(`desired-gains index built; divergence rank-correlation vs transparent = ${gi.divergence?.rank_correlation}`);
 
   const traits: ResultBundle['traits'] = TRAITS.map((id, j) => ({
     variable_id: id,
@@ -111,7 +139,8 @@ async function main() {
     },
     traits,
     genetic_correlations: { variable_ids: TRAITS, matrix: g.geneticCorrelation },
-    indices: [transparentIndex(genoBlups)],
+    indices: [transIdx, gi.index],
+    divergence: gi.divergence,
     warnings: [{ code: 'met_simple_model', message: 'Genotype main-effect MET model (no GxE or spatial term yet); genetic correlations are preliminary.', severity: 'info' }],
     provenance: { contract_version: 'v0', engine_versions: { blupf90: 'blupf90+' } },
   };
