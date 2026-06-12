@@ -59,6 +59,7 @@ export default function InsightBanner({ bundle }: { bundle: ResultBundle }) {
 function engineFn(engine: string): string {
   if (engine === "SpATS") return "SpATS::SpATS()  —  2D P-spline spatial mixed model";
   if (engine === "lme4") return "lme4::lmer()  —  REML mixed model";
+  if (engine === "blupf90+") return "blupf90+ (AIREMLF90)  —  multi-trait AI-REML variance components";
   return engine;
 }
 

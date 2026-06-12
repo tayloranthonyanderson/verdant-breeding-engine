@@ -30,6 +30,8 @@ export interface GeneticCovarianceResult {
   residualCovariance: number[][];
   residualCorrelation: number[][];
   geneticVariances: number[];
+  /** Per-genotype multi-trait BLUPs (genotype random-effect solutions), one entry per genotype. */
+  blups: Array<{ genotype: string; values: Array<number | null> }>;
   converged: boolean;
   rounds: number | null;
   engine: string;
@@ -107,6 +109,7 @@ export function estimateGeneticCovariance(input: GeneticCovarianceInput): Geneti
     const G = parseMatrix(log, /Genetic variance\(s\)[^\n]*\n/, n);
     const R = parseMatrix(log, /Residual variance\(s\)[^\n]*\n/, n);
     const rounds = lastRound(log);
+    const blups = parseGenotypeBlups(dir, n);
     return {
       variableIds,
       geneticCovariance: G,
@@ -114,6 +117,7 @@ export function estimateGeneticCovariance(input: GeneticCovarianceInput): Geneti
       residualCovariance: R,
       residualCorrelation: cov2cor(R),
       geneticVariances: G.map((row, i) => row[i]),
+      blups,
       converged: /convergence=\s*[\d.]+E?-(0[6-9]|1[0-9])/.test(log) || rounds != null,
       rounds,
       engine: 'blupf90+',
@@ -175,6 +179,40 @@ function parseMatrix(log: string, header: RegExp, n: number): number[][] {
   const M: number[][] = [];
   for (let i = 0; i < n; i++) M.push(nums.slice(i * n, i * n + n));
   return M;
+}
+
+/** Per-genotype multi-trait BLUPs from the genotype random effect (effect #2): map renumbered
+ *  levels back to original ids via renf90.tables, then read effect-2 solutions per trait. */
+function parseGenotypeBlups(
+  dir: string,
+  nTraits: number,
+): Array<{ genotype: string; values: Array<number | null> }> {
+  const level2name = new Map<number, string>();
+  let inEff2 = false;
+  for (const line of safeRead(join(dir, 'renf90.tables')).split('\n')) {
+    if (/Effect group/.test(line)) {
+      inEff2 = /effect #\s*2\b/.test(line);
+      continue;
+    }
+    if (!inEff2 || /consecutive number/.test(line)) continue;
+    const toks = line.trim().split(/\s+/).filter(Boolean);
+    if (toks.length < 3) continue;
+    const level = Number(toks[toks.length - 1]);
+    const name = toks.slice(0, toks.length - 2).join(' '); // id may contain '/', not spaces
+    if (Number.isFinite(level) && name) level2name.set(level, name);
+  }
+  const byGeno = new Map<string, Array<number | null>>();
+  for (const line of safeRead(join(dir, 'solutions')).split('\n')) {
+    const t = line.trim().split(/\s+/);
+    if (t.length < 4) continue;
+    const trait = Number(t[0]), effect = Number(t[1]), level = Number(t[2]), sol = Number(t[3]);
+    if (effect !== 2 || !Number.isFinite(sol) || !(trait >= 1 && trait <= nTraits)) continue;
+    const name = level2name.get(level);
+    if (!name) continue;
+    if (!byGeno.has(name)) byGeno.set(name, Array(nTraits).fill(null));
+    byGeno.get(name)![trait - 1] = sol;
+  }
+  return [...byGeno].map(([genotype, values]) => ({ genotype, values }));
 }
 
 function cov2cor(M: number[][]): number[][] {

@@ -30,3 +30,8 @@ console.log(`\nconverged: ${res.converged} (rounds: ${res.rounds}), engine: ${re
 console.log('\ngenetic correlation:\n' + fmt(res.geneticCorrelation));
 console.log('\ngenetic variances: ' + res.geneticVariances.map((x) => x.toFixed(3)).join(', '));
 console.log('\nresidual correlation:\n' + fmt(res.residualCorrelation));
+console.log(`\ngenotype BLUPs extracted: ${res.blups.length}`);
+console.log('sample (first 3):');
+for (const b of res.blups.slice(0, 3)) {
+  console.log(`  ${b.genotype.padEnd(24)} ${b.values.map((v) => (v == null ? '  —' : v.toFixed(3).padStart(8))).join('')}`);
+}

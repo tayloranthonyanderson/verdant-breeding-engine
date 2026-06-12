@@ -2,6 +2,7 @@ import { Leaf, FlaskConical, Sprout } from "lucide-react";
 import { getLatestResult } from "@/lib/data";
 import InsightBanner from "@/components/InsightBanner";
 import HeritabilityCards from "@/components/HeritabilityCards";
+import GeneticCorrelations from "@/components/GeneticCorrelations";
 import IndexExplorer from "@/components/IndexExplorer";
 
 // Always read the freshest persisted result from Postgres.
@@ -41,6 +42,8 @@ export default async function Home() {
               <h3 className="mb-2 text-sm font-semibold text-slate-700">Heritability</h3>
               <HeritabilityCards bundle={result.bundle} />
             </section>
+
+            <GeneticCorrelations bundle={result.bundle} />
 
             <IndexExplorer bundle={result.bundle} />
           </div>
