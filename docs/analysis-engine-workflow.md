@@ -61,7 +61,9 @@ trial_meta
 
 ## Tech for the slice
 - **R + Shiny** (you can read/extend all of it).
-- Modeling: `sommer::mmer` or `lme4::lmer` (+ `statgenSTA`/`statgenGxE` for METs).
+- Modeling: `lme4::lmer` / `SpATS` (trial-scale) or **BLUPF90/AIREMLF90** (multi-trait
+  variance components & genomic scale) (+ `statgenSTA`/`statgenGxE` for METs). sommer
+  avoided — memory/scale.
 - Data wrangling: `tidyverse`. Tables/plots: `gt` / `ggplot2`.
 - No database, no accounts, no cloud yet — a local app you run on real data.
 

@@ -155,7 +155,7 @@ AI-forward, transparent, and easy — never raw OR tooling. Deep, specialized; e
 |---|---|---|
 | Single-trial BLUP/BLUE | `lme4` | 0 |
 | Spatial (row–col, AR1×AR1, splines) | `SpATS`, `statgenSTA` | 0→1 |
-| MET + GxE; genetic correlations | `sommer` / `statgenGxE` | 1 |
+| MET + GxE; genetic correlations | **BLUPF90** (AIREMLF90, multi-trait REML) / `statgenGxE` | 1 |
 | Heritability — standard & **Cullis** | variance components / PEV | 1 |
 | Stability — Finlay–Wilkinson, AMMI, GGE | `statgenGxE` / `metan` | 1 |
 | Selection index — weighted + **Smith–Hazel** / desired-gains | engine | 0→1 |
@@ -164,7 +164,7 @@ AI-forward, transparent, and easy — never raw OR tooling. Deep, specialized; e
 | Pedigree A-matrix; realized gain | `AGHmatrix` / `nadiv` | 5 |
 | Cross planning — usefulness, optimal contribution | `optiSel` / custom | 5 |
 | Genomic prediction — GBLUP, Bayesian; CV accuracy | `rrBLUP`, `BGLR` | 6 |
-| Single-step (H-matrix); scale solvers | `AGHmatrix` + `sommer`; **BLUPF90/GCTA** | 6 |
+| Single-step (H-matrix); scale solvers | `AGHmatrix` + **BLUPF90** (ssGBLUP) / GCTA | 6 |
 | Image phenotyping | Python service | 7 |
 
 ---

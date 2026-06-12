@@ -15,8 +15,10 @@ deliberately deferred until the slice above it is real and validated.
 - Heritability / repeatability, genetic correlations, GxE & stability metrics.
 - Interactive **selection index** with user-set trait weights and directions.
 - Data validation: balance, missingness, outliers, factor-level sanity.
-- R engine: `sommer` / `lme4` / `statgenSTA` / `statgenGxE` (avoid ASReml — that's
-  what we're replacing).
+- Engines: `lme4` / `SpATS` / `statgenSTA` / `statgenGxE` for trial-scale fits;
+  **BLUPF90** (AIREMLF90 multi-trait REML; ssGBLUP) for multi-trait variance
+  components & genomic scale. Avoid sommer (memory/scale), ASReml (cost/support),
+  INLA (memory).
 
 ## Phase 2 — Natural-language Q&A
 - Ask questions over the analyzed results ("which lines were most stable across
