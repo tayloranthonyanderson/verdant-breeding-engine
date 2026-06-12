@@ -14,6 +14,7 @@ export interface DosageExport {
   nSamples: number;
   nMarkers: number;
   matched: string[]; // cohort names that had a CallSet
+  snpPath?: string; // BLUPF90 SNP text file (id + 0/1/2/5 string), when requested
 }
 
 /** Evenly thin a sorted index list to at most `max` entries (keeps genome-wide spread). */
@@ -30,7 +31,7 @@ export async function exportCohortDosages(
   cohortNames: string[],
   binPath: string,
   metaPath: string,
-  opts: { setName?: string; mafMin?: number; maxMarkers?: number } = {},
+  opts: { setName?: string; mafMin?: number; maxMarkers?: number; snpPath?: string } = {},
 ): Promise<DosageExport> {
   const mafMin = opts.mafMin ?? 0.05;
   const maxMarkers = opts.maxMarkers ?? 50000;
@@ -51,8 +52,13 @@ export async function exportCohortDosages(
   const sel = markers.map((m) => m.idx); // selected byte offsets into the packed dosage vector
   const nMarkers = sel.length;
 
-  // Cohort CallSets, decoded at the selected offsets, streamed to the binary (sample-major).
+  // Cohort CallSets, decoded at the selected offsets, streamed to the binary (sample-major). When
+  // snpPath is set, also write a BLUPF90 SNP text file (id + 0/1/2 string, missing→5) for preGSf90.
   const fd = openSync(binPath, 'w');
+  const snpFd = opts.snpPath ? openSync(opts.snpPath, 'w') : null;
+  // preGSf90 needs a FIXED-WIDTH SNP file: the genotype string must start at the same column on every
+  // line, so pad each id to a constant width (max over the cohort) before the genotype string.
+  const idWidth = snpFd !== null ? Math.max(1, ...cohortNames.map((s) => s.length)) : 0;
   const matched: string[] = [];
   const BATCH = 100;
   for (let i = 0; i < cohortNames.length; i += BATCH) {
@@ -70,10 +76,16 @@ export async function exportCohortDosages(
       const out = Buffer.allocUnsafe(nMarkers);
       for (let j = 0; j < nMarkers; j++) out[j] = buf[sel[j]];
       writeSync(fd, out);
+      if (snpFd !== null) {
+        let s = name.padEnd(idWidth) + ' ';
+        for (let j = 0; j < nMarkers; j++) s += out[j] === MISSING ? '5' : String(out[j]);
+        writeSync(snpFd, s + '\n');
+      }
       matched.push(name);
     }
   }
   closeSync(fd);
+  if (snpFd !== null) closeSync(snpFd);
 
   writeFileSync(
     metaPath,
@@ -90,5 +102,5 @@ export async function exportCohortDosages(
     }),
   );
 
-  return { binPath, metaPath, nSamples: matched.length, nMarkers, matched };
+  return { binPath, metaPath, nSamples: matched.length, nMarkers, matched, snpPath: opts.snpPath };
 }

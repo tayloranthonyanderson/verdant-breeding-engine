@@ -13,23 +13,35 @@ recursion, and packed-dosage IO were copy-pasted across `relationship.R`, `genom
 extraction (G predictive ability 0.701/0.736/0.326/0.422), so the science is unchanged — the gating
 is just concentrated in one testable place now.
 
+## Refined (done) — the genomic-driver sweep (2026-06-12)
+
+Candidates 1–3 below were the same friction from three angles; landed as one sweep on
+`feat/genomic-prediction`. All driver paths re-verified end-to-end with **exact** numeric reproduction
+(G sanity h²=0.2026; CV G=0.701/0.736/0.326/0.422, A=0.644/0.654/0.191/0.319, identity=0; ssGBLUP
+H=0.0765 vs A=0.043), and both kernel transports (stdin + cfg-file) exercised. Package + workspace
+typecheck clean.
+
+- **`runRKernel()` — kernel-invocation seam (`kernel.ts`) · was Strong.** The `spawnSync('Rscript', …)`
+  → status-check → `JSON.parse` idiom (8 sites, two drifting conventions) now lives behind one runner
+  with a `transport: 'stdin' | 'cfg-file'` option; callers name the kernel + payload. The move to a
+  durable job queue (ADR-0001) is now a one-module change. Rewired: `pipeline.ts`, `stage1.ts`,
+  `planner.ts`, `met-build.ts`, and the four genomic drivers.
+- **`buildGenomicInputs()` — genotype-cohort intake module (`genomic-inputs.ts`) · was Strong.** The
+  four genomic drivers no longer re-parse `MET_2019.csv` or assemble the pedigree by hand; they ask the
+  module for the cohort view (means / genotyped subset / founders-first pedigree). G2F column names are
+  confined to a new `parseG2fHybrids()` in the `g2f.ts` adapter (same discipline as `parseG2fMet()`).
+- **Driver-scripts-as-library (`entry.ts`) · was Worth exploring.** Each genomic driver now exports its
+  core flow (`checkRelationship` / `crossValidateRelationships` / `runSsGblup` / `buildGenomicBlock`)
+  and guards the CLI shell with `isEntrypoint(import.meta.url)` — the "does relationship info add value"
+  CV flow is importable for the eventual UI/queue trigger without firing the subprocess + DB side
+  effects.
+
 ## Recommended next (from the review, prioritized)
 
-1. **`buildGenomicInputs()` — genomic-inputs TS module · Strong.** `genomic-build.ts`,
-   `genomic-validate-run.ts`, `ssgblup-run.ts`, and `genomic-check.ts` each re-parse `MET_2019.csv`,
-   rebuild the per-hybrid-means map, and assemble the founders-first pedigree — bypassing the clean
-   `parseG2fMet()` seam. A module exposing the cohort / per-hybrid-means / pedigree view removes the
-   duplication (a missing seam, not just repetition).
-2. **`runRKernel()` — R-kernel runner seam · Strong.** The `spawnSync('Rscript', …, maxBuffer)` →
-   status-check → `JSON.parse` idiom is hand-written in ~7 places (two drifting conventions: stdin vs
-   cfg-file). One runner makes the eventual durable-job-queue move (ADR-0001) a one-module change.
-3. **Driver-scripts-as-library · Worth exploring.** Load-bearing genomic logic lives inside
-   `console.log`/`process.exit` `main()`s across five sibling scripts; only `genomic-build.ts` is a
-   production path. The "does relationship info add value" CV flow should be importable.
-4. **`blupf90.ts` param-builder · Worth exploring (preventative).** The repo's deepest module — before
+1. **`blupf90.ts` param-builder · Worth exploring (preventative).** The repo's deepest module — before
    native A/G/H + ssGBLUP options land, factor an `Effect[]` model + `renderRenumPar` so it doesn't go
    shallow under per-feature branches.
-5. **`bundleStore` (load-latest / persist / augment) · Worth exploring.** `genomic-build.ts` and
+2. **`bundleStore` (load-latest / persist / augment) · Worth exploring.** `genomic-build.ts` and
    `met-build.ts` each open-code Drizzle read-modify-validate-write; one store owns validation-on-write.
-6. **Transparent index implemented 3× (met-build.ts / analyze.R / IndexExplorer.tsx) · Speculative.**
+3. **Transparent index implemented 3× (met-build.ts / analyze.R / IndexExplorer.tsx) · Speculative.**
    Three runtimes can't share code, but a single spec + golden fixture would catch silent ranking drift.

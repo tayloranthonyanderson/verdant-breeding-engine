@@ -1,53 +1,47 @@
-// Genomic foundation smoke + validation driver: build G for the MET cohort and run rrBLUP GBLUP.
-// Phenotype = per-hybrid mean yield from the MET (any consistent per-hybrid value works for the G
-// sanity + GBLUP slice). Run: corepack pnpm --filter @verdant/pipeline exec tsx src/genomic-check.ts
-import { readFileSync, writeFileSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
-import { resolve } from 'node:path';
-import { tmpdir } from 'node:os';
+// Genomic foundation smoke + validation: build G for the genotyped MET cohort and run rrBLUP GBLUP
+// on per-hybrid mean yield (any consistent per-hybrid value works for the G sanity + GBLUP slice).
+// The cohort view comes from buildGenomicInputs; checkRelationship() is importable, the CLI shell
+// prints. Run: corepack pnpm --filter @verdant/pipeline exec tsx src/genomic-check.ts
 import { join } from 'node:path';
-import { exportCohortDosages } from './grm';
+import { tmpdir } from 'node:os';
 import { db } from '@verdant/db';
+import { runRKernel } from './kernel';
+import { buildGenomicInputs } from './genomic-inputs';
+import { isEntrypoint } from './entry';
 
-async function main() {
-  // MET hybrids + per-hybrid mean yield (the phenotype for this single-trait slice)
-  const csv = resolve(import.meta.dirname, '../../../data/g2f/MET_2019.csv');
-  const lines = readFileSync(csv, 'utf8').trim().split('\n');
-  const h = lines[0].split(',');
-  const GENO = h.indexOf('Hybrid'), Y = h.indexOf('Yield_Mg_ha');
-  const sum = new Map<string, { s: number; n: number }>();
-  for (const l of lines.slice(1)) {
-    const f = l.split(',');
-    const v = f[Y] === 'NA' || f[Y] === '' ? null : Number(f[Y]);
-    if (v == null || !Number.isFinite(v)) continue;
-    const a = sum.get(f[GENO]) ?? { s: 0, n: 0 };
-    a.s += v; a.n += 1; sum.set(f[GENO], a);
-  }
-  const cohort = [...sum.keys()];
-  console.log(`MET cohort: ${cohort.length} hybrids with yield`);
+export interface RelationshipResult {
+  samples: string[];
+  sanity: Record<string, number | boolean>;
+  gblup?: {
+    Vg: number;
+    Ve: number;
+    h2_genomic: number;
+    n_trained: number;
+    gebv: Array<{ id: string; gebv: number }>;
+  };
+}
 
+/** Build G for the genotyped MET cohort and fit rrBLUP GBLUP on per-hybrid mean yield. */
+export async function checkRelationship(): Promise<RelationshipResult> {
   const bin = join(tmpdir(), 'verdant-dosage.bin');
   const meta = join(tmpdir(), 'verdant-dosage.meta.json');
   console.log('exporting dosages (MAF≥0.05, ≤50k markers) ...');
-  const exp = await exportCohortDosages(cohort, bin, meta, { mafMin: 0.05, maxMarkers: 50000 });
-  console.log(`genotyped: ${exp.nSamples}/${cohort.length} hybrids × ${exp.nMarkers} markers`);
-
-  const pheno = {
-    names: exp.matched,
-    y: exp.matched.map((n) => { const a = sum.get(n)!; return a.s / a.n; }),
-  };
-  const cfg = join(tmpdir(), 'verdant-rel.cfg.json');
-  writeFileSync(cfg, JSON.stringify({ bin, meta, pheno }));
+  const cohort = await buildGenomicInputs({
+    traits: ['Yield_Mg_ha'],
+    binPath: bin,
+    metaPath: meta,
+    requirePhenotyped: true,
+  });
+  console.log(`MET cohort: ${cohort.hybrids.length} hybrids with yield`);
+  console.log(`genotyped: ${cohort.matched.length}/${cohort.hybrids.length} hybrids × ${cohort.export.nMarkers} markers`);
 
   console.log('building G + rrBLUP GBLUP ...');
-  const script = resolve(import.meta.dirname, '../../../services/kernel/relationship.R');
-  const proc = spawnSync('Rscript', [script, cfg], { encoding: 'utf8', maxBuffer: 1 << 28 });
-  if (proc.status !== 0) throw new Error(`relationship.R failed:\n${proc.stderr}`);
-  const out = JSON.parse(proc.stdout) as {
-    sanity: Record<string, number | boolean>;
-    gblup?: { Vg: number; Ve: number; h2_genomic: number; n_trained: number; gebv: Array<{ id: string; gebv: number }> };
-  };
+  const pheno = { names: cohort.matched, y: cohort.phenoByTrait()['Yield_Mg_ha'] };
+  return runRKernel<RelationshipResult>('relationship.R', { bin, meta, pheno }, { transport: 'cfg-file' });
+}
 
+async function cli() {
+  const out = await checkRelationship();
   console.log('\n=== G sanity ===');
   for (const [k, v] of Object.entries(out.sanity)) console.log(`  ${k.padEnd(18)} ${v}`);
   if (out.gblup) {
@@ -59,4 +53,4 @@ async function main() {
   await db.$client.end();
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+if (isEntrypoint(import.meta.url)) cli().catch((e) => { console.error(e); process.exit(1); });

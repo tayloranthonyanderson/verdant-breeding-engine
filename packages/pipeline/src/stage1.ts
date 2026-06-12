@@ -2,8 +2,7 @@
 // Drives services/kernel/stage1-spatial.R, which fits a spatial model per environment × trait and
 // returns spatially-adjusted entry means (BLUEs) + weights. Crop-agnostic: consumes the generic plot
 // record (no dataset column names) and hands the adjusted means to the multi-trait BLUPF90 adapter.
-import { spawnSync } from 'node:child_process';
-import { resolve } from 'node:path';
+import { runRKernel } from './kernel';
 
 /** Generic plot record (ADR-0015) — what every ingestion adapter emits, no crop/dataset names. */
 export interface PlotRecord {
@@ -47,12 +46,5 @@ export function spatialStage1(variableIds: string[], records: PlotRecord[]): Sta
     rep: records.map((r) => r.rep),
     values: records.map((r) => r.values),
   };
-  const script = resolve(import.meta.dirname, '../../../services/kernel/stage1-spatial.R');
-  const proc = spawnSync('Rscript', [script], {
-    input: JSON.stringify(input),
-    encoding: 'utf8',
-    maxBuffer: 1 << 28,
-  });
-  if (proc.status !== 0) throw new Error(`stage1-spatial.R failed:\n${proc.stderr}`);
-  return JSON.parse(proc.stdout) as Stage1Result;
+  return runRKernel<Stage1Result>('stage1-spatial.R', input);
 }

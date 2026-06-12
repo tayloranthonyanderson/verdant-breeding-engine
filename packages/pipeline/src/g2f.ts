@@ -58,6 +58,48 @@ export function parseG2fMet(
   return { variableIds: traitColumns, records: out };
 }
 
+/** Per-hybrid trait sums/counts + parentage for the genomic cohort path. Like parseG2fMet, this
+ *  confines the G2F genotype/parent column names (Hybrid, Hybrid_Parent1/2) to this adapter — the
+ *  genomic-inputs module and the kernels see only generic ids, means, and pedigree. One record per
+ *  genotype, in first-appearance order; callers divide sum/n for means and assemble the pedigree. */
+export interface G2fHybrid {
+  genotype: string;
+  parent1: string;
+  parent2: string;
+  sum: number[]; // aligned to traitColumns
+  n: number[];
+}
+
+export function parseG2fHybrids(path: string, traitColumns: string[]): G2fHybrid[] {
+  const records = parse(readFileSync(path), { columns: true, skip_empty_lines: true }) as Record<
+    string,
+    string
+  >[];
+  if (records.length === 0) throw new Error(`No rows in ${path}`);
+  const byGeno = new Map<string, G2fHybrid>();
+  for (const r of records) {
+    let a = byGeno.get(r.Hybrid);
+    if (!a) {
+      a = {
+        genotype: r.Hybrid,
+        parent1: r.Hybrid_Parent1,
+        parent2: r.Hybrid_Parent2,
+        sum: traitColumns.map(() => 0),
+        n: traitColumns.map(() => 0),
+      };
+      byGeno.set(r.Hybrid, a);
+    }
+    traitColumns.forEach((c, t) => {
+      const v = toNum(r[c]);
+      if (v != null) {
+        a!.sum[t] += v;
+        a!.n[t] += 1;
+      }
+    });
+  }
+  return [...byGeno.values()];
+}
+
 export function parseG2fCsv(path: string, traits: TraitSpec[]): ParsedStudy {
   const records = parse(readFileSync(path), { columns: true, skip_empty_lines: true }) as Record<
     string,
