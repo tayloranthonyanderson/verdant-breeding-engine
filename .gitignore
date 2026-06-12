@@ -36,3 +36,6 @@ playwright-report/
 
 # Large public G2F raw downloads (extract small per-env fixtures instead)
 /data/g2f/raw/
+
+# TypeScript incremental build cache
+*.tsbuildinfo
