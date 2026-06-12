@@ -47,6 +47,56 @@ test('a request with an unknown intent is rejected', () => {
   );
 });
 
+test('a request with model_overrides validates and an unknown override value is rejected', () => {
+  const req = example('single-trial-request.example.json') as Record<string, unknown>;
+  // a well-formed override is accepted
+  const ok = validateAnalysisRequest({
+    ...req,
+    model_overrides: { relationship: 'G', gxe: 'include', spatial: null },
+  });
+  assert.equal(ok.model_overrides?.relationship, 'G');
+  // an out-of-enum override value is rejected
+  assert.throws(
+    () => validateAnalysisRequest({ ...req, model_overrides: { relationship: 'kinship' } }),
+    ContractValidationError,
+  );
+  // an unknown override factor is rejected (additionalProperties:false)
+  assert.throws(
+    () => validateAnalysisRequest({ ...req, model_overrides: { smoothing: 'on' } }),
+    ContractValidationError,
+  );
+});
+
+test('a bundle with overridden + refused decisions and an overridable map validates', () => {
+  const bundle = example('single-trial-bundle.example.json') as Record<string, unknown>;
+  const cm = (bundle.chosen_model as Record<string, unknown>);
+  const merged = {
+    ...bundle,
+    chosen_model: {
+      ...cm,
+      decisions: [
+        { factor: 'relationship', choice: 'identity', reason: 'Breeder kept identity.',
+          source: 'overridden', recommended: 'G', feasible: true,
+          evidence: { genomic_G: 0.42, pedigree_A: 0.31, identity: 0 } },
+        { factor: 'gxe', choice: 'skipped', reason: 'GxE override refused.',
+          source: 'overridden', recommended: 'skipped', feasible: false,
+          refused_reason: 'No within-environment replication; GxE cannot be separated.' },
+      ],
+      overridable: [
+        { factor: 'relationship', options: [
+          { value: 'identity', feasible: true, reason: null },
+          { value: 'G', feasible: true, reason: null },
+          { value: 'A', feasible: false, reason: 'No pedigree supplied.' },
+        ] },
+      ],
+    },
+  };
+  const out = validateResultBundle(merged);
+  assert.equal(out.chosen_model.decisions?.[0].source, 'overridden');
+  assert.equal(out.chosen_model.decisions?.[1].feasible, false);
+  assert.equal(out.chosen_model.overridable?.[0].options.length, 3);
+});
+
 test('a target-mode index weight requires a numeric target', () => {
   const req = example('single-trial-request.example.json') as Record<string, unknown>;
   const withMode = (iw: unknown) => ({ ...req, objective: { index_weights: iw } });

@@ -14,7 +14,7 @@ export interface AnalysisRequest {
    */
   analysis_request_id?: string;
   /**
-   * What the breeder is analyzing FOR. The kernel turns intent + data into a model choice: 'selection' -> genotype random -> BLUPs; 'comparison' -> genotype fixed -> BLUEs; 'prediction' -> uses the relationship structure (A/G/H) to predict un/under-tested material. The web tier MUST NOT send a formula or model form (ADR-0002).
+   * What the breeder is analyzing FOR. The kernel turns intent + data into a model choice: 'selection' -> genotype random -> BLUPs; 'comparison' -> genotype fixed -> BLUEs; 'prediction' -> uses the relationship structure (A/G/H) to predict un/under-tested material. The web tier MUST NOT send a formula. It MAY send `model_overrides` naming preferred values for decisions the planner makes; the planner validates each against data readiness and may refuse an infeasible one with a reason (ADR-0002 / ADR-0018).
    */
   intent: 'selection' | 'comparison' | 'prediction';
   /**
@@ -216,13 +216,38 @@ export interface AnalysisRequest {
    */
   relationship?: {
     /**
-     * identity = no kinship (MVP); A = pedigree-based; G = marker-based; H = single-step (pedigree+markers). A/G/H are MAPPED, not built — present so the seam anticipates M5–M6 without a contract break.
+     * identity = no kinship (MVP); A = pedigree-based; G = marker-based; H = single-step (pedigree+markers). A/G/H are MAPPED, not built — present so the seam anticipates M5–M6 without a contract break. Superseded by `model_overrides.relationship` when present (the authoritative override channel).
      */
     type: 'identity' | 'A' | 'G' | 'H';
     /**
      * For A/G/H: a reference the kernel resolves to the matrix or its inputs (pedigree set / marker set). Unused for 'identity'. Transport of large matrices is an OPEN operational detail (see README).
      */
     source_ref?: string | null;
+  };
+  /**
+   * Optional breeder overrides of the planner's RECOMMENDED model decisions (ADR-0002 evolved / ADR-0018). NOT a model spec: each field names a decision the planner already makes and the breeder's preferred value. R remains the authority — the planner validates each override against data readiness and MAY refuse an infeasible one, keeping its recommendation and recording the reason. Absent = accept every recommendation. `model_overrides.relationship` is the authoritative relationship channel (supersedes the top-level `relationship.type`).
+   */
+  model_overrides?: {
+    /**
+     * Force within-environment spatial de-trending on ('spats') or off ('none'). Refused if no environment has a usable row×col grid.
+     */
+    spatial?: 'spats' | 'none' | null;
+    /**
+     * Force a one-stage joint fit or a two-stage (Stage-1 de-trend → Stage-2 cross-env) fit. single_stage refused above the engine's equation budget.
+     */
+    staging?: 'single_stage' | 'two_stage' | null;
+    /**
+     * Force a genotype×environment term in ('include') or fold it into the residual ('skip'). include refused without cross-environment connectivity + within-cell replication, or in a two-stage genotype-main fit.
+     */
+    gxe?: 'include' | 'skip' | null;
+    /**
+     * Force the relationship structure. A needs a pedigree; G needs markers; H needs both. Refused when the required data is absent.
+     */
+    relationship?: 'identity' | 'A' | 'G' | 'H' | null;
+    /**
+     * Force the compute engine. Native BLUPF90 genomic (GBLUP/ssGBLUP) is Phase-2 and currently refused; genomic prediction runs on rrBLUP.
+     */
+    engine?: 'rrblup' | 'blupf90' | null;
   };
   /**
    * The selection objective derived from the target Segment's TPP and the (Segment × Stage) SelectionCriteria (DOMAIN-MODEL §2.4). Drives gating and the index(es). Optional: absent for pure comparison/prediction runs.

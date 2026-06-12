@@ -16,6 +16,9 @@ importers:
       '@verdant/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@verdant/pipeline':
+        specifier: workspace:*
+        version: link:../../packages/pipeline
       drizzle-orm:
         specifier: ^0.38.3
         version: 0.38.4(@types/pg@8.20.0)(@types/react@19.2.17)(pg@8.21.0)(react@19.2.4)

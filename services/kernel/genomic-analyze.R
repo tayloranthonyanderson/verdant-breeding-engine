@@ -53,7 +53,20 @@ for (tr in traits) {
   }
 }
 
-## ---- GEBVs + reliability on the FULL data (genomic model) -------------------------------------
+## ---- full-data breeding values per model (for the index re-point, ADR-0018) -------------------
+## Each relationship model produces its own GEBVs; the selection index uses whichever the breeder
+## adopts. Values align to `cohort` (= ids). identity = shrunken means (no borrowing).
+gebv_by_model <- list()
+for (mn in names(models)) {
+  Kc <- models[[mn]]; bytrait <- list()
+  for (tr in traits) {
+    fit <- rrBLUP::kin.blup(data.frame(id = ids, y = yByTrait[[tr]]), geno = "id", pheno = "y", K = Kc)
+    bytrait[[tr]] <- list(values = round(unname(fit$g[ids]), 5), Vg = round(fit$Vg, 5), Ve = round(fit$Ve, 5))
+  }
+  gebv_by_model[[mn]] <- bytrait
+}
+
+## ---- GEBVs + reliability on the FULL data (genomic model — the UI detail panel) ----------------
 ## reliability_i = 1 - PEV_i/(G_ii * Vg); PEV = diag( (Z'Z/Ve + Ginv/Vg)^-1 ), one record per genotype.
 Ginv <- solve(Gr)
 gebv <- list()
@@ -70,8 +83,9 @@ for (tr in traits) {
 e <- eigen(G, symmetric = TRUE)
 ve <- e$values / sum(abs(e$values))
 pcs <- e$vectors[, 1:3] %*% diag(sqrt(pmax(e$values[1:3], 0)))
-## family label = the non-tester parent prefix (for coloring): use sire of each hybrid
-sireName <- as.character(ped$sire)[match(ids, pid)]
+## family label = the non-tester parent (for coloring): the sire of each hybrid from the pedigree
+pid <- as.character(cfg$pedigree$id)
+sireName <- as.character(cfg$pedigree$sire)[match(ids, pid)]
 pca <- list(
   var_explained = round(ve[1:6], 4),
   coords = lapply(seq_len(n), function(i) list(id = ids[i], pc1 = round(pcs[i, 1], 3), pc2 = round(pcs[i, 2], 3), pc3 = round(pcs[i, 3], 3), family = sireName[i]))
@@ -94,5 +108,5 @@ cat(jsonlite::toJSON(list(
   sanity = list(raw_diag_mean = round(raw_diag_mean, 4), diag_mean = round(mean(dg), 3),
     offdiag_mean = round(mean(off), 4), offdiag_sd = round(sd(off), 4),
     min_eigenvalue = round(min(e$values), 6), is_pd = min(e$values) > -1e-6, rank = sum(e$values > 1e-8)),
-  model_comparison = comparison, gebv = gebv, pca = pca, heatmap = heatmap, distribution = distribution),
+  model_comparison = comparison, gebv = gebv, gebv_by_model = gebv_by_model, pca = pca, heatmap = heatmap, distribution = distribution),
   auto_unbox = TRUE, null = "null", na = "null", digits = NA))

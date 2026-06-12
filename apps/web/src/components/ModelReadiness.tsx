@@ -6,6 +6,7 @@ import {
   Layers,
   Network,
   Dna,
+  Share2,
   Cpu,
   Lightbulb,
   type LucideIcon,
@@ -110,6 +111,8 @@ function factorMeta(factor: ModelDecision["factor"]): { icon: LucideIcon; label:
       return { icon: Network, label: "GxE" };
     case "genotype_effect":
       return { icon: Dna, label: "Genotype" };
+    case "relationship":
+      return { icon: Share2, label: "Relationship" };
     case "engine":
       return { icon: Cpu, label: "Engine" };
     default:

@@ -1,11 +1,9 @@
 // The M0 tracer-bullet pipeline: ingest a parsed G2F study into the relational tables, assemble
 // a contract AnalysisRequest FROM the database, run the R kernel, and persist the ResultBundle.
 //
-// The kernel is invoked as an Rscript subprocess (ADR-0012). `runKernel` is the unit that the
-// JobQueue worker will call once the queue is wired — keeping it isolated means swapping
-// "direct call" for "queued job" is a localized change, not a rewrite.
-import { spawnSync } from 'node:child_process';
-import { resolve } from 'node:path';
+// The kernel is invoked as an Rscript subprocess (ADR-0012) through the runRKernel seam. `runKernel`
+// is the unit that the JobQueue worker will call once the queue is wired — keeping it (and runRKernel)
+// isolated means swapping "direct call" for "queued job" is a localized change, not a rewrite.
 import { eq } from 'drizzle-orm';
 import {
   db,
@@ -25,8 +23,13 @@ import {
   type ResultBundle,
 } from '@verdant/contracts';
 import type { ParsedStudy } from './g2f';
+import { runRKernel } from './kernel';
 
-const KERNEL = resolve(import.meta.dirname, '../../../services/kernel/analyze.R');
+// The override-aware MET analysis entrypoint (ADR-0018) + its types, re-exported so the web tier's
+// Server Action / job queue can drive a re-run without reaching into the driver module.
+export { runMetAnalysis, type RunMetOptions, type RunMetResult } from './met-build';
+export type { ModelOverrides, ModelDecision, OverridableFactor } from './planner';
+
 const PROGRAM_NAME = 'G2F (public dev data)';
 
 const chunk = <T>(xs: T[], n: number): T[][] => {
@@ -162,23 +165,9 @@ export async function buildRequestFromDb(
   return validateAnalysisRequest(request);
 }
 
-/** Run the R compute kernel on a request (Rscript subprocess). Validates the returned bundle. */
+/** Run the R compute kernel on a request (via the runRKernel seam). Validates the returned bundle. */
 export function runKernel(request: AnalysisRequest): ResultBundle {
-  const proc = spawnSync('Rscript', [KERNEL], {
-    input: JSON.stringify(request),
-    encoding: 'utf8',
-    maxBuffer: 1 << 28,
-  });
-  if (proc.status !== 0) {
-    throw new Error(`kernel failed (exit ${proc.status}):\n${proc.stderr}`);
-  }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(proc.stdout);
-  } catch {
-    throw new Error(`kernel did not return JSON:\n${proc.stdout.slice(0, 500)}\n${proc.stderr}`);
-  }
-  return validateResultBundle(parsed);
+  return validateResultBundle(runRKernel('analyze.R', request));
 }
 
 /** Persist the run + its result bundle (the bundle stored whole as JSONB, ADR-0001). */

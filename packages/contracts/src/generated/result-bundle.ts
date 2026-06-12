@@ -59,9 +59,13 @@ export interface ResultBundle {
      */
     staging_weighted?: boolean | null;
     /**
-     * The deterministic Model Planner's decision log: each scientific choice with its reason and the diagnostic that triggered it (ADR-0016). The trust/teaching surface — the AI narrates these, never makes them.
+     * The deterministic Model Planner's decision log: each scientific choice with its reason and the diagnostic that triggered it (ADR-0016). The trust/teaching surface — the AI narrates these, never makes them. Each may be recommended or breeder-overridden (ADR-0018).
      */
     decisions?: ModelDecision[];
+    /**
+     * Per-axis feasibility map for the override UI (ADR-0018): which values of each decision are currently selectable vs blocked-with-reason, so controls grey out impossible choices before a re-run. Optional/additive.
+     */
+    overridable?: OverridableFactor[];
   };
   /**
    * One result per analyzed ObservationVariable.
@@ -330,15 +334,15 @@ export interface ResultBundle {
   };
 }
 /**
- * One deterministic model choice with its reason and the diagnostic that triggered it (ADR-0016).
+ * One model choice with its reason and the diagnostic that triggered it (ADR-0016). The planner recommends each; the breeder may override it (ADR-0018). `source`/`recommended`/`feasible`/`refused_reason` record whether the active choice is the recommendation or an override, and — when an override was infeasible — why it was refused (the planner kept its recommendation).
  */
 export interface ModelDecision {
   /**
    * Which decision this is.
    */
-  factor: 'spatial' | 'genotype_effect' | 'staging' | 'gxe' | 'engine';
+  factor: 'spatial' | 'genotype_effect' | 'staging' | 'gxe' | 'relationship' | 'engine';
   /**
-   * What was chosen, e.g. 'included' / 'skipped' / 'weighted two-stage' / 'spats'.
+   * What was chosen (and actually fitted), e.g. 'included' / 'skipped' / 'two-stage' / 'spats' / 'G'.
    */
   choice: string;
   /**
@@ -351,6 +355,42 @@ export interface ModelDecision {
   diagnostic?: {
     [k: string]: unknown;
   } | null;
+  /**
+   * Whether the active `choice` is the planner's recommendation or a breeder override.
+   */
+  source?: 'recommended' | 'overridden';
+  /**
+   * What the planner would have chosen, so the UI can badge it and offer reset-to-recommended.
+   */
+  recommended?: string | null;
+  /**
+   * False only when an override was requested but refused; `choice` then falls back to `recommended`.
+   */
+  feasible?: boolean;
+  /**
+   * When feasible=false: why the requested override could not be fit (e.g. 'no marker data supplied').
+   */
+  refused_reason?: string | null;
+  /**
+   * Optional supporting numbers for the recommendation — for relationship, the cross-validation predictive-ability summary per model.
+   */
+  evidence?: {
+    [k: string]: unknown;
+  } | null;
+}
+/**
+ * The selectable values for one decision axis and whether each is currently feasible — the UI's feasibility map, so override controls grey out impossible choices before a re-run (ADR-0018).
+ */
+export interface OverridableFactor {
+  factor: 'spatial' | 'staging' | 'gxe' | 'relationship' | 'engine';
+  options: {
+    value: string;
+    feasible: boolean;
+    /**
+     * When feasible=false, why it's blocked + how to unlock it; null when feasible.
+     */
+    reason?: string | null;
+  }[];
 }
 export interface Warning {
   /**

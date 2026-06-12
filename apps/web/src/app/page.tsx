@@ -2,6 +2,7 @@ import { Leaf, FlaskConical, Sprout } from "lucide-react";
 import { getLatestResult } from "@/lib/data";
 import InsightBanner from "@/components/InsightBanner";
 import ModelReadiness from "@/components/ModelReadiness";
+import ModelStudio from "@/components/ModelStudio";
 import HeritabilityCards from "@/components/HeritabilityCards";
 import GeneticCorrelations from "@/components/GeneticCorrelations";
 import SelectionWorkspace from "@/components/SelectionWorkspace";
@@ -9,6 +10,8 @@ import GenomicWorkspace from "@/components/GenomicWorkspace";
 
 // Always read the freshest persisted result from Postgres.
 export const dynamic = "force-dynamic";
+// A synchronous override re-run (ADR-0018) can refit the model; give the Server Action headroom.
+export const maxDuration = 300;
 
 export default async function Home() {
   const result = await getLatestResult();
@@ -41,6 +44,8 @@ export default async function Home() {
             <InsightBanner bundle={result.bundle} />
 
             <ModelReadiness bundle={result.bundle} />
+
+            <ModelStudio bundle={result.bundle} />
 
             <section>
               <h3 className="mb-2 text-sm font-semibold text-slate-700">Heritability</h3>

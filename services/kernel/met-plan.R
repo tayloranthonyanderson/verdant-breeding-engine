@@ -8,7 +8,9 @@
 ##   Rscript services/kernel/met-plan.R < plan-input.json > plan-output.json
 ##
 ## Input  (JSON, parallel vectors): { variableIds:[K], environment:[N], genotype:[N], row:[N],
-##           col:[N], rep:[N], intent?, relationship? }
+##           col:[N], rep:[N], intent?, relationship?, overrides?, evidence?, genomic? }
+##   overrides = model_overrides (ADR-0018); evidence = relationship CV summary; genomic = {markers_present,
+##   pedigree_present, n_genotyped} (the driver supplies the genomic readiness the structure can't see).
 ## Output (JSON): { readiness: {...}, plan: {...} }   # plan = make_plan() output
 suppressWarnings(suppressPackageStartupMessages(library(jsonlite)))
 
@@ -30,9 +32,13 @@ df <- data.frame(
   stringsAsFactors = FALSE
 )
 readiness <- compute_readiness(df, as.character(inp$variableIds))
+## genomic readiness is supplied by the driver (markers/pedigree presence the plot structure can't see)
+if (!is.null(inp$genomic)) readiness$genomic <- as.list(inp$genomic)
 plan <- make_plan(readiness,
   intent = if (!is.null(inp$intent)) inp$intent else "selection",
-  relationship = if (!is.null(inp$relationship)) inp$relationship else "identity")
+  relationship = if (!is.null(inp$relationship)) inp$relationship else "identity",
+  overrides = if (!is.null(inp$overrides)) as.list(inp$overrides) else NULL,
+  evidence = if (!is.null(inp$evidence)) inp$evidence else NULL)
 
 cat(jsonlite::toJSON(list(readiness = readiness, plan = plan),
                      auto_unbox = TRUE, null = "null", na = "null", digits = NA))

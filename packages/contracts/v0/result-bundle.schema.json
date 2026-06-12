@@ -32,8 +32,13 @@
         "staging_weighted": { "type": ["boolean", "null"], "description": "For a two-stage fit, whether Stage-1 standard errors were carried into Stage 2 as weights (makes GxE identifiable without within-location replication)." },
         "decisions": {
           "type": "array",
-          "description": "The deterministic Model Planner's decision log: each scientific choice with its reason and the diagnostic that triggered it (ADR-0016). The trust/teaching surface — the AI narrates these, never makes them.",
+          "description": "The deterministic Model Planner's decision log: each scientific choice with its reason and the diagnostic that triggered it (ADR-0016). The trust/teaching surface — the AI narrates these, never makes them. Each may be recommended or breeder-overridden (ADR-0018).",
           "items": { "$ref": "#/$defs/model_decision" }
+        },
+        "overridable": {
+          "type": "array",
+          "description": "Per-axis feasibility map for the override UI (ADR-0018): which values of each decision are currently selectable vs blocked-with-reason, so controls grey out impossible choices before a re-run. Optional/additive.",
+          "items": { "$ref": "#/$defs/overridable_factor" }
         }
       }
     },
@@ -247,14 +252,41 @@
     },
     "model_decision": {
       "type": "object",
-      "description": "One deterministic model choice with its reason and the diagnostic that triggered it (ADR-0016).",
+      "description": "One model choice with its reason and the diagnostic that triggered it (ADR-0016). The planner recommends each; the breeder may override it (ADR-0018). `source`/`recommended`/`feasible`/`refused_reason` record whether the active choice is the recommendation or an override, and — when an override was infeasible — why it was refused (the planner kept its recommendation).",
       "required": ["factor", "choice", "reason"],
       "additionalProperties": false,
       "properties": {
-        "factor": { "type": "string", "enum": ["spatial", "genotype_effect", "staging", "gxe", "engine"], "description": "Which decision this is." },
-        "choice": { "type": "string", "description": "What was chosen, e.g. 'included' / 'skipped' / 'weighted two-stage' / 'spats'." },
+        "factor": { "type": "string", "enum": ["spatial", "genotype_effect", "staging", "gxe", "relationship", "engine"], "description": "Which decision this is." },
+        "choice": { "type": "string", "description": "What was chosen (and actually fitted), e.g. 'included' / 'skipped' / 'two-stage' / 'spats' / 'G'." },
         "reason": { "type": "string", "description": "Plain-language justification the AI surfaces to the breeder." },
-        "diagnostic": { "type": ["object", "null"], "additionalProperties": true, "description": "The structural numbers behind the choice (e.g. connectors, median environments per genotype)." }
+        "diagnostic": { "type": ["object", "null"], "additionalProperties": true, "description": "The structural numbers behind the choice (e.g. connectors, median environments per genotype)." },
+        "source": { "type": "string", "enum": ["recommended", "overridden"], "default": "recommended", "description": "Whether the active `choice` is the planner's recommendation or a breeder override." },
+        "recommended": { "type": ["string", "null"], "description": "What the planner would have chosen, so the UI can badge it and offer reset-to-recommended." },
+        "feasible": { "type": "boolean", "default": true, "description": "False only when an override was requested but refused; `choice` then falls back to `recommended`." },
+        "refused_reason": { "type": ["string", "null"], "description": "When feasible=false: why the requested override could not be fit (e.g. 'no marker data supplied')." },
+        "evidence": { "type": ["object", "null"], "additionalProperties": true, "description": "Optional supporting numbers for the recommendation — for relationship, the cross-validation predictive-ability summary per model." }
+      }
+    },
+    "overridable_factor": {
+      "type": "object",
+      "description": "The selectable values for one decision axis and whether each is currently feasible — the UI's feasibility map, so override controls grey out impossible choices before a re-run (ADR-0018).",
+      "required": ["factor", "options"],
+      "additionalProperties": false,
+      "properties": {
+        "factor": { "type": "string", "enum": ["spatial", "staging", "gxe", "relationship", "engine"] },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["value", "feasible"],
+            "additionalProperties": false,
+            "properties": {
+              "value": { "type": "string" },
+              "feasible": { "type": "boolean" },
+              "reason": { "type": ["string", "null"], "description": "When feasible=false, why it's blocked + how to unlock it; null when feasible." }
+            }
+          }
+        }
       }
     },
     "readiness_unlock": {
