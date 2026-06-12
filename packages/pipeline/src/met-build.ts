@@ -14,12 +14,13 @@ import { db, program, study, analysisRun, resultBundle } from '@verdant/db';
 import { validateResultBundle, type ResultBundle, type AnalysisRequest } from '@verdant/contracts';
 import { estimateGeneticCovariance } from './blupf90';
 
-const TRAITS = ['Plant_Height_cm', 'Yield_Mg_ha', 'Grain_Moisture'];
+const TRAITS = ['Plant_Height_cm', 'Ear_Height_cm', 'Yield_Mg_ha', 'Grain_Moisture'];
 // Objective for the seed transparent index (mode + relative weight per trait).
 const WEIGHTS = [
-  { variable_id: 'Yield_Mg_ha', mode: 'max' as const, weight: 0.5 },
-  { variable_id: 'Grain_Moisture', mode: 'min' as const, weight: 0.3 },
+  { variable_id: 'Yield_Mg_ha', mode: 'max' as const, weight: 0.4 },
+  { variable_id: 'Grain_Moisture', mode: 'min' as const, weight: 0.25 },
   { variable_id: 'Plant_Height_cm', mode: 'max' as const, weight: 0.2 },
+  { variable_id: 'Ear_Height_cm', mode: 'min' as const, weight: 0.15 },
 ];
 
 function parseFixture() {
@@ -85,7 +86,10 @@ function geneticIndex(
     genetic_covariance: G,
     germplasm_ids: germplasmIds,
     blups,
-    desired_gains: [0, 1, -1], // [Plant_Height_cm, Yield_Mg_ha, Grain_Moisture] in genetic-sd units
+    // [Plant_Height_cm, Ear_Height_cm, Yield_Mg_ha, Grain_Moisture] in genetic-sd units.
+    // Decent height but LOW ear placement (lodging resistance) deliberately fights the strong
+    // height–ear genetic correlation — that's what makes the genetic-aware index diverge.
+    desired_gains: [0.5, -0.5, 1, -1],
     transparent_ranking: transparentRanking.map((r) => ({ germplasm_id: r.germplasm_id, rank: r.rank })),
   };
   const script = resolve(import.meta.dirname, '../../../services/kernel/select-index.R');

@@ -4,6 +4,7 @@ import InsightBanner from "@/components/InsightBanner";
 import HeritabilityCards from "@/components/HeritabilityCards";
 import GeneticCorrelations from "@/components/GeneticCorrelations";
 import IndexExplorer from "@/components/IndexExplorer";
+import DesiredGainsExplorer from "@/components/DesiredGainsExplorer";
 import IndexDivergence from "@/components/IndexDivergence";
 
 // Always read the freshest persisted result from Postgres.
@@ -47,6 +48,8 @@ export default async function Home() {
             <GeneticCorrelations bundle={result.bundle} />
 
             <IndexExplorer bundle={result.bundle} />
+
+            <DesiredGainsExplorer bundle={result.bundle} />
 
             <IndexDivergence bundle={result.bundle} />
           </div>

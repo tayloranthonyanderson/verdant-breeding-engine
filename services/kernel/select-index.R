@@ -36,8 +36,11 @@ ranking <- lapply(seq_along(ord), function(i) {
   list(germplasm_id = gid[k], rank = i, score = round(score[k], 5),
        gated_out = FALSE, gate_failures = character(0))
 })
+## weights_used carries the DESIRED GAINS d (genetic-sd units) — the slider seed. The client derives
+## b = G^{-1}(d·σ) live from G (reconstructed from the bundle's correlation + genetic_sd) and
+## reproduces this ranking, so the desired-gain sliders recompute client-side like the transparent ones.
 weights_used <- lapply(seq_len(n), function(i)
-  list(variable_id = vids[i], direction = if (b[i] < 0) -1L else 1L, weight = round(abs(b[i]), 6)))
+  list(variable_id = vids[i], direction = if (d_sd[i] < 0) -1L else 1L, weight = round(d_sd[i], 6)))
 
 ## divergence vs the transparent ranking
 tr <- inp$transparent_ranking          # data.frame germplasm_id, rank
