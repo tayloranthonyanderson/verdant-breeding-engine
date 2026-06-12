@@ -42,6 +42,11 @@ BLUPF90 is the correct engine for this task, not a compromise.
   `airemlf90` → parse solutions & (co)variance components), consistent with
   [ADR-0012](0012-web-tier-and-worker-stack.md)'s subprocess-per-job kernel pattern — now generalized
   from "Rscript" to "any compiled binary behind the same job contract."
+- **Runtime: containerized native Linux, not Rosetta.** BLUPF90 ships Intel-only Mac builds and no
+  ARM build; the dev machine is Apple Silicon. Rather than translate Intel binaries via Rosetta, we
+  run the native **Linux (amd64)** binaries inside a container — which *is* production (Linux hosts).
+  Local dev runs the same image under Docker emulation; production runs it native. (Decided
+  2026-06-11.)
 - **Licensing:** BLUPF90 is free for research/academic use; commercial use needs a license/agreement
   with the UGA (Misztal) group — gate before shipping (the README's "verify commercial licensing").
 - Heavier integration than an R library call (data prep, parameter files, convergence handling);

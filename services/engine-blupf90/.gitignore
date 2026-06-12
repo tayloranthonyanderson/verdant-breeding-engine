@@ -1,0 +1,3 @@
+# Vendored third-party BLUPF90 binaries — fetched via fetch-binaries.sh, NOT committed
+# (research-use license; commercial use needs a UGA agreement — ADR-0014).
+bin/
