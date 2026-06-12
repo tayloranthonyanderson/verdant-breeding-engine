@@ -9,7 +9,7 @@
 // divergence from the transparent index — the first-class insight ("your stated priorities rank X;
 // achieving those gains given co-inheritance ranks Y"). G is reconstructed from the bundle's genetic
 // correlation matrix + per-trait genetic_sd, so this stays numerically identical to the R seed.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUp, ArrowDown, GitCompareArrows } from "lucide-react";
 import type { ResultBundle } from "@verdant/contracts";
 
@@ -37,7 +37,13 @@ function solve(A: number[][], rhs: number[]): number[] {
   return M.map((row, i) => row[n] / (row[i] || 1e-12));
 }
 
-export default function DesiredGainsExplorer({ bundle }: { bundle: ResultBundle }) {
+export default function DesiredGainsExplorer({
+  bundle,
+  onRankingChange,
+}: {
+  bundle: ResultBundle;
+  onRankingChange?: (ranking: Array<{ germplasm_id: string; rank: number }>) => void;
+}) {
   const gc = bundle.genetic_correlations;
   const seed = bundle.indices?.find((i) => i.kind === "desired_gains");
   const transparent = bundle.indices?.find((i) => i.kind === "weighted");
@@ -97,8 +103,15 @@ export default function DesiredGainsExplorer({ bundle }: { bundle: ResultBundle 
     return { traitIds, ranking, b, rho, movers, blup, genRank };
   }, [pre, gains]);
 
+  // report the live ranking up for the Compare lens (ref keeps the callback out of effect deps)
+  const cbRef = useRef(onRankingChange);
+  cbRef.current = onRankingChange;
+  useEffect(() => {
+    if (result) cbRef.current?.(result.ranking.map((r) => ({ germplasm_id: r.g, rank: r.rank })));
+  }, [result]);
+
   if (!pre || !result) return null;
-  const { traitIds, ranking, b, rho, movers } = result;
+  const { traitIds, ranking, b } = result;
 
   return (
     <section className="rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm">
@@ -155,30 +168,7 @@ export default function DesiredGainsExplorer({ bundle }: { bundle: ResultBundle 
             </div>
           </div>
 
-          {/* divergence headline */}
-          <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4">
-            <div className="flex items-baseline justify-between">
-              <div className="text-xs font-semibold text-slate-700">Divergence from the transparent index</div>
-              <div className="tnum text-lg font-bold text-indigo-700">ρ = {rho.toFixed(2)}</div>
-            </div>
-            <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
-              Rank correlation with your stated-priority index. Lower = co-inheritance reshapes
-              selection more. These genotypes move the most:
-            </p>
-            <div className="mt-2 space-y-1">
-              {movers.map((m) => (
-                <div key={m.g} className="flex items-center justify-between text-[11px]">
-                  <span className="truncate pr-2 font-medium text-slate-700">{m.g}</span>
-                  <span className="tnum shrink-0 text-slate-500">
-                    #{m.from} → #{m.to}{" "}
-                    <span className={m.delta > 0 ? "text-emerald-600" : "text-rose-600"}>
-                      {m.delta > 0 ? `▲${m.delta}` : `▼${-m.delta}`}
-                    </span>
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
+          {/* divergence lives in the Compare lens now (keeps this lens focused) */}
         </div>
 
         {/* ranking */}

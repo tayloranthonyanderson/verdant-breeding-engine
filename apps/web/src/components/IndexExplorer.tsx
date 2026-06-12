@@ -16,7 +16,7 @@
 //
 // The "Top of the index" chart stacks each trait's weighted CONTRIBUTION (merit × weight ÷ ΣW) so
 // the bar segments sum to the index score — the breeder sees which trait is driving each genotype.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUp, ArrowDown, Crosshair } from "lucide-react";
 import {
   Bar,
@@ -38,7 +38,13 @@ const CHART_N = 15;
 
 type Mode = "max" | "min" | "target";
 
-export default function IndexExplorer({ bundle }: { bundle: ResultBundle }) {
+export default function IndexExplorer({
+  bundle,
+  onRankingChange,
+}: {
+  bundle: ResultBundle;
+  onRankingChange?: (ranking: Array<{ germplasm_id: string; rank: number }>) => void;
+}) {
   // Precompute, once per bundle: per-trait mean/sd, genotype z-scores, raw BLUPs, and gate flags
   // (gates are independent of weights, so we keep the kernel's gate decisions).
   const { traitIds, genos, z, blup, stats, gated } = useMemo(() => {
@@ -185,6 +191,14 @@ export default function IndexExplorer({ bundle }: { bundle: ResultBundle }) {
       .sort((a, b) => b.score - a.score)
       .map((r, i) => ({ ...r, rank: i + 1 }));
   }, [genos, traitIds, z, modes, targets, weights, gated, totalW, stats]);
+
+  // Report the live ranking up (for the Compare lens). Ref keeps the callback out of the effect
+  // deps so this can't loop.
+  const cbRef = useRef(onRankingChange);
+  cbRef.current = onRankingChange;
+  useEffect(() => {
+    cbRef.current?.(ranking.map((r) => ({ germplasm_id: r.g, rank: r.rank })));
+  }, [ranking]);
 
   const chartData = ranking
     .filter((r) => !r.gated)

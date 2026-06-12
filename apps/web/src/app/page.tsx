@@ -3,9 +3,7 @@ import { getLatestResult } from "@/lib/data";
 import InsightBanner from "@/components/InsightBanner";
 import HeritabilityCards from "@/components/HeritabilityCards";
 import GeneticCorrelations from "@/components/GeneticCorrelations";
-import IndexExplorer from "@/components/IndexExplorer";
-import DesiredGainsExplorer from "@/components/DesiredGainsExplorer";
-import IndexDivergence from "@/components/IndexDivergence";
+import SelectionWorkspace from "@/components/SelectionWorkspace";
 
 // Always read the freshest persisted result from Postgres.
 export const dynamic = "force-dynamic";
@@ -47,11 +45,7 @@ export default async function Home() {
 
             <GeneticCorrelations bundle={result.bundle} />
 
-            <IndexExplorer bundle={result.bundle} />
-
-            <DesiredGainsExplorer bundle={result.bundle} />
-
-            <IndexDivergence bundle={result.bundle} />
+            <SelectionWorkspace bundle={result.bundle} />
           </div>
         )}
       </main>
