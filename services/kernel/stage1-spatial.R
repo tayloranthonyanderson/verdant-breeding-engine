@@ -20,6 +20,11 @@ suppressWarnings(suppressPackageStartupMessages({
   library(jsonlite)
 }))
 
+## Shared grid/rep predicates (ADR-0016) — the same gating analyze.R uses, in one place.
+.self_dir <- { a <- commandArgs(FALSE); f <- sub("^--file=", "", a[grep("^--file=", a)])
+               if (length(f)) dirname(normalizePath(f)) else "." }
+source(file.path(.self_dir, "diagnostics.R"))
+
 read_input <- function() {
   args <- commandArgs(trailingOnly = TRUE)
   con <- if (length(args) >= 1 && file.exists(args[1])) args[1] else "stdin"
@@ -33,10 +38,8 @@ adjust_one <- function(d) {
   if (nrow(d) < 3 || length(unique(d$genotype)) < 2)
     return(list(est = NULL, method = "skipped"))
   d$germplasm <- factor(d$genotype)
-  has_rep <- length(unique(d$rep[!is.na(d$rep)])) > 1
-  n_row <- length(unique(d$row[!is.na(d$row)]))
-  n_col <- length(unique(d$col[!is.na(d$col)]))
-  has_grid <- !anyNA(d$row) && !anyNA(d$col) && n_row >= 5 && n_col >= 5 && nrow(d) >= 50
+  has_rep <- rep_ok(d$rep)
+  has_grid <- grid_ok(d$row, d$col, nrow(d))
 
   if (has_grid && requireNamespace("SpATS", quietly = TRUE)) {
     est <- tryCatch(spats_blue(d, has_rep), error = function(e) NULL)

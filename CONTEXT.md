@@ -63,6 +63,21 @@ See [PRODUCT.md](PRODUCT.md), [ROADMAP.md](ROADMAP.md), [docs/MVP-PLAN.md](docs/
   Their **divergence** is itself an insight (ADR-0006).
 - **Genomic prediction / GBLUP** — predicting breeding values from markers (parked for a later
   stage; see ROADMAP).
+- **Data readiness** — deterministic diagnostics the kernel computes from the generic plot record to
+  gate every model choice: per-environment **grid** (row/col density → spatial-capable?), per-environment
+  **replication** (within-env entry replication → residual identifiable?), cross-environment
+  **connectivity** (genotypes shared across environments → GxE/stability estimable?), and **scale**
+  (n_obs/n_geno/n_env/n_traits, markers present). Crop-agnostic (ADR-0015); never reads column names (ADR-0016).
+- **Model Plan** — the planner's declarative output *before* fitting: trial structure, spatial method
+  per environment, genotype effect (random/fixed), GxE include/skip, staging (single vs weighted
+  two-stage), engine, relationship. Each decision carries a **reason** and the **diagnostic value** that
+  triggered it. One-stage is the default; weighted two-stage is the deliberate scale fallback; GxE fires
+  only when **data readiness** says it is identifiable (ADR-0016).
+- **Engine registry** — engines (lme4, SpATS, BLUPF90, future rrBLUP/BGLR) as adapters behind a uniform
+  `plan → result` interface plus a **capability descriptor** (multiTrait, gxe, spatial methods,
+  relationship support, genomic, scale tier). The planner selects an engine by matching the **Model
+  Plan**'s required capabilities, tie-broken by ADR-0014 scale tiering; new engines plug in by
+  capability, not by rewrite (ADR-0016).
 
 ## Program organization vocabulary (the two axes — see [DOMAIN-MODEL.md](docs/DOMAIN-MODEL.md))
 - **Stage** — a candidate's position on the program's *ordered* advancement ladder (e.g.

@@ -1,6 +1,7 @@
 import { Leaf, FlaskConical, Sprout } from "lucide-react";
 import { getLatestResult } from "@/lib/data";
 import InsightBanner from "@/components/InsightBanner";
+import ModelReadiness from "@/components/ModelReadiness";
 import HeritabilityCards from "@/components/HeritabilityCards";
 import GeneticCorrelations from "@/components/GeneticCorrelations";
 import SelectionWorkspace from "@/components/SelectionWorkspace";
@@ -37,6 +38,8 @@ export default async function Home() {
         ) : (
           <div className="space-y-5">
             <InsightBanner bundle={result.bundle} />
+
+            <ModelReadiness bundle={result.bundle} />
 
             <section>
               <h3 className="mb-2 text-sm font-semibold text-slate-700">Heritability</h3>

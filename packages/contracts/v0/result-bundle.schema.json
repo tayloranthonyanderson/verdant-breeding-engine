@@ -27,7 +27,14 @@
         "spatial_method": { "type": ["string", "null"], "enum": ["none", "row_col", "ar1xar1", "spats", "splines", null], "description": "Which spatial correction the kernel applied (or 'none' if layout did not support one)." },
         "relationship": { "type": "string", "enum": ["identity", "A", "G", "H"], "description": "Echo of the relationship structure actually used." },
         "engine": { "type": ["string", "null"], "description": "Backend that produced the fit (e.g. 'lme4', 'sommer', 'SpATS'). Internal; not shown to breeders by default." },
-        "rationale": { "type": "string", "description": "Why this model fits this data + intent — the human-readable justification the AI surfaces ('your trial has spatial trend across rows, so…')." }
+        "rationale": { "type": "string", "description": "Why this model fits this data + intent — the human-readable justification the AI surfaces ('your trial has spatial trend across rows, so…')." },
+        "model_class": { "type": ["string", "null"], "enum": ["single_stage", "two_stage", null], "description": "Whether the model was fit in one joint pass (gold standard) or staged (Stage-1 spatial de-trend → Stage-2 cross-environment), the latter chosen for scale (ADR-0016)." },
+        "staging_weighted": { "type": ["boolean", "null"], "description": "For a two-stage fit, whether Stage-1 standard errors were carried into Stage 2 as weights (makes GxE identifiable without within-location replication)." },
+        "decisions": {
+          "type": "array",
+          "description": "The deterministic Model Planner's decision log: each scientific choice with its reason and the diagnostic that triggered it (ADR-0016). The trust/teaching surface — the AI narrates these, never makes them.",
+          "items": { "$ref": "#/$defs/model_decision" }
+        }
       }
     },
     "traits": {
@@ -113,6 +120,21 @@
       "type": ["object", "null"],
       "description": "MET genotype-by-environment / stability view (M1+; Finlay–Wilkinson / AMMI / GGE). Mapped; null in single-trial or when not requested.",
       "additionalProperties": true
+    },
+    "data_readiness": {
+      "type": ["object", "null"],
+      "description": "Deterministic structural diagnostics that gated the model choices (grid, replication, cross-environment connectivity, scale), plus what additional data would unlock richer models (ADR-0016). Surfaced to the breeder as the 'why this model / what would unlock more' panel.",
+      "additionalProperties": true,
+      "properties": {
+        "scale": { "type": ["object", "null"], "additionalProperties": true, "description": "n_obs, n_geno, n_env, n_cells, n_traits." },
+        "connectivity": { "type": ["object", "null"], "additionalProperties": true, "description": "Cross-environment genotype overlap — connectors (genotypes in ≥2 environments), median environments per genotype — which gates GxE estimability." },
+        "replication": { "type": ["object", "null"], "additionalProperties": true, "description": "Within-environment replication that identifies residual error for a one-stage GxE fit." },
+        "unlocks": {
+          "type": "array",
+          "description": "What is NOT estimated and the data that would unlock it (e.g. GxE blocked by low connectivity; genomic prediction blocked by no markers).",
+          "items": { "$ref": "#/$defs/readiness_unlock" }
+        }
+      }
     },
     "indices": {
       "type": "array",
@@ -206,6 +228,29 @@
         "code": { "type": ["string", "null"], "description": "Stable machine code for the warning class, for filtering/eval." },
         "message": { "type": "string", "description": "Plain-language explanation for the breeder." },
         "severity": { "type": "string", "enum": ["info", "warning", "error"], "default": "warning" }
+      }
+    },
+    "model_decision": {
+      "type": "object",
+      "description": "One deterministic model choice with its reason and the diagnostic that triggered it (ADR-0016).",
+      "required": ["factor", "choice", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "factor": { "type": "string", "enum": ["spatial", "genotype_effect", "staging", "gxe", "engine"], "description": "Which decision this is." },
+        "choice": { "type": "string", "description": "What was chosen, e.g. 'included' / 'skipped' / 'weighted two-stage' / 'spats'." },
+        "reason": { "type": "string", "description": "Plain-language justification the AI surfaces to the breeder." },
+        "diagnostic": { "type": ["object", "null"], "additionalProperties": true, "description": "The structural numbers behind the choice (e.g. connectors, median environments per genotype)." }
+      }
+    },
+    "readiness_unlock": {
+      "type": "object",
+      "description": "A capability not estimated and the data that would unlock it (ADR-0016).",
+      "required": ["capability", "blocked_by", "hint"],
+      "additionalProperties": false,
+      "properties": {
+        "capability": { "type": "string", "description": "What could be added, e.g. 'GxE / stability'." },
+        "blocked_by": { "type": "string", "description": "The structural reason it isn't estimated." },
+        "hint": { "type": "string", "description": "Actionable guidance — what data the breeder would collect to enable it." }
       }
     }
   }

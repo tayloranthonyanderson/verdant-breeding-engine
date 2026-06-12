@@ -11,6 +11,12 @@ suppressWarnings(suppressPackageStartupMessages({
   library(lme4)
 }))
 
+## Shared data-readiness predicates (grid_ok / rep_ok), so the spatial gating lives in ONE place
+## (ADR-0016) rather than being duplicated here and in stage1-spatial.R.
+.self_dir <- { a <- commandArgs(FALSE); f <- sub("^--file=", "", a[grep("^--file=", a)])
+               if (length(f)) dirname(normalizePath(f)) else "." }
+source(file.path(.self_dir, "diagnostics.R"))
+
 ## ---- IO ---------------------------------------------------------------------------------
 read_request <- function() {
   args <- commandArgs(trailingOnly = TRUE)
@@ -42,10 +48,8 @@ trait_data <- function(req, ou, variable_id) {
 
 ## ---- model selection + fit for one trait -----------------------------------------------
 fit_trait <- function(d) {
-  n_row <- length(unique(d$row[!is.na(d$row)]))
-  n_col <- length(unique(d$col[!is.na(d$col)]))
-  has_grid <- !anyNA(d$row) && !anyNA(d$col) && n_row >= 5 && n_col >= 5 && nrow(d) >= 50
-  has_rep <- length(unique(d$rep[!is.na(d$rep)])) > 1
+  has_grid <- grid_ok(d$row, d$col, nrow(d))
+  has_rep <- rep_ok(d$rep)
 
   if (has_grid && requireNamespace("SpATS", quietly = TRUE)) {
     out <- tryCatch(fit_spats(d, has_rep), error = function(e) NULL)

@@ -50,6 +50,18 @@ export interface ResultBundle {
      * Why this model fits this data + intent — the human-readable justification the AI surfaces ('your trial has spatial trend across rows, so…').
      */
     rationale: string;
+    /**
+     * Whether the model was fit in one joint pass (gold standard) or staged (Stage-1 spatial de-trend → Stage-2 cross-environment), the latter chosen for scale (ADR-0016).
+     */
+    model_class?: 'single_stage' | 'two_stage' | null;
+    /**
+     * For a two-stage fit, whether Stage-1 standard errors were carried into Stage 2 as weights (makes GxE identifiable without within-location replication).
+     */
+    staging_weighted?: boolean | null;
+    /**
+     * The deterministic Model Planner's decision log: each scientific choice with its reason and the diagnostic that triggered it (ADR-0016). The trust/teaching surface — the AI narrates these, never makes them.
+     */
+    decisions?: ModelDecision[];
   };
   /**
    * One result per analyzed ObservationVariable.
@@ -148,6 +160,34 @@ export interface ResultBundle {
     [k: string]: unknown;
   } | null;
   /**
+   * Deterministic structural diagnostics that gated the model choices (grid, replication, cross-environment connectivity, scale), plus what additional data would unlock richer models (ADR-0016). Surfaced to the breeder as the 'why this model / what would unlock more' panel.
+   */
+  data_readiness?: {
+    /**
+     * n_obs, n_geno, n_env, n_cells, n_traits.
+     */
+    scale?: {
+      [k: string]: unknown;
+    } | null;
+    /**
+     * Cross-environment genotype overlap — connectors (genotypes in ≥2 environments), median environments per genotype — which gates GxE estimability.
+     */
+    connectivity?: {
+      [k: string]: unknown;
+    } | null;
+    /**
+     * Within-environment replication that identifies residual error for a one-stage GxE fit.
+     */
+    replication?: {
+      [k: string]: unknown;
+    } | null;
+    /**
+     * What is NOT estimated and the data that would unlock it (e.g. GxE blocked by low connectivity; genomic prediction blocked by no markers).
+     */
+    unlocks?: ReadinessUnlock[];
+    [k: string]: unknown;
+  } | null;
+  /**
    * Selection rankings. Both index kinds may appear so the GUI can show their DIVERGENCE as insight (ADR-0006). The transparent weighted index is also client-recomputable for live re-weighting (PRD §6).
    */
   indices?: {
@@ -243,6 +283,29 @@ export interface ResultBundle {
     [k: string]: unknown;
   };
 }
+/**
+ * One deterministic model choice with its reason and the diagnostic that triggered it (ADR-0016).
+ */
+export interface ModelDecision {
+  /**
+   * Which decision this is.
+   */
+  factor: 'spatial' | 'genotype_effect' | 'staging' | 'gxe' | 'engine';
+  /**
+   * What was chosen, e.g. 'included' / 'skipped' / 'weighted two-stage' / 'spats'.
+   */
+  choice: string;
+  /**
+   * Plain-language justification the AI surfaces to the breeder.
+   */
+  reason: string;
+  /**
+   * The structural numbers behind the choice (e.g. connectors, median environments per genotype).
+   */
+  diagnostic?: {
+    [k: string]: unknown;
+  } | null;
+}
 export interface Warning {
   /**
    * Stable machine code for the warning class, for filtering/eval.
@@ -253,4 +316,21 @@ export interface Warning {
    */
   message: string;
   severity?: 'info' | 'warning' | 'error';
+}
+/**
+ * A capability not estimated and the data that would unlock it (ADR-0016).
+ */
+export interface ReadinessUnlock {
+  /**
+   * What could be added, e.g. 'GxE / stability'.
+   */
+  capability: string;
+  /**
+   * The structural reason it isn't estimated.
+   */
+  blocked_by: string;
+  /**
+   * Actionable guidance — what data the breeder would collect to enable it.
+   */
+  hint: string;
 }

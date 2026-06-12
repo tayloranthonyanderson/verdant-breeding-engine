@@ -14,6 +14,7 @@ import { validateResultBundle, type ResultBundle, type AnalysisRequest } from '@
 import { estimateGeneticCovariance } from './blupf90';
 import { parseG2fMet } from './g2f';
 import { spatialStage1 } from './stage1';
+import { runPlanner } from './planner';
 
 const TRAITS = ['Plant_Height_cm', 'Ear_Height_cm', 'Yield_Mg_ha', 'Grain_Moisture'];
 // Objective for the seed transparent index (mode + relative weight per trait).
@@ -88,19 +89,32 @@ async function main() {
   const { variableIds, records } = parseG2fMet(csv, TRAITS);
   console.log(`parsed ${records.length} plot rows, ${new Set(records.map((r) => r.genotype)).size} genotypes, ${new Set(records.map((r) => r.environment)).size} environments`);
 
-  // Stage 1: within-environment spatial de-trending → spatially-adjusted entry means (BLUEs).
-  console.log('Stage 1: within-environment spatial de-trending (SpATS) ...');
-  const s1 = spatialStage1(variableIds, records);
-  const nSpats = s1.stage1.filter((p) => p.method === 'spats').length;
-  console.log(`Stage 1 done: ${s1.adjusted.length} adjusted entry×env means; ${nSpats}/${s1.stage1.length} env×trait fits used a spatial spline`);
+  // Deterministic Model Planner (ADR-0016): decides the model from data STRUCTURE; we execute it.
+  const { readiness, plan } = runPlanner(variableIds, records);
+  console.log(`planner: model_class=${plan.model_class} gxe=${plan.gxe.include} — ${plan.decisions.find((d) => d.factor === 'staging')?.reason ?? ''}`);
 
-  // Stage 2: multi-trait AI-REML across environments on the de-trended means → genetic covariance.
-  console.log('Stage 2: multi-trait AI-REML (BLUPF90) on adjusted means ...');
-  const g = estimateGeneticCovariance({
-    variableIds: TRAITS,
-    rows: s1.adjusted.map((a) => ({ genotype: a.genotype, environment: a.environment, values: a.values })),
-  });
-  console.log(`converged in ${g.rounds} rounds; ${g.blups.length} genotype BLUPs`);
+  // Execute the plan. One-stage = joint AI-REML on plots (the only path that yields GxE); two-stage =
+  // SpATS spatial de-trend (Stage 1) → multi-trait AI-REML on adjusted means (Stage 2), the scale path.
+  let g: ReturnType<typeof estimateGeneticCovariance>;
+  if (plan.model_class === 'single_stage') {
+    console.log(`Single-stage multi-trait AI-REML on plots${plan.gxe.include ? ' (+ genotype×environment)' : ''} ...`);
+    g = estimateGeneticCovariance({
+      variableIds: TRAITS,
+      rows: records.map((r) => ({ genotype: r.genotype, environment: r.environment, values: r.values })),
+      interaction: plan.gxe.include,
+    });
+  } else {
+    console.log('Stage 1: within-environment spatial de-trending (SpATS) ...');
+    const s1 = spatialStage1(variableIds, records);
+    const nSpats = s1.stage1.filter((p) => p.method === 'spats').length;
+    console.log(`Stage 1 done: ${s1.adjusted.length} adjusted entry×env means; ${nSpats}/${s1.stage1.length} env×trait fits used a spatial spline`);
+    console.log('Stage 2: multi-trait AI-REML (BLUPF90) on adjusted means ...');
+    g = estimateGeneticCovariance({
+      variableIds: TRAITS,
+      rows: s1.adjusted.map((a) => ({ genotype: a.genotype, environment: a.environment, values: a.values })),
+    });
+  }
+  console.log(`converged in ${g.rounds} rounds; ${g.blups.length} genotype BLUPs${g.gxeVariances ? `; GxE diag ${g.gxeVariances.map((v) => v.toFixed(2)).join('/')}` : ''}`);
 
   const genoBlups = new Map(g.blups.map((b) => [b.genotype, b.values]));
   const Ve = g.residualCovariance.map((r, i) => r[i]);
@@ -110,38 +124,63 @@ async function main() {
   const gi = geneticIndex(g.geneticCovariance, g.blups.map((b) => b.genotype), g.blups.map((b) => b.values), transIdx.ranking);
   console.log(`desired-gains index built; divergence rank-correlation vs transparent = ${gi.divergence?.rank_correlation}`);
 
-  const traits: ResultBundle['traits'] = TRAITS.map((id, j) => ({
-    variable_id: id,
-    status: 'ok',
-    effects: g.blups.map((b) => ({ germplasm_id: b.genotype, value: b.values[j], type: 'BLUP' as const })),
-    heritability: { method: 'standard', value: Number((g.geneticVariances[j] / (g.geneticVariances[j] + Ve[j])).toFixed(4)) },
-    genetic_sd: Number(Math.sqrt(g.geneticVariances[j]).toFixed(6)),
-    varcomp: [
-      { component: 'genotype', variance: Number(g.geneticVariances[j].toFixed(6)) },
-      { component: 'residual', variance: Number(Ve[j].toFixed(6)) },
-    ],
-    diagnostics: { converged: g.converged, n_genotypes: g.blups.length },
-    warnings: [],
-  }));
+  const traits: ResultBundle['traits'] = TRAITS.map((id, j) => {
+    const vg = g.geneticVariances[j];
+    const vge = g.gxeVariances?.[j] ?? 0; // present only in the one-stage GxE fit
+    const ve = Ve[j];
+    return {
+      variable_id: id,
+      status: 'ok' as const,
+      effects: g.blups.map((b) => ({ germplasm_id: b.genotype, value: b.values[j], type: 'BLUP' as const })),
+      heritability: { method: 'standard' as const, value: Number((vg / (vg + vge + ve)).toFixed(4)) },
+      genetic_sd: Number(Math.sqrt(vg).toFixed(6)),
+      varcomp: [
+        { component: 'genotype', variance: Number(vg.toFixed(6)) },
+        ...(g.gxeVariances ? [{ component: 'genotype:environment', variance: Number(vge.toFixed(6)) }] : []),
+        { component: 'residual', variance: Number(ve.toFixed(6)) },
+      ],
+      diagnostics: { converged: g.converged, n_genotypes: g.blups.length },
+      warnings: [],
+    };
+  });
 
+  const oneStage = plan.model_class === 'single_stage';
   const bundle: ResultBundle = {
     contract_version: 'v0',
     status: 'ok',
     intent: 'selection',
     chosen_model: {
-      description: 'Two-stage MET: Stage 1 removes within-environment field trend (SpATS 2D P-spline per environment × trait, genotype fixed → adjusted entry means); Stage 2 fits multi-trait AI-REML across 8 environments (genotype random) for the genetic covariance and BLUPs.',
-      formula: 'stage 1: trait ~ PSANOVA(col,row) + genotype(fixed)  [per env];  stage 2: adjusted_mean ~ environment + genotype(random)',
+      description: oneStage
+        ? `Single-stage multi-trait AI-REML${plan.gxe.include ? ' with a genotype×environment term' : ''}; genotype random (BLUPs).`
+        : 'Two-stage MET: SpATS within-environment spatial de-trending, then multi-trait AI-REML across environments; genotype random (BLUPs).',
+      formula: oneStage
+        ? `trait ~ environment + genotype(random)${plan.gxe.include ? ' + genotype:environment(random)' : ''}`
+        : 'stage 1: trait ~ PSANOVA(col,row) + genotype(fixed)  [per env];  stage 2: adjusted_mean ~ environment + genotype(random)',
       genotype_effect: 'random',
-      spatial_method: 'spats',
-      relationship: 'identity',
-      engine: 'SpATS + blupf90+',
-      rationale: 'Spatial de-trending stops field heterogeneity from contaminating the genetic correlations and heritabilities; the multi-trait AI-REML then estimates the across-environment genetic covariance G — the basis for genetic correlations and the genetically-aware Smith–Hazel index.',
+      spatial_method: plan.spatial_method,
+      relationship: plan.relationship as 'identity' | 'A' | 'G' | 'H',
+      engine: plan.engine,
+      // headline only; the full per-decision reasoning lives in `decisions[]` (the readiness panel).
+      rationale: plan.decisions.find((d) => d.factor === 'staging')?.reason ?? '',
+      model_class: plan.model_class,
+      staging_weighted: plan.staging_weighted,
+      decisions: plan.decisions,
     },
     traits,
     genetic_correlations: { variable_ids: TRAITS, matrix: g.geneticCorrelation },
+    gxe: g.gxeCovariance
+      ? { variable_ids: TRAITS, covariance: g.gxeCovariance, correlation: g.gxeCorrelation, variances: g.gxeVariances }
+      : null,
+    data_readiness: {
+      scale: readiness.scale,
+      connectivity: readiness.connectivity,
+      replication: readiness.replication,
+      grids: readiness.grids,
+      unlocks: plan.unlocks,
+    },
     indices: [transIdx, gi.index],
     divergence: gi.divergence,
-    warnings: [{ code: 'met_gxe_in_residual', message: 'Within-environment spatial trend is removed (Stage 1), so genetic correlations are no longer contaminated by field heterogeneity. Genotype×environment is not separated from residual error: the trial is largely unreplicated within environment, so a distinct GxE variance is not identifiable without replicated trials (or a weighted two-stage with fixed residual). GxE is folded into the residual here.', severity: 'info' }],
+    warnings: plan.gxe.include ? [] : [{ code: 'gxe_not_separated', message: plan.gxe.reason, severity: 'info' as const }],
     provenance: { contract_version: 'v0', engine_versions: { blupf90: 'blupf90+' } },
   };
 
