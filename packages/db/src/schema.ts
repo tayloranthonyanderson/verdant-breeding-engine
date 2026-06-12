@@ -23,12 +23,20 @@ import {
   jsonb,
   index,
   uniqueIndex,
+  customType,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 const id = () => bigint('id', { mode: 'number' }).generatedAlwaysAsIdentity().primaryKey();
 const createdAt = () =>
   timestamp('created_at', { withTimezone: true }).defaultNow().notNull();
+
+/** Postgres bytea ↔ Node Buffer — the packed genotype dosage vector (ADR-0017). */
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType() {
+    return 'bytea';
+  },
+});
 
 /** Breeding program — the tenant-scoping root (ADR-0005). Everything hangs off a program. */
 export const program = pgTable(
@@ -186,6 +194,89 @@ export const resultBundle = pgTable(
   (t) => [uniqueIndex('resultbundle_run_uq').on(t.analysisRunId)],
 );
 
+// --- Genotyping layer (ADR-0017) — BrAPI VariantSet / Variant / Sample / CallSet -------------
+// Each marker panel/platform is a VariantSet — the crop/platform heterogeneity axis (a maize 437k
+// hybrid VCF, a tomato GBS run, an Illumina array all coexist as separate sets). A line's dosages
+// are stored PACKED on its CallSet (one byte per variant: 0/1/2, 255=missing, ordered by
+// variant.idx), LZ4/TOAST-compressed by Postgres — compact + fast to bulk-load for genomic
+// prediction. The BrAPI long `call` form (one row per variant×callset) is the canonical contract
+// and the BigQuery target; in the Postgres tier it is a DERIVABLE VIEW over these blobs, not a
+// stored billions-row table. Packed is a swappable physical layer; the long model is the contract.
+
+/** VariantSet — one marker panel / genotyping platform / build. The heterogeneity scaling axis. */
+export const variantSet = pgTable(
+  'variant_set',
+  {
+    id: id(),
+    name: text('name').notNull(), // e.g. "G2F 2014-2023 hybrids (437k, competition VCF)"
+    crop: text('crop'), // e.g. "maize" — lets many crops coexist
+    platform: text('platform'), // e.g. "TASSEL hybrid build", "Illumina 50K", "GBS"
+    genomeBuild: text('genome_build'), // reference assembly the positions are on
+    encoding: text('encoding').notNull().default('dosage_u8'), // 1 byte/variant: 0,1,2; 255=missing
+    nVariants: integer('n_variants'),
+    nCallSets: integer('n_call_sets'),
+    source: text('source'), // provenance (DOI / file)
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('variant_set_name_uq').on(t.name)],
+);
+
+/** Variant — one marker (SNP) in a set. `idx` is its ordinal position in the packed dosage vector. */
+export const variant = pgTable(
+  'variant',
+  {
+    id: id(),
+    variantSetId: bigint('variant_set_id', { mode: 'number' })
+      .notNull()
+      .references(() => variantSet.id),
+    idx: integer('idx').notNull(), // position in the CallSet dosage byte vector
+    name: text('name'), // SNP id (VCF ID, e.g. "S1_120931")
+    chrom: text('chrom'),
+    pos: bigint('pos', { mode: 'number' }),
+    alleleRef: text('allele_ref'),
+    alleleAlt: text('allele_alt'),
+    maf: doublePrecision('maf'), // QC stats, filled on ingest
+    callRate: doublePrecision('call_rate'),
+  },
+  (t) => [
+    uniqueIndex('variant_set_idx_uq').on(t.variantSetId, t.idx),
+    index('variant_set_pos_idx').on(t.variantSetId, t.chrom, t.pos),
+  ],
+);
+
+/** Sample — a genotyped biological entry (here, a hybrid). Maps to germplasm when identified. */
+export const sample = pgTable(
+  'sample',
+  {
+    id: id(),
+    name: text('name').notNull(), // line/hybrid name as in the VCF (e.g. "2369/DK3IIH6")
+    germplasmId: bigint('germplasm_id', { mode: 'number' }).references(() => germplasm.id),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('sample_name_uq').on(t.name)],
+);
+
+/** CallSet — one sample's genotype within one VariantSet. Holds the PACKED dosage vector. */
+export const callSet = pgTable(
+  'call_set',
+  {
+    id: id(),
+    variantSetId: bigint('variant_set_id', { mode: 'number' })
+      .notNull()
+      .references(() => variantSet.id),
+    sampleId: bigint('sample_id', { mode: 'number' })
+      .notNull()
+      .references(() => sample.id),
+    dosages: bytea('dosages').notNull(), // length = variantSet.nVariants, ordered by variant.idx
+    callRate: doublePrecision('call_rate'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex('call_set_set_sample_uq').on(t.variantSetId, t.sampleId),
+    index('call_set_sample_idx').on(t.sampleId),
+  ],
+);
+
 // --- relations (for ergonomic relational queries) -------------------------------------------
 export const programRelations = relations(program, ({ many }) => ({
   studies: many(study),
@@ -229,4 +320,19 @@ export const resultBundleRelations = relations(resultBundle, ({ one }) => ({
     fields: [resultBundle.analysisRunId],
     references: [analysisRun.id],
   }),
+}));
+export const variantSetRelations = relations(variantSet, ({ many }) => ({
+  variants: many(variant),
+  callSets: many(callSet),
+}));
+export const variantRelations = relations(variant, ({ one }) => ({
+  variantSet: one(variantSet, { fields: [variant.variantSetId], references: [variantSet.id] }),
+}));
+export const sampleRelations = relations(sample, ({ one, many }) => ({
+  germplasm: one(germplasm, { fields: [sample.germplasmId], references: [germplasm.id] }),
+  callSets: many(callSet),
+}));
+export const callSetRelations = relations(callSet, ({ one }) => ({
+  variantSet: one(variantSet, { fields: [callSet.variantSetId], references: [variantSet.id] }),
+  sample: one(sample, { fields: [callSet.sampleId], references: [sample.id] }),
 }));

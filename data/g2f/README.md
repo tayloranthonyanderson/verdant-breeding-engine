@@ -15,5 +15,24 @@ Re-download the raw file:
 curl -sL https://raw.githubusercontent.com/dperondi/maizegxeprediction2022/HEAD/data/raw/Training_Data/1_Training_Trait_Data_2014_2021.csv \
   -o data/g2f/raw/1_Training_Trait_Data_2014_2021.csv
 ```
+
+## Genotype data (markers) — for GBLUP / rrBLUP
+
+Source: the **official** G2F GxE competition archive on CyVerse Data Commons
+(DOI [10.25739/tq5e-ak26](https://doi.org/10.25739/tq5e-ak26)). The competitor GitHub repo's
+`5_Genotype_Data_All_Years.vcf.zip` is a macOS alias stub, not real data — use CyVerse.
+
+- `5_Genotype_Data_All_Years.vcf.zip` — **368 MB zip → 8.6 GB VCF**, git-ignored. VCFv4.0, GT format,
+  **~437k SNPs × 4,928 hybrids** (`G2F_2014-2023_Hybrids_437k`, TASSEL hybrid build, B73 contigs 1–10).
+  Hybrid-level genotypes named `parent1/parent2` — **1,153 of our 1,198 MET_2019 hybrids match by
+  exact name** (the rest are name/parent-order variants). No midparent derivation needed.
+
+Re-download (resumable; the WebDAV endpoint can truncate — verify size = 385,667,072 bytes):
+```
+curl -L -C - --retry 5 -o data/g2f/raw/5_Genotype_Data_All_Years.vcf.zip \
+  "https://data.cyverse.org/dav-anon/iplant/projects/commons_repo/curated/GenomesToFields_GenotypeByEnvironment_PredictionCompetition_2023/Training_data/5_Genotype_Data_All_Years.vcf.zip"
+```
+Storage model: [ADR-0017](../../docs/adr/0017-genotype-storage-packed-callsets.md) (BrAPI VariantSet/
+Variant/Sample/CallSet, packed dosage `bytea` in Postgres).
 Column glossary (key fields): Env=location-year · Range/Pass=spatial grid · Replicate/Block=design ·
 Hybrid=genotype (Parent1/Parent2) · Yield_Mg_ha=grain yield · plus height, moisture, DAP, lodging traits.
