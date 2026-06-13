@@ -29,14 +29,17 @@ A tidy long table + a small bit of metadata:
   correlations among traits, and **GxE / stability** metrics.
 - **Selection index:** combine standardized trait BLUPs by user weights &
   directions into a single rank.
-- **Validation first:** balance, missingness, outliers, factor-level sanity —
-  surfaced in plain language before any model runs.
+- **Validation first** — ✅ built (ADR-0021): pre-fit **Data Quality** (robust outliers,
+  missingness, factor-level sanity, box-and-whisker distributions) surfaced in plain language
+  before any model runs, plus post-fit **Model QC** (residual diagnostics, normal Q-Q, the
+  raw→trend→residual field triptych). Advisory — the breeder excludes flagged data and re-runs.
 
 ### Output
 - Per-genotype BLUP/BLUE table per trait.
 - Heritability + reliability per trait.
 - **Ranked selection list** by index; sliders to re-weight traits live.
-- Diagnostics (residual plots, convergence, what model was chosen and *why*).
+- Diagnostics — ✅ built: residual-vs-fitted, normal Q-Q, spatial field maps, influential
+  observations, convergence, and the chosen model + *why* (the Model Planner's decision log).
 
 ## Minimal v1 data model (file-based, NOT a DB server yet)
 Just enough to run the slice. Persistence comes in Phase 4.

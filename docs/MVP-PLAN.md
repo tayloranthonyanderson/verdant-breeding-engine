@@ -90,6 +90,15 @@ Effort is relative (S/M/L/XL) at ~8–12 hrs/wk, not a date.
     surfaces as an unlock.
   - ✅ **Crop-agnostic MET seams (ADR-0015):** generic plot record; dataset column names
     (G2F's `Range`/`Pass`/`Hybrid`…) live only in ingestion, never in the kernel/adapter.
+  - ✅ **Trust layer — Data Quality + Model QC (ADR-0021):** the "diagnostics" + analysis-time
+    "validation report" promise, built end-to-end. Pre-fit **Data Quality** (robust MAD outliers,
+    missingness, factor sanity, box-and-whisker distributions) and post-fit **Model QC** (the fit's
+    own spatially-adjusted residuals → residual-vs-fitted, normal Q-Q, the raw→trend→residual field
+    triptych, influential observations, reliability/h²-boundary). Advisory-only: findings propose, the
+    breeder disposes via a **`data_overrides`** exclusion overlay that re-plans on re-run and never
+    deletes stored data. Surfaced across the journey as the **Data** step (pre-fit) and the Model
+    step's **fit-checks** (post-fit). *Ingestion-time* validation (impossible-value ranges, unit
+    harmonization) waits on the Trait Library — Thread B, ADR-0022.
 - **As-planted layout (ADR-0006):** the **visual field-map editor** (gaps, obstacles, non-contiguous
   ranges); coordinate-import as the fast path; layout as a first-class object.
 - **Ingestion (ADR-0007):** **AI-assisted column mapping + design detection + validation report**, with

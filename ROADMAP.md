@@ -20,9 +20,14 @@ deliberately deferred until the slice above it is real and validated.
 > →BLUP, within-pool ranking) + SCA, topology-selected (line×tester here, 614 lines × 13
 > testers), with a breeder-grade workspace — GCA/hybrid ranking, per-se↔GCA divergence,
 > SCA heatmap, native-trait gating, and recorded advancement. The **trust layer (ADR-0021)** is now
-> built end-to-end too: two-pass **Data Quality** (pre-fit, value-level) + **Model QC** (post-fit
-> residuals), advisory-only, with a breeder-dispositioned **`data_overrides`** exclusion overlay and a
-> "Quality" journey step — completing the previously-unchecked Phase-1 data-validation item. **Next:** the
+> built end-to-end too: two-pass **Data Quality** (pre-fit — robust MAD outliers, missingness,
+> box-and-whisker by environment) + **Model QC** (post-fit, on the fit's OWN spatially-adjusted
+> residuals — residual-vs-fitted, normal Q-Q, the raw→trend→residual **field triptych**, influential
+> observations), advisory-only, with a breeder-dispositioned **`data_overrides`** exclusion overlay that
+> re-plans on re-run and never deletes data. Split across the journey (**Overview → Data → Model →
+> Understand → Select → Advance → Genomics**: pre-fit checks in the **Data** step, model-dependent
+> diagnostics in the **Model** step's fit-checks) — completing the previously-unchecked Phase-1
+> data-validation item. **Next:** the
 > natural-language Q&A layer (Phase 2); the ingestion front door (Trait Library + unit harmonization,
 > Thread B / ADR-0022); a `relationship_set` cache table + `sample.germplasm_id` mapping; forward-year
 > predictive validation.
