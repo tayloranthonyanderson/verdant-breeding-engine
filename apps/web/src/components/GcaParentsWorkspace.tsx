@@ -7,14 +7,14 @@
 // machinery as hybrids, pointed at parent GCA.
 import { useMemo, useState } from "react";
 import { SlidersHorizontal, Dna, GitCompareArrows, Grid3x3 } from "lucide-react";
-import { getCombiningAbility, gcaBundleForPool, statedRankingForPool, geneticRankingForPool, type CombiningAbility } from "@/lib/ca";
+import { getCombiningAbility, gcaBundleForPool, statedRankingForPool, geneticRankingForPool, gatedSet, type CombiningAbility, type MarkerGates, type AdvanceFn } from "@/lib/ca";
 import type { ResultBundle } from "@verdant/contracts";
 import GcaParents from "./GcaParents";
+import GcaGates from "./GcaGates";
 import DesiredGainsExplorer from "./DesiredGainsExplorer";
 import IndexDivergence from "./IndexDivergence";
 import PerSeGcaDivergence from "./PerSeGcaDivergence";
 import ScaHeatmap from "./ScaHeatmap";
-import type { AdvanceFn } from "@/lib/ca";
 
 const POOL_COLOR: Record<string, string> = { A: "#0ea5e9", B: "#8b5cf6" };
 type Lens = "stated" | "genetic" | "compare" | "sca";
@@ -32,6 +32,8 @@ export default function GcaParentsWorkspace({
   const pools = ca?.topology.pools.map((p) => p.pool) ?? [];
   const [pool, setPool] = useState(pools[0] ?? "A");
   const [lens, setLens] = useState<Lens>("stated");
+  const [gates, setGates] = useState<MarkerGates>({});
+  const gated = useMemo(() => (ca ? gatedSet(ca, gates) : new Set<string>()), [ca, gates]);
   if (!ca) return null;
 
   const lenses: Array<{ id: Lens; label: string; icon: React.ReactNode; hint: string }> = [
@@ -65,20 +67,23 @@ export default function GcaParentsWorkspace({
         <span className="text-[11px] text-slate-400">{lenses.find((l) => l.id === lens)?.hint}</span>
       </div>
 
-      {lens === "stated" && <GcaParents ca={ca} pool={pool} advancedKeys={advancedKeys} onAdvance={onAdvance} onAdvanceMany={onAdvanceMany} busyKey={busyKey} />}
-      {lens === "genetic" && <DesiredGainsExplorer bundle={gcaBundleForPool(ca, pool)} />}
-      {lens === "compare" && <CompareLens ca={ca} pool={pool} bundle={bundle} />}
+      {/* marker gates — shared across lenses (cull first, then rank survivors) */}
+      {lens !== "sca" && <GcaGates ca={ca} pool={pool} gates={gates} onChange={setGates} />}
+
+      {lens === "stated" && <GcaParents ca={ca} pool={pool} gatedLines={gated} advancedKeys={advancedKeys} onAdvance={onAdvance} onAdvanceMany={onAdvanceMany} busyKey={busyKey} />}
+      {lens === "genetic" && <DesiredGainsExplorer bundle={gcaBundleForPool(ca, pool, gated)} />}
+      {lens === "compare" && <CompareLens ca={ca} pool={pool} gated={gated} />}
       {lens === "sca" && <ScaHeatmap ca={ca} />}
     </div>
   );
 }
 
-function CompareLens({ ca, pool, bundle }: { ca: CombiningAbility; pool: string; bundle: ResultBundle }) {
-  const stated = useMemo(() => statedRankingForPool(ca, pool), [ca, pool]);
-  const genetic = useMemo(() => geneticRankingForPool(ca, pool), [ca, pool]);
+function CompareLens({ ca, pool, gated }: { ca: CombiningAbility; pool: string; gated: Set<string> }) {
+  const stated = useMemo(() => statedRankingForPool(ca, pool, gated), [ca, pool, gated]);
+  const genetic = useMemo(() => geneticRankingForPool(ca, pool, undefined, gated), [ca, pool, gated]);
   return (
     <div className="space-y-4">
-      <IndexDivergence bundle={gcaBundleForPool(ca, pool)} transparentRanking={stated} geneticRanking={genetic} />
+      <IndexDivergence bundle={gcaBundleForPool(ca, pool, gated)} transparentRanking={stated} geneticRanking={genetic} />
       <div>
         <h4 className="mb-2 text-sm font-semibold text-slate-700">Per-se vs combining ability</h4>
         <PerSeGcaDivergence ca={ca} />

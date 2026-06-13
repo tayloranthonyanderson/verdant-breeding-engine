@@ -15,10 +15,12 @@ export interface CaDiagnostics {
   replication: { replicated_crosses: number; total_crosses: number };
 }
 export interface CaTraitSummary { variable_id: string; varcomp: Array<{ component: string; variance: number }>; genetic_sd: number | null; baker_ratio: number | null }
+export interface CaLocus { locus: string; trait: string; alleles: [string, string]; favorable: string; freq: number }
 export interface CaGca {
   line: string; pool: string;
   cross_degree: { n_testers: number; n_plots: number };
   per_se: number | null; nclb_resistant: number | null;
+  loci?: Record<string, string> | null;
   values: Record<string, number | null>;
 }
 export interface CaRankRow { line: string; pool: string; score: number; rank: number; gated_out: boolean; gate_failures: string[] }
@@ -37,6 +39,7 @@ export interface CombiningAbility {
   diagnostics: CaDiagnostics;
   traits: CaTraitSummary[];
   gca_genetic_correlations: { variable_ids: string[]; matrix: number[][] };
+  loci_catalog?: CaLocus[];
   index_traits: string[];
   gca: CaGca[];
   pool_rankings: CaPoolRanking[];
@@ -48,6 +51,27 @@ export interface CombiningAbility {
 export function getCombiningAbility(bundle: ResultBundle): CombiningAbility | null {
   const ca = (bundle as { combining_ability?: unknown }).combining_ability;
   return ca ? (ca as unknown as CombiningAbility) : null;
+}
+
+// Marker gates: locus → the desired allele(s). A line is gated OUT if, at any locus with a non-empty
+// selection, its homozygous allele is not among the desired ones (independent culling — ADR-0020).
+export type MarkerGates = Record<string, string[]>;
+export function activeGateLoci(gates: MarkerGates): string[] {
+  return Object.keys(gates).filter((l) => (gates[l]?.length ?? 0) > 0);
+}
+export function lineFailsGates(g: CaGca, gates: MarkerGates): boolean {
+  for (const locus of activeGateLoci(gates)) {
+    const allele = g.loci?.[locus];
+    if (!allele || !gates[locus].includes(allele)) return true;
+  }
+  return false;
+}
+/** The set of line names culled by the active gates (across all pools). */
+export function gatedSet(ca: CombiningAbility, gates: MarkerGates): Set<string> {
+  const out = new Set<string>();
+  if (activeGateLoci(gates).length === 0) return out;
+  for (const g of ca.gca) if (lineFailsGates(g, gates)) out.add(g.line);
+  return out;
 }
 
 // Advancement wiring shared across the selection levels.
@@ -77,10 +101,12 @@ export const DEFAULT_GCA_GAINS: Record<string, number> = {
   Yield_Mg_ha: 1, Grain_Moisture: -1, Plant_Height_cm: 0.5, Ear_Height_cm: -0.5,
 };
 
-/** The kernel's within-pool transparent (stated) GCA ranking as {germplasm_id, rank}. */
-export function statedRankingForPool(ca: CombiningAbility, pool: string): Array<{ germplasm_id: string; rank: number }> {
+/** The kernel's within-pool transparent (stated) GCA ranking as {germplasm_id, rank}, gated lines culled. */
+export function statedRankingForPool(ca: CombiningAbility, pool: string, exclude?: Set<string>): Array<{ germplasm_id: string; rank: number }> {
   const pr = ca.pool_rankings.find((p) => p.pool === pool);
-  return (pr?.ranking ?? []).map((r) => ({ germplasm_id: r.line, rank: r.rank }));
+  return (pr?.ranking ?? [])
+    .filter((r) => !exclude?.has(r.line))
+    .map((r, i) => ({ germplasm_id: r.line, rank: i + 1 }));
 }
 
 function solveLin(A: number[][], rhs: number[]): number[] {
@@ -95,13 +121,13 @@ function solveLin(A: number[][], rhs: number[]): number[] {
 }
 
 /** The genetically-aware (desired-gains) within-pool GCA ranking: b = G⁻¹(d·σ), rank on b·GCA. */
-export function geneticRankingForPool(ca: CombiningAbility, pool: string, gains = DEFAULT_GCA_GAINS): Array<{ germplasm_id: string; rank: number }> {
+export function geneticRankingForPool(ca: CombiningAbility, pool: string, gains = DEFAULT_GCA_GAINS, exclude?: Set<string>): Array<{ germplasm_id: string; rank: number }> {
   const traits = ca.gca_genetic_correlations.variable_ids;
   const sd = traits.map((id) => ca.traits.find((t) => t.variable_id === id)?.genetic_sd ?? 1);
   const C = ca.gca_genetic_correlations.matrix;
   const G = C.map((row, i) => row.map((c, j) => (c ?? 0) * (sd[i] ?? 1) * (sd[j] ?? 1)));
   const b = solveLin(G, traits.map((id, j) => (gains[id] ?? 0) * (sd[j] ?? 1)));
-  const members = ca.gca.filter((g) => g.pool === pool);
+  const members = ca.gca.filter((g) => g.pool === pool && !exclude?.has(g.line));
   return members
     .map((g) => ({ id: g.line, s: traits.reduce((acc, id, j) => acc + b[j] * (g.values[id] ?? 0), 0) }))
     .sort((a, z) => z.s - a.s)
@@ -111,9 +137,9 @@ export function geneticRankingForPool(ca: CombiningAbility, pool: string, gains 
 /** A ResultBundle-shaped slice for one pool: per-line GCA as the trait effects, the GCA genetic
  *  correlation as G, and the stated + desired-gains seed indices. Only the fields the index
  *  components read are populated; the rest is a typed stub. */
-export function gcaBundleForPool(ca: CombiningAbility, pool: string): ResultBundle {
+export function gcaBundleForPool(ca: CombiningAbility, pool: string, exclude?: Set<string>): ResultBundle {
   const traits = ca.gca_genetic_correlations.variable_ids;
-  const members = ca.gca.filter((g) => g.pool === pool);
+  const members = ca.gca.filter((g) => g.pool === pool && !exclude?.has(g.line));
   const sdByTrait = new Map(ca.traits.map((t) => [t.variable_id, t.genetic_sd]));
   const traitObjs = traits.map((id) => ({
     variable_id: id, status: "ok" as const, genetic_sd: sdByTrait.get(id) ?? 1,
@@ -126,7 +152,7 @@ export function gcaBundleForPool(ca: CombiningAbility, pool: string): ResultBund
     traits: traitObjs,
     genetic_correlations: { variable_ids: traits, matrix: ca.gca_genetic_correlations.matrix },
     indices: [
-      { kind: "weighted", segment_id: `pool-${pool}`, ranking: statedRankingForPool(ca, pool).map((r) => ({ ...r, score: null, gated_out: false, gate_failures: [] })) },
+      { kind: "weighted", segment_id: `pool-${pool}`, ranking: statedRankingForPool(ca, pool, exclude).map((r) => ({ ...r, score: null, gated_out: false, gate_failures: [] })) },
       { kind: "desired_gains", segment_id: `pool-${pool}`, ranking: [], weights_used: traits.map((id) => ({ variable_id: id, weight: DEFAULT_GCA_GAINS[id] ?? 0, direction: (DEFAULT_GCA_GAINS[id] ?? 0) < 0 ? -1 : 1 })) },
     ],
     divergence: null, warnings: [], provenance: { contract_version: "v0" },

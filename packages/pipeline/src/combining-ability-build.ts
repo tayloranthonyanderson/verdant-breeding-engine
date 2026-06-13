@@ -10,6 +10,7 @@ import { db, pool as pgPool, program, study, analysisRun, resultBundle, inbredLi
 import { validateResultBundle, type ResultBundle, type AnalysisRequest } from '@verdant/contracts';
 import { parseG2fMet, parseG2fHybrids } from './g2f';
 import { runRKernel } from './kernel';
+import { LOCI_CATALOG, type Locus } from './loci';
 import { metFixture } from './paths';
 import { isEntrypoint } from './entry';
 
@@ -36,7 +37,8 @@ export interface CombiningAbility {
   traits: Array<{ variable_id: string; varcomp: Array<{ component: string; variance: number }>; genetic_sd: number | null; baker_ratio: number | null }>;
   gca_genetic_correlations: { variable_ids: string[]; matrix: number[][] };
   index_traits: string[];
-  gca: Array<{ line: string; pool: string; cross_degree: { n_testers: number; n_plots: number }; per_se: number | null; nclb_resistant: number | null; values: Record<string, number | null> }>;
+  loci_catalog?: Locus[];
+  gca: Array<{ line: string; pool: string; cross_degree: { n_testers: number; n_plots: number }; per_se: number | null; nclb_resistant: number | null; loci?: Record<string, string> | null; values: Record<string, number | null> }>;
   pool_rankings: Array<{ pool: string; n: number; ranking: Array<{ line: string; pool: string; score: number; rank: number; gated_out: boolean; gate_failures: string[] }> }>;
   hybrids: Array<{ hybrid: string; line: string; tester: string; pool: string; n_plots: number; rank: number; score: number; observed: Record<string, number | null>; line_gca: Record<string, number | null> }>;
   sca: Array<{ line: string; tester: string; value: number }>;
@@ -78,7 +80,12 @@ export async function computeCombiningAbility(opts: { traits?: string[] } = {}):
     },
     objective,
   };
-  return runRKernel<{ combining_ability: CombiningAbility }>('combining-ability.R', payload, { transport: 'cfg-file', maxBuffer: 1 << 28 }).combining_ability;
+  const ca = runRKernel<{ combining_ability: CombiningAbility }>('combining-ability.R', payload, { transport: 'cfg-file', maxBuffer: 1 << 28 }).combining_ability;
+  // attach the directly-observed inbred marker calls (the gate source) + the locus catalog.
+  const lociByName = new Map(inbreds.map((i) => [i.name, (i.loci as Record<string, string> | null) ?? null]));
+  ca.gca = ca.gca.map((g) => ({ ...g, loci: lociByName.get(g.line) ?? null }));
+  ca.loci_catalog = LOCI_CATALOG;
+  return ca;
 }
 
 /** The latest persisted bundle that carries the rich HYBRID analysis (model decisions + genomic +

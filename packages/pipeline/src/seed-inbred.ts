@@ -8,6 +8,7 @@
 import { eq } from 'drizzle-orm';
 import { db, pool as pgPool, program, inbredLine } from '@verdant/db';
 import { parseG2fHybrids } from './g2f';
+import { allelesFor } from './loci';
 import { metFixture } from './paths';
 import { isEntrypoint } from './entry';
 
@@ -82,9 +83,10 @@ async function main() {
     // diverges. r≈0.6 with the line's testcross mean; deterministic noise from the name hash.
     const z = lineMean.has(name) ? (lineMean.get(name)! - mu) / sd : 0;
     const perSe = isTester ? null : Number((0.6 * z + 0.8 * gauss(name)).toFixed(4));
-    // native qualitative trait Ht1 / NCLB resistance: ~38% of lines carry it (directly observed on
-    // the inbred). Testers left null (not the selection unit here).
-    const nclb = isTester ? null : (unit(name + '#nclb') < 0.38 ? 1 : 0);
+    // homozygous major-gene alleles (the marker-gate source). Lines only; the legacy nctlb flag is
+    // derived from the Ht1 locus for back-compat.
+    const loci = isTester ? null : allelesFor(name);
+    const nclb = loci ? (loci.Ht1 === 'Ht1' ? 1 : 0) : null;
 
     rows.push({
       programId: pid, name,
@@ -92,6 +94,7 @@ async function main() {
       pool: assignedPool,
       perSeValue: perSe,
       nctlbResistant: nclb,
+      loci,
       synthetic: 1,
     });
   }

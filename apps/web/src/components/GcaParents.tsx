@@ -11,27 +11,27 @@ import {
   ScatterChart, Scatter, XAxis, YAxis, ZAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer,
   BarChart, Bar, Legend,
 } from "recharts";
-import { ShieldCheck, Check, ArrowUp, ArrowDown, Crosshair } from "lucide-react";
-import { fmt, type CombiningAbility, type CaGca } from "@/lib/ca";
-import type { AdvanceFn } from "@/lib/ca";
+import { Check, ArrowUp, ArrowDown, Crosshair } from "lucide-react";
+import { fmt, type CombiningAbility, type CaGca, type CaLocus, type AdvanceFn } from "@/lib/ca";
 
 const POOL_COLOR: Record<string, string> = { A: "#0ea5e9", B: "#8b5cf6" };
 const TRAIT_COLORS = ["#10b981", "#6366f1", "#f59e0b", "#0ea5e9", "#f43f5e"];
 type Mode = "max" | "min" | "target";
 
 export default function GcaParents({
-  ca, pool, advancedKeys, onAdvance, onAdvanceMany, busyKey,
+  ca, pool, gatedLines, advancedKeys, onAdvance, onAdvanceMany, busyKey,
 }: {
   ca: CombiningAbility;
   pool: string;
+  gatedLines: Set<string>;
   advancedKeys: Map<string, string>;
   onAdvance: AdvanceFn;
   onAdvanceMany: (rows: Array<{ candidate: string; unit: "inbred" | "hybrid"; pool: string | null; disposition: string }>) => void;
   busyKey: string | null;
 }) {
   const traits = ca.index_traits;
+  const catalog = ca.loci_catalog ?? [];
   const [showAll, setShowAll] = useState(false);
-  const [gateOn, setGateOn] = useState(true);
 
   // --- interactive index controls (weights to 100%, mode per trait) -------------------------------
   const seed = useMemo(() => {
@@ -90,12 +90,12 @@ export default function GcaParents({
           const mn = ((merit[t].get(g.line) ?? 0) - meritNorm[t].mean) / meritNorm[t].sd;
           const c = (mn * (weights[t] ?? 0)) / totalW; parts[t] = c; s += c;
         }
-        const gated = gateOn && g.nclb_resistant !== 1;
+        const gated = gatedLines.has(g.line);
         return { g, score: s, parts, gated };
       })
       .sort((a, b) => a.score - b.score === 0 ? 0 : b.score - a.score)
       .map((r, i) => ({ ...r, rank: i + 1 }));
-  }, [members, traits, modes, weights, totalW, gateOn]);
+  }, [members, traits, modes, weights, totalW, gatedLines]);
 
   const survivors = ranking.filter((r) => !r.gated);
   const maxAbs = Math.max(0.01, ...ranking.map((r) => Math.abs(r.score)));
@@ -116,11 +116,7 @@ export default function GcaParents({
     <div className="space-y-4">
       {/* controls row */}
       <div className="flex flex-wrap items-center gap-3">
-        <label className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-600">
-          <input type="checkbox" checked={gateOn} onChange={(e) => setGateOn(e.target.checked)} className="accent-emerald-600" />
-          NCLB gate
-        </label>
-        <span className="text-[11px] text-slate-400">Ranked within pool — pools scored independently.</span>
+        <span className="text-[11px] text-slate-400">Ranked within pool — pools scored independently. Gated lines (struck through) fail the marker gates above.</span>
         <button type="button" onClick={advanceTop10} disabled={busyKey === "__batch__"}
           className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50">
           <Check size={13} /> Advance top 10 (passing gate)
@@ -186,7 +182,7 @@ export default function GcaParents({
                   <th className="px-3 py-2 text-right font-medium">{shortTrait(yieldTrait)}</th>
                   {moistTrait && <th className="px-3 py-2 text-right font-medium">{shortTrait(moistTrait)}</th>}
                   <th className="px-3 py-2 text-center font-medium">Tested</th>
-                  <th className="px-3 py-2 text-center font-medium">NCLB</th>
+                  <th className="px-3 py-2 text-center font-medium">Markers</th>
                   <th className="px-3 py-2 text-right font-medium">Advance</th>
                 </tr>
               </thead>
@@ -205,9 +201,7 @@ export default function GcaParents({
                       <td className="px-3 py-1.5 text-right tabular-nums">{gcaCell(r.g.values[yieldTrait])}</td>
                       {moistTrait && <td className="px-3 py-1.5 text-right tabular-nums">{gcaCell(r.g.values[moistTrait])}</td>}
                       <td className="px-3 py-1.5"><div className="flex justify-center"><DegreeDot g={r.g} /></div></td>
-                      <td className="px-3 py-1.5 text-center">
-                        {r.g.nclb_resistant === 1 ? <ShieldCheck size={14} className="mx-auto text-emerald-600" /> : <span className="text-[11px] text-slate-300">—</span>}
-                      </td>
+                      <td className="px-3 py-1.5 text-center"><MarkerProfile loci={r.g.loci} catalog={catalog} /></td>
                       <td className="px-3 py-1.5 text-right">
                         <button type="button" onClick={() => onAdvance(r.g.line, "inbred", pool, "advance")} disabled={busy}
                           className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition disabled:opacity-40 ${advanced ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
@@ -253,7 +247,7 @@ export default function GcaParents({
           <div className="rounded-xl border border-slate-200 bg-white p-3 text-[11px] text-slate-500">
             <div className="mb-1.5 font-semibold text-slate-700">Reading this</div>
             <p><b className="text-slate-700">GCA</b> is each line&rsquo;s shrunken BLUP — the value already discounts thinly-tested lines toward the mean. The <b className="text-slate-700">Tested</b> dot shows how much data backs it: bigger / darker = more crosses & plots.</p>
-            <p className="mt-1.5">The <b className="text-rose-600">gate</b> culls lines lacking the directly-observed NCLB (Ht1) resistance allele — toggle it above.</p>
+            <p className="mt-1.5">The <b className="text-rose-600">gate</b> culls lines that don&rsquo;t carry the marker alleles you required above. The <b className="text-slate-700">Markers</b> dots show each line&rsquo;s favourable-allele profile (hover for the calls).</p>
           </div>
         </div>
       </div>
@@ -337,6 +331,18 @@ function roundTo100(weights: Record<string, number>, ids: string[]): Record<stri
   const out: Record<string, number> = {}; for (const p of parts) out[p.id] = p.floor;
   for (let i = 0; i < byRem.length && leftover > 0; i++, leftover--) out[byRem[i].id] += 1;
   return out;
+}
+
+function MarkerProfile({ loci, catalog }: { loci?: Record<string, string> | null; catalog: CaLocus[] }) {
+  if (!loci || catalog.length === 0) return <span className="text-[11px] text-slate-300">—</span>;
+  return (
+    <div className="flex justify-center gap-0.5" title={catalog.map((L) => `${L.locus}: ${loci[L.locus] ?? "?"}`).join("   ")}>
+      {catalog.map((L) => {
+        const fav = loci[L.locus] === L.favorable;
+        return <span key={L.locus} className={`h-2 w-2 rounded-full ${fav ? "bg-emerald-500" : "bg-slate-200"}`} />;
+      })}
+    </div>
+  );
 }
 
 function shortTrait(t: string | undefined) {

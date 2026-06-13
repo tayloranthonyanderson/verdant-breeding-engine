@@ -214,7 +214,8 @@ export const inbredLine = pgTable(
     role: text('role').notNull().default('line'), // 'line' (selection candidate) | 'tester' (tool)
     pool: text('pool'), // heterotic group, e.g. 'A' | 'B'; null for testers
     perSeValue: doublePrecision('per_se_value'), // synthetic per-se phenotype (yield), genetic-sd scale
-    nctlbResistant: integer('nctlb_resistant'), // native qualitative trait Ht1 (NCLB resistance): 1 carries / 0 not
+    nctlbResistant: integer('nctlb_resistant'), // legacy: 1 if carries the Ht1 favorable allele (derived from loci)
+    loci: jsonb('loci'), // homozygous allele per major-gene locus, e.g. {"Ht1":"Ht1","Rcg1":"rcg1",...} — the marker-gate source
     synthetic: integer('synthetic').notNull().default(1), // 1 = scaffolding data (ADR-0020), not real
     createdAt: createdAt(),
   },
