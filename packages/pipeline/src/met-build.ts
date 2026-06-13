@@ -17,6 +17,7 @@ import { genomicGblup } from './genomic-blupf90';
 import { parseG2fMet } from './g2f';
 import { spatialStage1 } from './stage1';
 import { runPlanner, type ModelOverrides, type GenomicReadiness } from './planner';
+import { computeCombiningAbility, attachCombiningAbility } from './combining-ability-build';
 import { buildGenomicInputs } from './genomic-inputs';
 import { runRKernel } from './kernel';
 import { isEntrypoint } from './entry';
@@ -338,9 +339,21 @@ export async function runMetAnalysis(opts: RunMetOptions = {}): Promise<RunMetRe
     provenance: { contract_version: 'v0', engine_versions: { blupf90: 'blupf90+', genomic: 'rrBLUP' } },
   };
 
-  const analysisRunId = persist ? await persistBundle(bundle, relationship) : null;
+  // Combining ability is a FACET of this one analysis (ADR-0019/0020): attach it so re-runs stay
+  // unified (the page renders Hybrids + Parents from one bundle). Best-effort — a CA failure must not
+  // sink the hybrid analysis.
+  let finalBundle = bundle;
+  try {
+    const ca = await computeCombiningAbility({ traits: TRAITS });
+    finalBundle = attachCombiningAbility(bundle, ca);
+    console.log(`attached combining ability (${ca.topology.kind}, ${ca.topology.n_lines} lines)`);
+  } catch (e) {
+    console.log(`combining ability not attached: ${(e as Error).message}`);
+  }
+
+  const analysisRunId = persist ? await persistBundle(finalBundle, relationship) : null;
   if (persist) console.log(`persisted MET bundle (analysis_run=${analysisRunId}); relationship=${relationship}`);
-  return { bundle, analysisRunId };
+  return { bundle: finalBundle, analysisRunId };
 }
 
 /** Fast re-run: only the relationship changed. Re-point the ranking from the latest bundle's

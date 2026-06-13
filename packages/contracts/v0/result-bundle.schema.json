@@ -141,6 +141,21 @@
         "distribution": { "type": ["object", "null"], "additionalProperties": true, "description": "Histograms of off-diagonal relatedness + diagonal (genomic inbreeding)." }
       }
     },
+    "combining_ability": {
+      "type": ["object", "null"],
+      "additionalProperties": true,
+      "description": "Combining-ability view (ADR-0019/0020): the hybrid trial decomposed into parent GCA (random→BLUP, the parent-selection target, carried with cross-degree) and SCA (specific-cross deviation, where estimable). Selected from the measured cross-graph topology (diallel/line×tester/sparse factorial); ranking is WITHIN heterotic pool. Null when germplasm are not crosses. Like `genomic`, this carries viz-ready derived data, not the raw fit.",
+      "properties": {
+        "topology": { "type": ["object", "null"], "additionalProperties": true, "description": "Detected mating-design topology (kind, n_lines, n_testers, n_crosses, tester fixed/random, sca_included), the heterotic pools, and the decision log (each with reason + diagnostic)." },
+        "diagnostics": { "type": ["object", "null"], "additionalProperties": true, "description": "Cross-graph readiness: per-line cross-degree distribution (crosses per inbred → GCA precision), connectivity (components — are GCAs on one scale), and cross-replication (SCA separability)." },
+        "traits": { "type": ["array", "null"], "items": { "type": "object", "additionalProperties": true }, "description": "Per trait: GCA/SCA/GCA×E/residual variance components + Baker's ratio (additive share of combining ability)." },
+        "index_traits": { "type": ["array", "null"], "items": { "type": "string" }, "description": "The trait subset the GCA index ranks on (the inbred objective is typically simpler than the hybrid one — complementation, ADR-0020)." },
+        "gca": { "type": ["array", "null"], "items": { "type": "object", "additionalProperties": true }, "description": "Per line: pool, per-trait GCA BLUP (shrinkage baked in), cross-degree (testers/plots — the visual trust signal), per-se value, native-trait calls." },
+        "pool_rankings": { "type": ["array", "null"], "items": { "type": "object", "additionalProperties": true }, "description": "Within-pool GCA ranking (ranking pools jointly would advance only the stronger pool — ADR-0020). Each entry: pool, n, ranking[] with rank/score/gated_out/gate_failures." },
+        "sca": { "type": ["array", "null"], "items": { "type": "object", "additionalProperties": true }, "description": "Observed-cross SCA deviations (line, tester, value) for the heatmap, where SCA is estimable." },
+        "divergence": { "type": ["object", "null"], "additionalProperties": true, "description": "Per-se ↔ GCA disagreement: a line strong per se but a poor combiner (or vice versa) — itself the insight (mirrors transparent-vs-Smith–Hazel)." }
+      }
+    },
     "data_readiness": {
       "type": ["object", "null"],
       "description": "Deterministic structural diagnostics that gated the model choices (grid, replication, cross-environment connectivity, scale), plus what additional data would unlock richer models (ADR-0016). Surfaced to the breeder as the 'why this model / what would unlock more' panel.",

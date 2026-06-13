@@ -77,10 +77,16 @@ See [PRODUCT.md](PRODUCT.md), [ROADMAP.md](ROADMAP.md), [docs/MVP-PLAN.md](docs/
   gate every model choice: per-environment **grid** (row/col density → spatial-capable?), per-environment
   **replication** (within-env entry replication → residual identifiable?), cross-environment
   **connectivity** (genotypes shared across environments → GxE/stability estimable?), and **scale**
-  (n_obs/n_geno/n_env/n_traits, markers present). Crop-agnostic (ADR-0015); never reads column names (ADR-0016).
+  (n_obs/n_geno/n_env/n_traits, markers present). When germplasm are crosses (`parent1`/`parent2`), two
+  further diagnostics gate combining ability: **cross-connectivity** (the bipartite parent cross-graph —
+  are parents linked through shared mating partners, and at what **degree** = crosses per inbred → is GCA
+  estimable, on one common scale, and how precise per parent) and **cross-replication** (specific
+  combinations observed more than once → is SCA separable from residual). Crop-agnostic (ADR-0015); never
+  reads column names (ADR-0016).
 - **Model Plan** — the planner's declarative output *before* fitting: trial structure, spatial method
-  per environment, genotype effect (random/fixed), GxE include/skip, staging (single vs weighted
-  two-stage), engine, relationship. Each decision carries a **reason** and the **diagnostic value** that
+  per environment, genotype effect (random/fixed), **genotype structure** (opaque hybrid BLUP vs a
+  GCA/SCA decomposition, plus its topology-selected parameterization), GxE include/skip, staging (single
+  vs weighted two-stage), engine, relationship. Each decision carries a **reason** and the **diagnostic value** that
   triggered it. One-stage is the default; weighted two-stage is the deliberate scale fallback; GxE fires
   only when **data readiness** says it is identifiable (ADR-0016).
 - **Engine registry** — engines (lme4, SpATS, BLUPF90, rrBLUP) as adapters behind a uniform
@@ -102,6 +108,48 @@ See [PRODUCT.md](PRODUCT.md), [ROADMAP.md](ROADMAP.md), [docs/MVP-PLAN.md](docs/
   choice is an instant re-point, not a refit. **Single-step H** ranks *all* phenotyped lines — including
   un-genotyped ones, which borrow through the pedigree link to genotyped relatives.
 
+## Combining-ability vocabulary (ADR-0019, ADR-0020)
+*Built* (2026-06-12): kernel `combining-ability.R` (lme4 long-form GCA/SCA, topology-selected, emits a
+GCA genetic-covariance), the `combining_ability` bundle section, a `inbred_line` table + synthetic seed.
+Combining ability is a **facet of the one trial analysis**, not a separate page: it is attached to the
+hybrid bundle (`buildCombinedAnalysis` / `runMetAnalysis`), and the web app is **one journey-ordered
+page** whose **Selection** workspace has a **level** switch (Hybrids / Parents·GCA) × a **lens** switch
+(Stated / Genetically-optimal / Compare) over the shared index components — the genetic desired-gains
+lens runs on GCA too. Within-pool GCA + hybrid ranking, per-se↔GCA divergence, SCA, native-trait gating,
+recorded advancement. Validated on G2F MET line×tester. See `.scratch/ux-architecture/plan.md`.
+- **Combining ability** — the decomposition of a *cross's* performance into the contributions of its
+  *parents*. Turns a hybrid-performance trial into **parent selection**: which inbreds are good
+  *combiners*, not merely which hybrids won (the opaque hybrid BLUP can't say). Fired by the planner as a
+  **genotype_structure** decision when germplasm are crosses (`parent1`/`parent2`) and **cross-connectivity**
+  says GCA is identifiable; one unified **random-effects mixed model**, never a fixed-effects Griffing method
+  (ADR-0019). Overridable (ADR-0018).
+- **GCA — general combining ability** — a parent's *average* contribution across its crosses (additive gene
+  action). The headline new deliverable: the **parent-selection target**, fitted random → **BLUP**
+  (the displayed value, shrinkage baked in — the reason breeders trust it). A parent's **cross-degree**
+  (times tested / combinations made) is surfaced as a separate visual signal (dot size/colour), not as the
+  value. An inbred's per-se BLUP and its GCA can disagree — that **divergence** is
+  itself the insight (mirroring transparent-vs-Smith–Hazel).
+- **SCA — specific combining ability** — the *cross-specific* deviation from the additive (GCA + GCA)
+  expectation (non-additive gene action). Rarely separable at real sparse-design degree (≤1 rep, ~2–6
+  crosses/inbred); the planner gates it on **cross-replication** and otherwise folds it into the residual,
+  or predicts it only via a dominance relationship matrix.
+- **Mating-design topology** — the shape of the parent cross-graph, **measured not declared**: **diallel**
+  (parent pools overlap, an inbred is both parents → *pool* both roles into one symmetric GCA, the
+  "overlay"); **line × tester** (pools near-disjoint, one pool a few *chosen* testers → **tester fixed**,
+  line-GCA random); **sparse factorial** (both pools large, sparse new×new → *both* pool-GCAs random). The
+  per-pool fixed-vs-random call follows pool *size* (few chosen levels → fixed; many → random). Selects the
+  GCA parameterization; auto-detected from the graph, overridable (ADR-0018).
+- **Hybrid prediction** — predicting a cross's value. Two tiers: the additive **mid-parent / GCA-only**
+  predictor `μ + GCA_a + GCA_b` (robust, predicts *unmade* crosses; the practical workhorse) and the
+  **GCA+SCA** predictor that adds the specific deviation (only where SCA is estimable). Distinct from
+  **observed hybrid performance** — the cross's own BLUP — which we still report alongside.
+- **Baker's ratio** — `2σ²_GCA / (2σ²_GCA + σ²_SCA)`: the share of cross performance that is additive
+  (predictable from GCA alone); a one-number read on how much SCA matters.
+- **Parent relationship matrix** — the A/G/H structure applied to the **GCA effect** rather than the hybrid
+  effect. At low cross-degree it is load-bearing, not optional: it borrows strength across the parents'
+  kinship so a thinly-crossed inbred still gets a usable GCA. Same machinery as genomic prediction, pointed
+  at the parents.
+
 ## Program organization vocabulary (the two axes — see [DOMAIN-MODEL.md](docs/DOMAIN-MODEL.md))
 - **Stage** — a candidate's position on the program's *ordered* advancement ladder (e.g.
   stage 1 → pre-commercial → commercial). Program-defined; material moves between stages via an
@@ -117,7 +165,12 @@ See [PRODUCT.md](PRODUCT.md), [ROADMAP.md](ROADMAP.md), [docs/MVP-PLAN.md](docs/
   selection = cull on **gates** (independent culling on must-have traits) then rank survivors by the
   **index**. Both vary by Stage: gates tighten toward commercial status (early stages stay loose to
   preserve diversity / combining potential); the index grows as more traits are measured (measurement
-  economics). Converges to the Segment's TPP as Stage advances.
+  economics). Converges to the Segment's TPP as Stage advances. In **GCA mode** the criteria gain two
+  further scope facets — the selection **unit** (inbred-parent vs hybrid) and the **pool** (heterotic
+  group, derived from the cross-graph, ADR-0019) — so parent selection is a separately-authored,
+  **within-pool** ranking (ranking pools jointly would advance only the stronger pool and collapse the
+  heterotic structure). The index ranks on **GCA**; gates may read **inbred per-se / marker-derived trait
+  values** (e.g. "carries the disease gene"), a different value source keyed to the same parent (ADR-0020).
 - **Advancement Decision** — the recorded staging move: candidate, from→to Stage, **disposition**
   (advance/hold/drop/recycle-as-parent/…), **per Segment**, rationale, source analysis. The capstone
   of the analysis→select→advance arc; the basis of genetic-gain tracking and institutional memory.

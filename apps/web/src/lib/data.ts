@@ -2,13 +2,14 @@
 // The bundle is stored whole as JSONB (ADR-0001); we cast it to the contract type it was
 // validated against on the way in.
 import { desc, eq } from "drizzle-orm";
-import { db, study, analysisRun, resultBundle } from "@verdant/db";
+import { db, study, analysisRun, resultBundle, advancementDecision } from "@verdant/db";
 import type { ResultBundle } from "@verdant/contracts";
 
 export interface LoadedResult {
   study: typeof study.$inferSelect | null;
   run: typeof analysisRun.$inferSelect;
   bundle: ResultBundle;
+  advancements: (typeof advancementDecision.$inferSelect)[];
 }
 
 /** The latest completed analysis + its bundle, or null if none has run yet. */
@@ -30,5 +31,11 @@ export async function getLatestResult(): Promise<LoadedResult | null> {
     [s] = await db.select().from(study).where(eq(study.id, run.studyId));
   }
 
-  return { study: s ?? null, run, bundle: rb.bundle as ResultBundle };
+  const advancements = await db
+    .select()
+    .from(advancementDecision)
+    .where(eq(advancementDecision.analysisRunId, run.id))
+    .orderBy(desc(advancementDecision.id));
+
+  return { study: s ?? null, run, bundle: rb.bundle as ResultBundle, advancements };
 }

@@ -28,6 +28,7 @@ import { runRKernel } from './kernel';
 // The override-aware MET analysis entrypoint (ADR-0018) + its types, re-exported so the web tier's
 // Server Action / job queue can drive a re-run without reaching into the driver module.
 export { runMetAnalysis, type RunMetOptions, type RunMetResult } from './met-build';
+export { computeCombiningAbility, buildCombinedAnalysis, attachCombiningAbility, type CombiningAbility } from './combining-ability-build';
 export type { ModelOverrides, ModelDecision, OverridableFactor } from './planner';
 
 const PROGRAM_NAME = 'G2F (public dev data)';

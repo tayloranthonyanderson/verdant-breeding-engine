@@ -36,3 +36,18 @@ Storage model: [ADR-0017](../../docs/adr/0017-genotype-storage-packed-callsets.m
 Variant/Sample/CallSet, packed dosage `bytea` in Postgres).
 Column glossary (key fields): Env=location-year · Range/Pass=spatial grid · Replicate/Block=design ·
 Hybrid=genotype (Parent1/Parent2) · Yield_Mg_ha=grain yield · plus height, moisture, DAP, lodging traits.
+
+## Combining ability (GCA/SCA) dev path — synthetic inbred fixture (ADR-0019/0020)
+
+MET_2019 is itself a **line × tester** hybrid trial — 614 lines × ~13 testers (2 dominant: LH195, PHT69),
+most lines crossed to 2 testers — so it drives combining-ability *modelling* directly (parent identity is in
+`Hybrid_Parent1/2`). What G2F **cannot** provide is inbred-*level* data: heterotic **pool**, inbred **per-se**
+performance, and **directly-observed native-trait** calls (e.g. an Ht1/NCLB-resistance gene scored on the
+inbred). Those drive within-pool ranking, the per-se↔GCA divergence, and the native-trait advancement gate.
+
+So we **synthesize** them — `packages/db` table `inbred_line`, seeded by
+`packages/pipeline/src/seed-inbred.ts` (deterministic; no RNG): pool by a line's dominant tester (opposite
+heterotic group), per-se correlated ~0.6 with testcross performance (so it diverges from GCA), NCLB
+resistance ~38%. **This is scaffolding to wire the engine + UI (ADR-0020); real tomato inbred data replaces
+it.** Run: `seed-inbred.ts` then `combining-ability-build.ts` → persists a `combining_ability` bundle the
+web tier renders.

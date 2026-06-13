@@ -194,6 +194,63 @@ export const resultBundle = pgTable(
   (t) => [uniqueIndex('resultbundle_run_uq').on(t.analysisRunId)],
 );
 
+// --- Combining ability (ADR-0019 / ADR-0020) -------------------------------------------------
+// An InbredLine carries the PARENT-level facts the hybrid trial cannot: which heterotic POOL the
+// line sits in (drives within-pool GCA ranking — ADR-0020), its per-se performance (the source of
+// the per-se↔GCA divergence), and directly-observed NATIVE-TRAIT calls (e.g. a major-gene disease
+// resistance) used to GATE inbred advancement. These are inbred-level values keyed to the same
+// parent name the germplasm.parent1/parent2 columns reference. G2F has none of this (its markers
+// are a hybrid build; its phenotypes are hybrid-level), so for the maize dev set this table is
+// seeded SYNTHETICALLY (ADR-0020) purely to wire the engine + UI; real tomato inbred data replaces
+// it later. Keyed by (program, name) so it joins to cross parentage by name.
+export const inbredLine = pgTable(
+  'inbred_line',
+  {
+    id: id(),
+    programId: bigint('program_id', { mode: 'number' })
+      .notNull()
+      .references(() => program.id),
+    name: text('name').notNull(), // the inbred's name — matches germplasm.parent1 / parent2
+    role: text('role').notNull().default('line'), // 'line' (selection candidate) | 'tester' (tool)
+    pool: text('pool'), // heterotic group, e.g. 'A' | 'B'; null for testers
+    perSeValue: doublePrecision('per_se_value'), // synthetic per-se phenotype (yield), genetic-sd scale
+    nctlbResistant: integer('nctlb_resistant'), // native qualitative trait Ht1 (NCLB resistance): 1 carries / 0 not
+    synthetic: integer('synthetic').notNull().default(1), // 1 = scaffolding data (ADR-0020), not real
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex('inbred_line_program_name_uq').on(t.programId, t.name),
+    index('inbred_line_program_idx').on(t.programId),
+    index('inbred_line_pool_idx').on(t.programId, t.pool),
+  ],
+);
+
+// --- AdvancementDecision (DOMAIN-MODEL §4) — the recorded staging move that closes the analysis→
+// select→advance arc. Pulled forward (lightweight) so the combining-ability workspace can record a
+// real, queryable decision per candidate × pool, sourced from the analysis it was made on.
+export const advancementDecision = pgTable(
+  'advancement_decision',
+  {
+    id: id(),
+    programId: bigint('program_id', { mode: 'number' })
+      .notNull()
+      .references(() => program.id),
+    analysisRunId: bigint('analysis_run_id', { mode: 'number' }).references(() => analysisRun.id),
+    candidate: text('candidate').notNull(), // inbred (GCA) or hybrid name
+    unit: text('unit').notNull().default('inbred'), // 'inbred' | 'hybrid'
+    pool: text('pool'), // heterotic group of the candidate (inbred case)
+    disposition: text('disposition').notNull(), // 'advance' | 'hold' | 'drop' | 'recycle-as-parent'
+    rationale: text('rationale'),
+    decidedBy: text('decided_by'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('advancement_program_idx').on(t.programId),
+    index('advancement_run_idx').on(t.analysisRunId),
+    uniqueIndex('advancement_candidate_run_uq').on(t.analysisRunId, t.candidate, t.unit),
+  ],
+);
+
 // --- Genotyping layer (ADR-0017) — BrAPI VariantSet / Variant / Sample / CallSet -------------
 // Each marker panel/platform is a VariantSet — the crop/platform heterogeneity axis (a maize 437k
 // hybrid VCF, a tomato GBS run, an Illumina array all coexist as separate sets). A line's dosages

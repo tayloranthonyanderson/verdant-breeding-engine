@@ -15,9 +15,13 @@ deliberately deferred until the slice above it is real and validated.
 > **AI-recommended model selection with full breeder override** — the planner
 > recommends every decision (relationship / spatial / staging / GxE / engine), the
 > breeder overrides any of them and re-runs, the kernel validates + refuses
-> infeasible ones (**Model Studio**, ADR-0018). **Next:** the natural-language Q&A
-> layer (Phase 2); a `relationship_set` cache table + `sample.germplasm_id` mapping;
-> forward-year predictive validation.
+> infeasible ones (**Model Studio**, ADR-0018). **Combining ability (GCA/SCA)** is now
+> built end-to-end (ADR-0019/0020): the hybrid trial decomposed into parent GCA (random
+> →BLUP, within-pool ranking) + SCA, topology-selected (line×tester here, 614 lines × 13
+> testers), with a breeder-grade workspace — GCA/hybrid ranking, per-se↔GCA divergence,
+> SCA heatmap, native-trait gating, and recorded advancement. **Next:** the
+> natural-language Q&A layer (Phase 2); a `relationship_set` cache table +
+> `sample.germplasm_id` mapping; forward-year predictive validation.
 
 ## Phase 0 — Plan + thin slice  *(current)*
 - Product brief, this roadmap, analysis-engine workflow map.
@@ -97,6 +101,23 @@ deliberately deferred until the slice above it is real and validated.
   diagnostics (reliability / QC / distribution), the field-BLUP-vs-genomic-GEBV
   teaching divergence, and the **Model Studio** relationship + engine selector
   (ADR-0018) — the planner recommends, the breeder overrides + re-runs.
+- ✅ **Combining ability — GCA / SCA (ADR-0019/0020):** the hybrid trial decomposed
+  into parental **GCA** (random → BLUP, the parent-selection target, shrinkage baked in,
+  cross-degree as the visual trust signal) + **SCA**, in one unified random-effects mixed
+  model whose parameterization is **selected from the measured cross-graph topology**
+  (diallel / line×tester / sparse factorial — testers fixed when few in effect; ADR-0019;
+  no fixed Griffing). Ranking is **within heterotic pool** (ADR-0020). A breeder-grade
+  workspace: within-pool GCA ranking, hybrid ranking, the **per-se↔GCA divergence**
+  (hidden gems / false promises), the SCA heatmap, Baker's ratio + variance components,
+  the cross-graph readiness diagnostics, **native-trait gating** from directly-observed
+  inbred data (dual-source gate), and recorded **advancement** (analysis→select→advance).
+  Built on the G2F MET line×tester; the inbred-level facts (pool / per-se / native trait)
+  are **synthetic scaffolding** until real tomato inbred data lands. Combining ability is a
+  **facet of the one trial analysis** (attached to the hybrid bundle, not a separate page): the
+  web app is one journey-ordered page whose **Selection** workspace switches **level**
+  (Hybrids / Parents·GCA) × **lens** (Stated / Genetically-optimal / Compare) over the shared
+  index components — the desired-gains/Smith–Hazel lens runs on GCA too (kernel emits a GCA
+  genetic-covariance). UX architecture: `.scratch/ux-architecture/plan.md`.
 - **Next (genomic):** a `relationship_set` cache table (keep big GRMs out of the
   JSONB bundle); `sample.germplasm_id` mapping; native BLUPF90 ssGBLUP (H) at
   scale; forward-year predictive validation (train year N, predict N+1).
