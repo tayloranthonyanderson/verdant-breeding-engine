@@ -9,6 +9,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq, inArray } from "drizzle-orm";
 import { db, analysisRun, advancementDecision } from "@verdant/db";
 import { runMetAnalysis, type ModelOverrides } from "@verdant/pipeline";
+import type { AnalysisRequest } from "@verdant/contracts";
 
 // --- Advancement (DOMAIN-MODEL §4) — record/withdraw the staging move that closes analysis→select→
 // advance. Persists to advancement_decision, scoped to the analysis it was made on; revalidates so the
@@ -75,6 +76,25 @@ export async function rerunWithOverrides(input: {
       status: refusals.length ? "refused" : "ok",
       relationship: bundle.chosen_model.relationship,
       refusals,
+    };
+  } catch (e) {
+    return { status: "error", error: (e as Error).message };
+  }
+}
+
+// Raw-data SELECTION re-run (ADR-0021): apply the breeder's exclusion overlay and refit. The data
+// sibling of rerunWithOverrides — dropping a site/plot/entry re-plans the model (decision-C). Stored
+// data is never touched; each re-run is a new immutable analysis, so with/without is a comparison.
+export async function rerunWithDataOverrides(input: {
+  dataOverrides: AnalysisRequest["data_overrides"];
+}): Promise<RerunResult & { excluded?: number }> {
+  try {
+    const { bundle } = await runMetAnalysis({ dataOverrides: input.dataOverrides, scope: "full" });
+    revalidatePath("/");
+    return {
+      status: "ok",
+      relationship: bundle.chosen_model.relationship,
+      excluded: input.dataOverrides?.exclusions?.length ?? 0,
     };
   } catch (e) {
     return { status: "error", error: (e as Error).message };

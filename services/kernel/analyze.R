@@ -16,6 +16,11 @@ suppressWarnings(suppressPackageStartupMessages({
 .self_dir <- { a <- commandArgs(FALSE); f <- sub("^--file=", "", a[grep("^--file=", a)])
                if (length(f)) dirname(normalizePath(f)) else "." }
 source(file.path(.self_dir, "diagnostics.R"))
+## QC parity with the MET path (ADR-0021): pre-fit Data Quality + post-fit Model QC from the single-
+## trial fit's OWN residuals. NO_MAIN guards keep these from running their stdin entrypoints on source.
+Sys.setenv(DQ_NO_MAIN = "1", MQ_NO_MAIN = "1")
+source(file.path(.self_dir, "data-quality.R"))
+source(file.path(.self_dir, "model-qc.R"))
 
 ## ---- IO ---------------------------------------------------------------------------------
 read_request <- function() {
@@ -46,6 +51,18 @@ trait_data <- function(req, ou, variable_id) {
   d
 }
 
+## Per-plot residual frame from a fit's residuals (aligned to d) — the REAL residuals Model QC uses.
+.plot_resid <- function(d, res) {
+  res <- suppressWarnings(as.numeric(res))
+  if (length(res) != nrow(d)) return(NULL)
+  env <- if ("environment_id" %in% names(d)) as.character(d$environment_id) else rep("trial", nrow(d))
+  env[is.na(env)] <- "trial"
+  data.frame(plot_id = as.character(d$observation_unit_id), genotype = as.character(d$germplasm),
+             environment = env, row = suppressWarnings(as.numeric(d$row)),
+             col = suppressWarnings(as.numeric(d$col)), residual = res, fitted = d$value - res,
+             stringsAsFactors = FALSE)
+}
+
 ## ---- model selection + fit for one trait -----------------------------------------------
 fit_trait <- function(d) {
   has_grid <- grid_ok(d$row, d$col, nrow(d))
@@ -71,7 +88,9 @@ fit_spats <- function(d, has_rep) {
   pred <- predict(fit, which = "germplasm")
   vc <- fit$var.comp
   vg <- suppressWarnings(as.numeric(vc["germplasm"]))   # genotype variance component = Vg
+  .res <- tryCatch(as.numeric(stats::residuals(fit)), error = function(e) rep(NA_real_, nrow(d)))
   list(
+    resid = .plot_resid(d, .res),
     effects = data.frame(
       germplasm_id = as.character(pred$germplasm),
       value = round(pred$predicted.values, 5),
@@ -106,6 +125,7 @@ fit_lme4 <- function(d, has_rep) {
   nrep <- max(1, round(nrow(d) / nlevels(d$germplasm)))
   rf <- lme4::ranef(m)$germplasm
   list(
+    resid = .plot_resid(d, as.numeric(stats::residuals(m))),
     effects = data.frame(
       germplasm_id = rownames(rf),
       value = round(lme4::fixef(m)[["(Intercept)"]] + rf[, 1], 5),
@@ -243,12 +263,21 @@ main <- function() {
     })
     vc_list <- lapply(seq_len(nrow(f$varcomp)), function(i)
       list(component = f$varcomp$component[i], variance = f$varcomp$variance[i]))
+    ## Model QC from the fit's OWN residuals (ADR-0021), merged into the trait diagnostics.
+    diag <- list(converged = TRUE, n_obs = f$n_obs, n_genotypes = f$n_geno)
+    if (!is.null(f$resid) && nrow(f$resid) >= 10) {
+      rd <- f$resid
+      mq <- model_qc_from_residuals(stats::setNames(list(list(
+        residual = rd$residual, fitted = rd$fitted, genotype = rd$genotype,
+        environment = rd$environment, row = rd$row, col = rd$col, plot_id = rd$plot_id)), v))[[v]]
+      if (!is.null(mq)) diag <- utils::modifyList(diag, mq)
+    }
     trait_results[[length(trait_results) + 1]] <- list(
       variable_id = v, status = "ok", effects = eff_list,
       genetic_sd = if (is.null(f$genetic_sd) || is.na(f$genetic_sd)) NULL else round(f$genetic_sd, 6),
       heritability = if (is.na(f$h2)) NULL else list(method = f$h2_method, value = f$h2),
       varcomp = vc_list,
-      diagnostics = list(converged = TRUE, n_obs = f$n_obs, n_genotypes = f$n_geno),
+      diagnostics = diag,
       warnings = list())
     warns[[paste0("model_", v)]] <- f$rationale
   }
@@ -276,6 +305,24 @@ main <- function() {
     message = "One location-season only: GxE and stability cannot be estimated.",
     severity = "info")
 
+  ## Pre-fit Data Quality over the assembled plots (ADR-0021), QC parity with the MET path.
+  data_quality <- tryCatch({
+    obs_all <- as.data.frame(req$observations, stringsAsFactors = FALSE)
+    ou_ids <- as.character(ou$observation_unit_id)
+    vbt <- list()
+    for (v in analyze_vars) {
+      ov <- obs_all[obs_all$variable_id == v, c("observation_unit_id", "value")]
+      vbt[[v]] <- suppressWarnings(as.numeric(ov$value))[match(ou_ids, as.character(ov$observation_unit_id))]
+    }
+    env_v <- if ("environment_id" %in% names(ou)) as.character(ou$environment_id) else rep("trial", length(ou_ids))
+    env_v[is.na(env_v)] <- "trial"
+    compute_data_quality(
+      genotype = as.character(ou$germplasm_id), environment = env_v,
+      row = suppressWarnings(as.numeric(ou$row)), col = suppressWarnings(as.numeric(ou$col)),
+      rep = if ("rep" %in% names(ou)) as.character(ou$rep) else rep(NA_character_, length(ou_ids)),
+      plot_id = ou_ids, values_by_trait = vbt)
+  }, error = function(e) NULL)
+
   bundle <- list(
     contract_version = "v0",
     analysis_request_id = if (!is.null(req$analysis_request_id)) req$analysis_request_id else NULL,
@@ -292,6 +339,7 @@ main <- function() {
       rationale = paste(unique(unlist(warns)), collapse = " ")
     ),
     traits = trait_results,
+    data_quality = data_quality,
     indices = indices,
     warnings = run_warnings,
     provenance = list(

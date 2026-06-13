@@ -122,6 +122,36 @@
         "engine": { "type": ["string", "null"], "enum": ["rrblup", "blupf90", null], "description": "Force the compute engine. Native BLUPF90 genomic (GBLUP/ssGBLUP) is Phase-2 and currently refused; genomic prediction runs on rrBLUP." }
       }
     },
+    "data_overrides": {
+      "type": "object",
+      "description": "The breeder's raw-data SELECTION for this analysis (ADR-0021) — the data sibling of `model_overrides`. An analysis-scoped exclusion overlay: a filter list applied before the fit, NEVER a deletion of stored observations. Excluding data is the sole channel by which a data choice changes the model (drop a site → connectivity changes → the planner re-plans). Each re-run is a new immutable analysis; with-vs-without is a comparison, not a destruction. Absent = use all data.",
+      "additionalProperties": false,
+      "properties": {
+        "exclusions": {
+          "type": "array",
+          "description": "What to leave out of this fit. Findings (pre- or post-fit) propose exclusions; the breeder's disposition policy (review/batch/auto, with a per-trait cap) turns proposals into these entries.",
+          "items": {
+            "type": "object",
+            "required": ["target"],
+            "additionalProperties": false,
+            "properties": {
+              "target": {
+                "type": "object",
+                "required": ["kind", "id"],
+                "additionalProperties": false,
+                "properties": {
+                  "kind": { "type": "string", "enum": ["environment", "observation_unit", "germplasm"], "description": "Exclusion level: drop a whole site, a single plot, or a whole entry. NOTE: there is deliberately no 'variable' (trait) level — choosing which traits enter the analysis is a SELECTION decision expressed through the objective's index weights (a weight of 0 drops a trait from the ranking), not a data-exclusion overlay (ADR-0021)." },
+                  "id": { "type": "string", "description": "The environment_id / observation_unit_id / germplasm_id to exclude." }
+                }
+              },
+              "variable_id": { "type": ["string", "null"], "description": "Scope the exclusion to one trait (e.g. drop this plot's value for yield only). Null = the target's data across all traits." },
+              "reason": { "type": ["string", "null"], "description": "Why excluded — shown in the audit and the with/without comparison." },
+              "source": { "type": "string", "enum": ["manual", "batch", "auto_policy"], "default": "manual", "description": "How this exclusion was created: a breeder click (manual), batch-accept of all suggestions (batch), or a standing auto-apply rule (auto_policy). Audit of how each exclusion happened (ADR-0021)." }
+            }
+          }
+        }
+      }
+    },
     "objective": {
       "type": ["object", "null"],
       "description": "The selection objective derived from the target Segment's TPP and the (Segment × Stage) SelectionCriteria (DOMAIN-MODEL §2.4). Drives gating and the index(es). Optional: absent for pure comparison/prediction runs.",

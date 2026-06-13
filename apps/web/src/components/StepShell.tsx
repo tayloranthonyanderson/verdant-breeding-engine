@@ -4,7 +4,7 @@
 // steps (Overview → Model → Understand → Select → Advance → Genomics); this shell shows ONE at a time
 // with a clickable step rail + Prev/Next. All steps stay mounted (hidden, not unmounted) so client
 // state — selection lenses, weight sliders, Model Studio edits — survives moving between steps.
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { ChevronLeft, ChevronRight, Check } from "lucide-react";
 
 export interface Step { id: string; label: string; sublabel?: string; icon?: React.ReactNode; content: React.ReactNode }
@@ -47,14 +47,17 @@ export default function StepShell({ steps }: { steps: Step[] }) {
         </ol>
       </nav>
 
-      {/* one step visible; the rest stay mounted (state preserved) */}
+      {/* one step visible; the rest stay mounted (state preserved). The header + the (cross-owner)
+          content node are wrapped in keyed Fragments so this runtime's key validator stays quiet. */}
       {steps.map((s, i) => (
         <div key={s.id} className={i === cur ? "" : "hidden"}>
-          <div className="mb-4 flex items-baseline gap-2">
-            <h2 className="text-lg font-semibold tracking-tight text-slate-900">{s.label}</h2>
-            {s.sublabel && <span className="text-xs text-slate-400">{s.sublabel}</span>}
-          </div>
-          {s.content}
+          <Fragment key="head">
+            <div className="mb-4 flex items-baseline gap-2">
+              <h2 className="text-lg font-semibold tracking-tight text-slate-900">{s.label}</h2>
+              {s.sublabel && <span className="text-xs text-slate-400">{s.sublabel}</span>}
+            </div>
+          </Fragment>
+          <Fragment key="body">{s.content}</Fragment>
         </div>
       ))}
 

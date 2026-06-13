@@ -127,7 +127,7 @@ export interface ResultBundle {
       std_error?: number | null;
     }[];
     /**
-     * Model-fit diagnostics for the 'is this trustworthy?' view (ADR-0006). Mapped; MVP populates a subset.
+     * Post-fit Model QC for the 'did the model actually work?' view (ADR-0021). Readiness says a model is FEASIBLE; these say it WORKED. The proper (residual-based) outlier pass lives here; the crude pre-fit pass is in top-level `data_quality`.
      */
     diagnostics?: {
       converged?: boolean | null;
@@ -137,6 +137,95 @@ export interface ResultBundle {
        * Residual distribution summary for outlier/assumption checks.
        */
       residual_summary?: {} | null;
+      /**
+       * p-value of a residual-normality test (Shapiro/Anderson-Darling). Reference only — at real trait sizes (n in the thousands) it rejects almost always, so the UI judges normality by effect size (skew/kurtosis) instead.
+       */
+      residual_normality_p?: number | null;
+      /**
+       * Residual skewness (effect size). ~0 symmetric; |skew| ≳ 1 is materially skewed → consider a transformation.
+       */
+      residual_skew?: number | null;
+      /**
+       * Residual EXCESS kurtosis (0 = normal tails). Large positive → heavy tails / outliers.
+       */
+      residual_kurtosis?: number | null;
+      /**
+       * p-value for non-constant residual variance (|resid| vs fitted, Spearman). Low → variance changes with the fitted value.
+       */
+      heteroscedasticity_p?: number | null;
+      /**
+       * Spearman correlation of |residual| with fitted value (effect size for heteroscedasticity); near 0 = constant variance.
+       */
+      heteroscedasticity_rho?: number | null;
+      /**
+       * 'fit' = the model's own residuals (e.g. spatially-adjusted Stage-1 SpATS residuals — preferred); 'reconstructed' = rebuilt from the BLUPs when per-plot residuals aren't available (one-stage).
+       */
+      residual_source?: 'fit' | 'reconstructed' | null;
+      /**
+       * Moran's I on the residuals over the row×col field layout. Far from 0 → spatial trend the model did not remove.
+       */
+      spatial_residual_autocorr?: number | null;
+      /**
+       * Observations with a large studentized/deletion residual — the residual-based outlier pass. Each carries its observation_unit_id so it can become a one-click suggested_exclusion (ADR-0021).
+       */
+      influential?:
+        | {
+            observation_unit_id: string;
+            germplasm_id?: string | null;
+            environment_id?: string | null;
+            value?: number | null;
+            studentized_resid: number | null;
+            [k: string]: unknown;
+          }[]
+        | null;
+      /**
+       * True when heritability sits at a boundary (≈0 or ≈1) — the genetic signal is degenerate; treat BLUPs with care.
+       */
+      h2_boundary?: boolean | null;
+      /**
+       * True when a variance component was estimated at (or pinned to) zero — the fit is at a boundary.
+       */
+      varcomp_boundary?: boolean | null;
+      /**
+       * Convergence / boundary warnings emitted by the REML engine.
+       */
+      reml_warnings?: string[] | null;
+      /**
+       * Mean per-genotype reliability (1 − PEV/Vg) — an overall trust read on the BLUPs.
+       */
+      mean_reliability?: number | null;
+      /**
+       * Compact, downsampled diagnostic-plot data so scientists can SEE the residuals (ADR-0021): a residual-vs-fitted scatter, a residual histogram + normal overlay, and (only when spatial autocorrelation is flagged) the most-structured environment's field residuals. Downsampled in the kernel to keep the bundle lean.
+       */
+      viz?: {
+        /**
+         * Residual-vs-fitted points {f, r, o} — o=1 marks an influential (outlier) point. Sampled, but every influential point is kept.
+         */
+        scatter?:
+          | {
+              [k: string]: unknown;
+            }[]
+          | null;
+        /**
+         * Normal Q-Q plot — the trustworthy normality diagnostic (replaces the histogram). { points:[{t,s,o}], n, n_outliers }: t = theoretical normal quantile, s = standardized residual, o=1 = tail/outlier. Points on the y=x line ⇒ normal; ends peeling off ⇒ heavy tails / outliers. Downsampled but every tail point kept.
+         */
+        qq?: {
+          [k: string]: unknown;
+        } | null;
+        /**
+         * DEPRECATED (superseded by `qq`). Residual histogram: { bins:[{x0,x1,n}], mean, sd, n }. May be absent on new bundles.
+         */
+        hist?: {
+          [k: string]: unknown;
+        } | null;
+        /**
+         * { environment, moran, cells:[{row,col,r}] } for the field residual heatmap of the most spatially-structured environment. Null when no environment is flagged.
+         */
+        spatial?: {
+          [k: string]: unknown;
+        } | null;
+        [k: string]: unknown;
+      } | null;
       [k: string]: unknown;
     } | null;
     /**
@@ -296,6 +385,34 @@ export interface ResultBundle {
      */
     unlocks?: ReadinessUnlock[];
     [k: string]: unknown;
+  } | null;
+  /**
+   * Pre-fit, VALUE-level audit of the assembled dataset (ADR-0021) — distinct from `data_readiness` (structural, gates model choice) and from per-trait `diagnostics` (post-fit Model QC). The crude-robust first pass a statistician runs before fitting: missingness, raw outliers, duplicate plot coordinates, near-duplicate genotype names, distribution shape, factor-level sanity. Advisory only — the kernel never removes data; each finding may carry a `suggested_exclusion` the breeder disposes via `data_overrides`. Always present (even when a trait fails to fit).
+   */
+  data_quality?: {
+    /**
+     * Individual value-level findings, each tagged with the data it concerns so the UI can wire it to a one-click exclude.
+     */
+    findings?: DataQualityFinding[];
+    /**
+     * Rollup: { n_findings, by_severity: {error,warning,info}, by_check } for the quiet headline before the breeder expands the detail.
+     */
+    summary?: {
+      n_findings?: number | null;
+      by_severity?: {
+        [k: string]: unknown;
+      } | null;
+      by_check?: {
+        [k: string]: unknown;
+      } | null;
+      [k: string]: unknown;
+    } | null;
+    /**
+     * Raw-measurement distributions for the 'see the spread + outliers of the actual data' view (ADR-0021) — a PRE-fit data-sanity check, distinct from the post-fit residual Q-Q. Keyed by variable_id; each is an array of per-environment Tukey box-and-whisker stats { environment, n, min, q1, median, q3, max, whisker_lo, whisker_hi, n_outliers, outliers:[values] } so the UI can draw box-and-whisker-by-environment with the out-of-whisker points flagged.
+     */
+    distributions?: {
+      [k: string]: unknown;
+    } | null;
   } | null;
   /**
    * Selection rankings. Both index kinds may appear so the GUI can show their DIVERGENCE as insight (ADR-0006). The transparent weighted index is also client-recomputable for live re-weighting (PRD §6).
@@ -479,4 +596,50 @@ export interface ReadinessUnlock {
    * Actionable guidance — what data the breeder would collect to enable it.
    */
   hint: string;
+}
+/**
+ * One pre-fit, value-level finding (ADR-0021). Target-tagged so the UI can wire it to a one-click `data_overrides` exclude. Advisory — never auto-applied.
+ */
+export interface DataQualityFinding {
+  /**
+   * Which check produced this finding.
+   */
+  check: 'missingness' | 'outlier' | 'duplicate_coords' | 'duplicate_name' | 'distribution' | 'factor_sanity';
+  /**
+   * error = corrupts the fit if kept; warning = likely problem; info = FYI (e.g. mild skew).
+   */
+  severity: 'info' | 'warning' | 'error';
+  /**
+   * Plain-language explanation the AI narrates and the breeder reads — the rule and the value that triggered it.
+   */
+  detail: string;
+  /**
+   * The data this finding concerns — what a one-click exclude would drop. `kind` names the level; `id` is the corresponding identifier in the request.
+   */
+  target: {
+    /**
+     * Exclusion level. 'dataset' = a whole-trial note with no single excludable target.
+     */
+    kind: 'environment' | 'observation_unit' | 'germplasm' | 'variable' | 'dataset';
+    /**
+     * The environment_id / observation_unit_id / germplasm_id / variable_id; null for 'dataset'.
+     */
+    id?: string | null;
+    /**
+     * A second id for pairwise findings (e.g. the other genotype in a near-duplicate-name pair).
+     */
+    id2?: string | null;
+  };
+  /**
+   * The trait this finding is scoped to, when applicable (e.g. an outlier or missingness is per-trait).
+   */
+  variable_id?: string | null;
+  /**
+   * The offending value or the metric that triggered the finding (e.g. the MAD score, the missing fraction).
+   */
+  value?: number | null;
+  /**
+   * Whether the kernel suggests this target be excluded. The disposition policy turns suggestions into a `data_overrides` set; the kernel never removes anything itself (ADR-0021).
+   */
+  suggested_exclusion?: boolean;
 }

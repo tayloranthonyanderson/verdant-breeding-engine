@@ -97,6 +97,72 @@ test('a bundle with overridden + refused decisions and an overridable map valida
   assert.equal(out.chosen_model.overridable?.[0].options.length, 3);
 });
 
+test('a bundle with a data_quality section + enriched Model-QC diagnostics validates', () => {
+  const bundle = example('single-trial-bundle.example.json') as Record<string, unknown>;
+  const traits = (bundle.traits as Array<Record<string, unknown>>).map((t, i) =>
+    i === 0
+      ? {
+          ...t,
+          diagnostics: {
+            converged: true,
+            n_obs: 96,
+            residual_normality_p: 0.03,
+            spatial_residual_autocorr: 0.18,
+            h2_boundary: false,
+            mean_reliability: 0.71,
+            influential: [
+              { observation_unit_id: 'plot-47', germplasm_id: 'G12', value: 9999, studentized_resid: 6.2 },
+            ],
+            reml_warnings: [],
+          },
+        }
+      : t,
+  );
+  const merged = {
+    ...bundle,
+    traits,
+    data_quality: {
+      findings: [
+        { check: 'outlier', severity: 'warning', detail: 'Plot-47 value 9999 is 8.1 MAD from its cell median.',
+          target: { kind: 'observation_unit', id: 'plot-47' }, variable_id: 'YIELD', value: 8.1, suggested_exclusion: true },
+        { check: 'duplicate_name', severity: 'info', detail: "'G12' and 'G12 ' differ only by whitespace — likely the same entry.",
+          target: { kind: 'germplasm', id: 'G12', id2: 'G12 ' } },
+        { check: 'missingness', severity: 'error', detail: 'Environment E3 is 62% missing for YIELD.',
+          target: { kind: 'environment', id: 'E3' }, variable_id: 'YIELD', value: 0.62, suggested_exclusion: true },
+      ],
+      summary: { n_findings: 3, by_severity: { error: 1, warning: 1, info: 1 } },
+    },
+  };
+  const out = validateResultBundle(merged);
+  assert.equal(out.data_quality?.findings?.length, 3);
+  assert.equal(out.data_quality?.findings?.[0].target.kind, 'observation_unit');
+  assert.equal(out.traits[0].diagnostics?.influential?.[0].observation_unit_id, 'plot-47');
+  // an unknown check value is rejected (additionalProperties + enum)
+  assert.throws(
+    () => validateResultBundle({ ...merged, data_quality: { findings: [{ check: 'vibes', severity: 'info', detail: 'x', target: { kind: 'dataset' } }] } }),
+    ContractValidationError,
+  );
+});
+
+test('a request with data_overrides validates and an unknown exclusion kind is rejected', () => {
+  const req = example('single-trial-request.example.json') as Record<string, unknown>;
+  const ok = validateAnalysisRequest({
+    ...req,
+    data_overrides: {
+      exclusions: [
+        { target: { kind: 'environment', id: 'E3' }, variable_id: 'YIELD', reason: 'flooded', source: 'manual' },
+        { target: { kind: 'observation_unit', id: 'plot-47' }, source: 'auto_policy' },
+      ],
+    },
+  });
+  assert.equal(ok.data_overrides?.exclusions?.length, 2);
+  assert.equal(ok.data_overrides?.exclusions?.[0].source, 'manual');
+  assert.throws(
+    () => validateAnalysisRequest({ ...req, data_overrides: { exclusions: [{ target: { kind: 'planet', id: 'x' } }] } }),
+    ContractValidationError,
+  );
+});
+
 test('a target-mode index weight requires a numeric target', () => {
   const req = example('single-trial-request.example.json') as Record<string, unknown>;
   const withMode = (iw: unknown) => ({ ...req, objective: { index_weights: iw } });

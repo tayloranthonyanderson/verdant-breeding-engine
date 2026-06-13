@@ -24,6 +24,11 @@ suppressWarnings(suppressPackageStartupMessages({
 .self_dir <- { a <- commandArgs(FALSE); f <- sub("^--file=", "", a[grep("^--file=", a)])
                if (length(f)) dirname(normalizePath(f)) else "." }
 source(file.path(.self_dir, "diagnostics.R"))
+## Model-QC core (ADR-0021): Stage 1 holds the genuinely spatially-adjusted plot residuals, so it
+## computes the post-fit residual diagnostics from them directly (the REAL residuals, not a
+## reconstruction). MQ_NO_MAIN keeps model-qc.R from running its own stdin entrypoint when sourced.
+Sys.setenv(MQ_NO_MAIN = "1")
+source(file.path(.self_dir, "model-qc.R"))
 
 read_input <- function() {
   args <- commandArgs(trailingOnly = TRUE)
@@ -31,24 +36,35 @@ read_input <- function() {
   jsonlite::fromJSON(paste(readLines(con, warn = FALSE), collapse = "\n"), simplifyVector = TRUE)
 }
 
-## Spatially-adjusted entry means for ONE environment × ONE trait.
-## Returns data.frame(genotype, blue, se) + the method actually used.
+## Spatially-adjusted entry means for ONE environment × ONE trait. Returns the genotype BLUEs (for
+## Stage 2), the method used, AND the per-plot residuals — value − (spatial surface + genotype + rep),
+## the genuinely de-trended residual Model QC validates (ADR-0021).
 adjust_one <- function(d) {
   d <- d[is.finite(d$value), , drop = FALSE]
   if (nrow(d) < 3 || length(unique(d$genotype)) < 2)
-    return(list(est = NULL, method = "skipped"))
+    return(list(est = NULL, method = "skipped", resid = NULL))
   d$germplasm <- factor(d$genotype)
   has_rep <- rep_ok(d$rep)
   has_grid <- grid_ok(d$row, d$col, nrow(d))
 
   if (has_grid && requireNamespace("SpATS", quietly = TRUE)) {
-    est <- tryCatch(spats_blue(d, has_rep), error = function(e) NULL)
-    if (!is.null(est)) return(list(est = est, method = "spats"))
+    out <- tryCatch(spats_blue(d, has_rep), error = function(e) NULL)
+    if (!is.null(out)) return(list(est = out$est, method = "spats", resid = out$resid))
   }
-  list(est = means_blue(d, has_rep), method = if (has_rep) "lsmeans" else "means")
+  mb <- means_blue(d, has_rep)
+  list(est = mb$est, method = if (has_rep) "lsmeans" else "means", resid = mb$resid)
 }
 
-## SpATS 2D P-spline, genotype FIXED → BLUEs + SE (mirrors analyze.R::fit_spats conventions).
+## per-plot residual frame from a fit's residuals (aligned to the finite-filtered rows of d).
+.resid_frame <- function(d, res) {
+  res <- suppressWarnings(as.numeric(res))
+  if (length(res) != nrow(d)) return(NULL)
+  data.frame(plot_id = as.character(d$plot_id), genotype = as.character(d$germplasm),
+             row = d$row, col = d$col, residual = res, fitted = d$value - res,
+             stringsAsFactors = FALSE)
+}
+
+## SpATS 2D P-spline, genotype FIXED → BLUEs + SE + plot residuals (mirrors analyze.R::fit_spats).
 spats_blue <- function(d, has_rep) {
   d$R <- as.numeric(d$row); d$C <- as.numeric(d$col)
   nseg <- c(min(20L, length(unique(d$C))), min(20L, length(unique(d$R))))
@@ -60,9 +76,11 @@ spats_blue <- function(d, has_rep) {
     control = list(monitoring = 0, maxit = 100)
   )
   pred <- predict(fit, which = "germplasm")
-  data.frame(genotype = as.character(pred$germplasm),
-             blue = pred$predicted.values, se = pred$standard.errors,
-             stringsAsFactors = FALSE)
+  est <- data.frame(genotype = as.character(pred$germplasm),
+                    blue = pred$predicted.values, se = pred$standard.errors,
+                    stringsAsFactors = FALSE)
+  res <- tryCatch(stats::residuals(fit), error = function(e) fit$residuals)
+  list(est = est, resid = .resid_frame(d, res))
 }
 
 ## Fallback when there is no usable grid: least-squares entry means (genotype fixed, + rep block if
@@ -74,15 +92,19 @@ means_blue <- function(d, has_rep) {
     if (!is.null(m)) {
       co <- summary(m)$coefficients
       gi <- grep("^germplasm", rownames(co))
-      if (length(gi)) return(data.frame(
-        genotype = sub("^germplasm", "", rownames(co)[gi]),
-        blue = co[gi, 1], se = co[gi, 2], stringsAsFactors = FALSE))
+      if (length(gi)) return(list(
+        est = data.frame(genotype = sub("^germplasm", "", rownames(co)[gi]),
+                         blue = co[gi, 1], se = co[gi, 2], stringsAsFactors = FALSE),
+        resid = .resid_frame(d, stats::residuals(m))))
     }
   }
+  gm <- stats::ave(d$value, d$germplasm)            # genotype means → residual = value − own-genotype mean
   ag <- stats::aggregate(value ~ germplasm, data = d,
     FUN = function(v) c(mean = mean(v), se = if (length(v) > 1) stats::sd(v) / sqrt(length(v)) else NA_real_))
-  data.frame(genotype = as.character(ag$germplasm),
-             blue = ag$value[, "mean"], se = ag$value[, "se"], stringsAsFactors = FALSE)
+  list(
+    est = data.frame(genotype = as.character(ag$germplasm),
+                     blue = ag$value[, "mean"], se = ag$value[, "se"], stringsAsFactors = FALSE),
+    resid = .resid_frame(d, d$value - gm))
 }
 
 main <- function() {
@@ -96,11 +118,13 @@ main <- function() {
     row = suppressWarnings(as.numeric(inp$row)),
     col = suppressWarnings(as.numeric(inp$col)),
     rep = if (!is.null(inp$rep)) inp$rep else NA,
+    plot_id = if (!is.null(inp$plot_id)) as.character(inp$plot_id) else as.character(seq_along(inp$environment)),
     stringsAsFactors = FALSE
   )
   envs <- sort(unique(base$environment))
 
   adjusted <- list(); prov <- list()
+  resid_by_trait <- vector("list", K); names(resid_by_trait) <- vids  # accumulate REAL residuals per trait
   for (e in envs) {
     ix <- base$environment == e
     de <- base[ix, , drop = FALSE]
@@ -110,11 +134,15 @@ main <- function() {
     wtM  <- matrix(NA_real_, length(genos), K, dimnames = list(genos, NULL))
     for (k in seq_len(K)) {
       dk <- data.frame(genotype = de$genotype, row = de$row, col = de$col,
-                       rep = de$rep, value = Ve[, k], stringsAsFactors = FALSE)
+                       rep = de$rep, value = Ve[, k], plot_id = de$plot_id, stringsAsFactors = FALSE)
       out <- adjust_one(dk)
       prov[[length(prov) + 1]] <- list(environment = e, variable_id = vids[k],
         method = out$method, n_obs = sum(is.finite(dk$value)),
         n_geno = length(unique(dk$genotype[is.finite(dk$value)])))
+      if (!is.null(out$resid)) {
+        rd <- out$resid; rd$environment <- e
+        resid_by_trait[[k]] <- if (is.null(resid_by_trait[[k]])) rd else rbind(resid_by_trait[[k]], rd)
+      }
       if (is.null(out$est)) next
       mi <- match(out$est$genotype, genos)
       ok <- !is.na(mi)
@@ -130,7 +158,17 @@ main <- function() {
     }
   }
 
-  cat(jsonlite::toJSON(list(adjusted = adjusted, stage1 = prov),
+  ## Model QC from the REAL (spatially-adjusted) residuals Stage 1 just produced (ADR-0021).
+  rbt <- list()
+  for (k in seq_len(K)) {
+    df <- resid_by_trait[[k]]
+    if (is.null(df) || nrow(df) == 0) next
+    rbt[[vids[k]]] <- list(residual = df$residual, fitted = df$fitted, genotype = df$genotype,
+                           environment = df$environment, row = df$row, col = df$col, plot_id = df$plot_id)
+  }
+  model_qc <- model_qc_from_residuals(rbt)
+
+  cat(jsonlite::toJSON(list(adjusted = adjusted, stage1 = prov, model_qc = model_qc),
                        auto_unbox = TRUE, null = "null", na = "null", digits = NA))
 }
 

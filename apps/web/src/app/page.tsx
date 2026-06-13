@@ -1,10 +1,11 @@
-import { Leaf, FlaskConical, Sprout, ClipboardCheck, Compass, SlidersHorizontal, Microscope, ListChecks, Dna } from "lucide-react";
-import type { ResultBundle } from "@verdant/contracts";
+import { Leaf, FlaskConical, Sprout, ClipboardCheck, Compass, SlidersHorizontal, Microscope, ListChecks, Dna, ShieldCheck } from "lucide-react";
+import type { ResultBundle, AnalysisRequest } from "@verdant/contracts";
 import { getLatestResult } from "@/lib/data";
 import { getCombiningAbility } from "@/lib/ca";
 import InsightBanner from "@/components/InsightBanner";
 import ModelReadiness from "@/components/ModelReadiness";
 import ModelStudio from "@/components/ModelStudio";
+import DataQuality from "@/components/DataQuality";
 import HeritabilityCards from "@/components/HeritabilityCards";
 import GeneticCorrelations from "@/components/GeneticCorrelations";
 import CombiningAbilityUnderstand from "@/components/CombiningAbilityUnderstand";
@@ -23,6 +24,8 @@ export default async function Home() {
   const result = await getLatestResult();
   const ca = result ? getCombiningAbility(result.bundle) : null;
   const hasGenomic = !!(result?.bundle as { genomic?: unknown } | undefined)?.genomic;
+  // The exclusion overlay the current run was fit with (for the with/without comparison).
+  const activeExclusions = (result?.run.request as AnalysisRequest | null)?.data_overrides?.exclusions ?? [];
 
   const steps: Step[] = result
     ? [
@@ -34,6 +37,10 @@ export default async function Home() {
               <InsightBanner bundle={result.bundle} />
             </div>
           ),
+        },
+        {
+          id: "quality", label: "Quality", sublabel: "trust your data & the fit", icon: <ShieldCheck size={14} />,
+          content: <DataQuality bundle={result.bundle} activeExclusions={activeExclusions} />,
         },
         {
           id: "model", label: "Model", sublabel: "trust & tune the fit", icon: <SlidersHorizontal size={14} />,

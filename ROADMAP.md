@@ -19,9 +19,13 @@ deliberately deferred until the slice above it is real and validated.
 > built end-to-end (ADR-0019/0020): the hybrid trial decomposed into parent GCA (random
 > →BLUP, within-pool ranking) + SCA, topology-selected (line×tester here, 614 lines × 13
 > testers), with a breeder-grade workspace — GCA/hybrid ranking, per-se↔GCA divergence,
-> SCA heatmap, native-trait gating, and recorded advancement. **Next:** the
-> natural-language Q&A layer (Phase 2); a `relationship_set` cache table +
-> `sample.germplasm_id` mapping; forward-year predictive validation.
+> SCA heatmap, native-trait gating, and recorded advancement. The **trust layer (ADR-0021)** is now
+> built end-to-end too: two-pass **Data Quality** (pre-fit, value-level) + **Model QC** (post-fit
+> residuals), advisory-only, with a breeder-dispositioned **`data_overrides`** exclusion overlay and a
+> "Quality" journey step — completing the previously-unchecked Phase-1 data-validation item. **Next:** the
+> natural-language Q&A layer (Phase 2); the ingestion front door (Trait Library + unit harmonization,
+> Thread B / ADR-0022); a `relationship_set` cache table + `sample.germplasm_id` mapping; forward-year
+> predictive validation.
 
 ## Phase 0 — Plan + thin slice  *(current)*
 - Product brief, this roadmap, analysis-engine workflow map.
@@ -41,7 +45,16 @@ deliberately deferred until the slice above it is real and validated.
   compute-bound at full G2F scale), surfaced as a readiness unlock (ADR-0016).
 - ✅ Interactive **selection index** with user-set trait weights and directions,
   plus the genetically-aware desired-gains index and the live divergence view.
-- Data validation: balance, missingness, outliers, factor-level sanity.
+- ✅ **Data Quality + Model QC + raw-data selection — the trust layer (ADR-0021).** Two-pass QC: a
+  column-blind **pre-fit** `data_quality` audit (raw MAD outliers, missingness, duplicate plot
+  coordinates, near-duplicate genotype names, distribution/skew) and a no-refit **post-fit Model QC**
+  (conditional residuals from the BLUPs → normality, heteroscedasticity, spatial-residual Moran's I,
+  influential observations, h²/varcomp boundary). Advisory only — findings propose; the breeder
+  **disposes** them (review / accept-all / auto, capped per trait) into a `data_overrides` **exclusion
+  overlay** that never deletes stored data and re-plans on re-run (the sole data→model channel). Shipped
+  as the **"Quality" journey step** with one-click excludes + a with/without comparison; validated on G2F
+  MET in the browser. Trait-semantic checks (impossible-value ranges, datatype-aware distribution) await
+  the Trait Library (Thread B, ADR-0022).
 - ✅ **Deterministic Model Planner** (ADR-0016): shared data-readiness diagnostics
   (grid / replication / connectivity / scale) gate spatial / genotype-effect /
   GxE / single-vs-two-stage / engine, each decision explained, with a "Model &

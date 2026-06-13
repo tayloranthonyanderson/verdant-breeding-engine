@@ -22,6 +22,15 @@ import { buildGenomicInputs } from './genomic-inputs';
 import { runRKernel } from './kernel';
 import { isEntrypoint } from './entry';
 import { metFixture } from './paths';
+import {
+  attachPlotIds,
+  applyDataOverrides,
+  runDataQuality,
+  runModelQc,
+  boundaryFlags,
+  mergeTraitDiagnostics,
+  type ModelQcByTrait,
+} from './data-quality-build';
 
 // Native BLUPF90 needs its inputs under $HOME (colima mounts $HOME, not /tmp). The SNP file lands here.
 const GENO_WORK = join(homedir(), '.verdant', 'blupf90');
@@ -149,7 +158,7 @@ function activeBreedingValues(
   return { genos: genomic.cohort, map: mapFrom(genomic.cohort, genomic.gebv_by_model[key]), subset: true };
 }
 
-async function persistBundle(bundle: ResultBundle, relationship: string): Promise<number> {
+async function persistBundle(bundle: ResultBundle, relationship: string, dataOverrides?: AnalysisRequest['data_overrides']): Promise<number> {
   const validated = validateResultBundle(bundle);
   await db.insert(program).values({ name: PROG }).onConflictDoNothing();
   const [prog] = await db.select().from(program).where(eq(program.name, PROG));
@@ -161,6 +170,9 @@ async function persistBundle(bundle: ResultBundle, relationship: string): Promis
     observation_units: [{ observation_unit_id: 'met', germplasm_id: 'g' }] as AnalysisRequest['observation_units'],
     observations: [],
     relationship: { type: relationship as 'identity' | 'A' | 'G' | 'H' },
+    // Self-describing: the exclusion overlay that produced this run, so the with/without comparison and
+    // audit are reconstructable from the persisted request alone (ADR-0021).
+    ...(dataOverrides && dataOverrides.exclusions?.length ? { data_overrides: dataOverrides } : {}),
   };
   const [run] = await db.insert(analysisRun).values({ programId: prog.id, studyId: s.id, intent: 'selection', status: 'ok', contractVersion: 'v0', request, finishedAt: new Date() }).returning({ id: analysisRun.id });
   await db.insert(resultBundle).values({ analysisRunId: run.id, contractVersion: 'v0', bundle: validated });
@@ -195,6 +207,9 @@ function chosenModel(plan: ReturnType<typeof runPlanner>['plan'], relationship: 
 export interface RunMetOptions {
   /** Breeder overrides of the planner's recommendations (ADR-0018). */
   overrides?: ModelOverrides;
+  /** The breeder's raw-data SELECTION — an analysis-scoped exclusion overlay applied before the fit,
+   *  so a data choice re-plans the model (ADR-0021, decision-C). Never deletes stored data. */
+  dataOverrides?: AnalysisRequest['data_overrides'];
   /** 'full' refits everything; 'relationship_only' re-points the ranking from the latest bundle (fast). */
   scope?: 'full' | 'relationship_only';
   /** Persist the bundle (default true). */
@@ -209,8 +224,20 @@ export async function runMetAnalysis(opts: RunMetOptions = {}): Promise<RunMetRe
   if ((opts.scope ?? 'full') === 'relationship_only') return rerunRelationshipOnly(opts);
   const persist = opts.persist ?? true;
 
-  const { variableIds, records } = parseG2fMet(FIXTURE, TRAITS);
+  const parsed = parseG2fMet(FIXTURE, TRAITS);
+  const variableIds = parsed.variableIds;
+  // Attach stable plot ids, then apply the breeder's exclusion overlay BEFORE planning/fitting — so
+  // dropping a site/plot/entry re-plans the model (decision-C). Stored data is untouched (ADR-0021).
+  const allRecords = attachPlotIds(parsed.records);
+  const applied = applyDataOverrides(allRecords, opts.dataOverrides?.exclusions);
+  const records = applied.records;
+  if (applied.removed > 0)
+    console.log(`data_overrides: excluded ${applied.removed} plot rows (${applied.environments.length} env, ${applied.germplasm.length} geno, ${applied.plots.length} plot) before the fit`);
   console.log(`parsed ${records.length} plot rows, ${new Set(records.map((r) => r.genotype)).size} genotypes, ${new Set(records.map((r) => r.environment)).size} environments`);
+
+  // Pre-fit Data Quality (ADR-0021): the crude value-level pass on the data that will actually be fit.
+  const dataQuality = runDataQuality(records, TRAITS);
+  if (dataQuality?.summary) console.log(`data_quality: ${dataQuality.summary.n_findings} finding(s)`);
 
   // Genomic readiness the plot structure can't see: export the cohort's dosages (markers/pedigree).
   // Also write the SNP file (under $HOME) so the native BLUPF90 GBLUP engine is available on demand.
@@ -237,12 +264,16 @@ export async function runMetAnalysis(opts: RunMetOptions = {}): Promise<RunMetRe
 
   // Phenotypic fit (the field BLUPs). One-stage = joint AI-REML (yields GxE); two-stage = SpATS → AI-REML.
   let g: ReturnType<typeof estimateGeneticCovariance>;
+  // Model QC from the REAL spatially-adjusted residuals when Stage 1 ran (two-stage); else null and we
+  // fall back to reconstructing residuals from the BLUPs (one-stage). ADR-0021.
+  let stage1ModelQc: ModelQcByTrait | undefined;
   if (plan0.model_class === 'single_stage') {
     console.log(`Single-stage multi-trait AI-REML on plots${plan0.gxe.include ? ' (+ genotype×environment)' : ''} ...`);
     g = estimateGeneticCovariance({ variableIds: TRAITS, rows: records.map((r) => ({ genotype: r.genotype, environment: r.environment, values: r.values })), interaction: plan0.gxe.include });
   } else {
     console.log('Stage 1: within-environment spatial de-trending (SpATS) ...');
     const s1 = spatialStage1(variableIds, records);
+    stage1ModelQc = s1.model_qc as ModelQcByTrait | undefined;
     console.log('Stage 2: multi-trait AI-REML (BLUPF90) on adjusted means ...');
     g = estimateGeneticCovariance({ variableIds: TRAITS, rows: s1.adjusted.map((a) => ({ genotype: a.genotype, environment: a.environment, values: a.values })) });
   }
@@ -304,6 +335,25 @@ export async function runMetAnalysis(opts: RunMetOptions = {}): Promise<RunMetRe
   const transIdx = transparentIndex(active.map);
   const gi = geneticIndex(g.geneticCovariance, active.genos, active.genos.map((gn) => active.map.get(gn)!), transIdx.ranking);
 
+  // Post-fit Model QC (ADR-0021): conditional residuals reconstructed from the field BLUPs (no refit)
+  // → per-trait residual diagnostics. The BLUPs are the genotype contribution the residuals subtract.
+  // Two-stage: the REAL spatially-adjusted residuals from Stage 1 (preferred). One-stage: reconstruct
+  // from the BLUPs (no per-plot residuals available from the joint BLUPF90 fit). ADR-0021.
+  let modelQc: ModelQcByTrait;
+  if (stage1ModelQc && Object.keys(stage1ModelQc).length > 0) {
+    modelQc = stage1ModelQc;
+    console.log('model-qc: from real Stage-1 residuals');
+  } else {
+    const blupsByTrait: Record<string, Record<string, number>> = {};
+    TRAITS.forEach((id, j) => {
+      const m: Record<string, number> = {};
+      for (const b of g.blups) if (b.values[j] != null) m[b.genotype] = b.values[j] as number;
+      blupsByTrait[id] = m;
+    });
+    modelQc = runModelQc(records, TRAITS, blupsByTrait);
+    console.log('model-qc: reconstructed from BLUPs (one-stage)');
+  }
+
   const traits: ResultBundle['traits'] = TRAITS.map((id, j) => {
     const vg = g.geneticVariances[j]; const vge = g.gxeVariances?.[j] ?? 0; const ve = Ve[j];
     return {
@@ -316,7 +366,12 @@ export async function runMetAnalysis(opts: RunMetOptions = {}): Promise<RunMetRe
         ...(g.gxeVariances ? [{ component: 'genotype:environment', variance: Number(vge.toFixed(6)) }] : []),
         { component: 'residual', variance: Number(ve.toFixed(6)) },
       ],
-      diagnostics: { converged: g.converged, n_genotypes: g.blups.length }, warnings: [],
+      diagnostics: mergeTraitDiagnostics(
+        { converged: g.converged, n_genotypes: g.blups.length, n_obs: records.filter((r) => r.values[j] != null).length },
+        modelQc[id],
+        boundaryFlags(vg, vge, ve),
+      ),
+      warnings: [],
     };
   });
 
@@ -332,6 +387,7 @@ export async function runMetAnalysis(opts: RunMetOptions = {}): Promise<RunMetRe
     genetic_correlations: { variable_ids: TRAITS, matrix: g.geneticCorrelation },
     gxe: g.gxeCovariance ? { variable_ids: TRAITS, covariance: g.gxeCovariance, correlation: g.gxeCorrelation, variances: g.gxeVariances } : null,
     data_readiness: { scale: struct.readiness.scale, connectivity: struct.readiness.connectivity, replication: struct.readiness.replication, grids: struct.readiness.grids, unlocks: plan.unlocks },
+    data_quality: dataQuality ?? null,
     indices: [transIdx, gi.index],
     divergence: gi.divergence,
     ...(genomic ? { genomic: genomic as unknown as ResultBundle['genomic'] } : {}),
@@ -351,7 +407,7 @@ export async function runMetAnalysis(opts: RunMetOptions = {}): Promise<RunMetRe
     console.log(`combining ability not attached: ${(e as Error).message}`);
   }
 
-  const analysisRunId = persist ? await persistBundle(finalBundle, relationship) : null;
+  const analysisRunId = persist ? await persistBundle(finalBundle, relationship, opts.dataOverrides) : null;
   if (persist) console.log(`persisted MET bundle (analysis_run=${analysisRunId}); relationship=${relationship}`);
   return { bundle: finalBundle, analysisRunId };
 }

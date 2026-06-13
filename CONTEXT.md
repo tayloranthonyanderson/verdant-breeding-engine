@@ -82,7 +82,59 @@ See [PRODUCT.md](PRODUCT.md), [ROADMAP.md](ROADMAP.md), [docs/MVP-PLAN.md](docs/
   are parents linked through shared mating partners, and at what **degree** = crosses per inbred → is GCA
   estimable, on one common scale, and how precise per parent) and **cross-replication** (specific
   combinations observed more than once → is SCA separable from residual). Crop-agnostic (ADR-0015); never
-  reads column names (ADR-0016).
+  reads column names (ADR-0016). **Readiness gates model choice** — distinct from **Data Quality**, which
+  gates *trust*.
+- **Trait** (the Library entry) — the program's **canonical measurable**, promoted to a first-class object:
+  canonical name, aliases (for column-name matching on import), **datatype** (BrAPI `Numerical / Ordinal /
+  Nominal / Code / Date / Text`), **canonical unit**, **valid range** (BrAPI `validValues` min/max/
+  categories), and a default **QC method** (type-keyed; overridable). Built once, reused every trial: the AI
+  proposes an entry at first sighting of a new column, the breeder confirms once, deterministic alias-match
+  thereafter. Aligns to BrAPI **ObservationVariable** = Trait × Method × Scale (ADR-0009); the unit lives on
+  the **Scale** (so **per-variable, never per-observation** — mixed units = two variables, same Trait).
+  _Avoid_: "trait dictionary", "trait config".
+- **Trait Library** — the program-scoped set of **Trait** definitions; the persistent home for the
+  curated-trait-list-with-per-trait-QC a breeder would otherwise re-specify every trial. The bridge between
+  messy uploaded columns and the generic, column-blind kernel.
+- **Ingest QC** — the **preventive, pre-commit** validation at the data's front door, where unit
+  harmonization and per-value plausibility are resolved so nothing dirty reaches storage. Two doors: **mobile
+  capture** (variable picked from the Trait Library at entry → unit fixed at source; live range-check) and the
+  **import workflow** (messy file → **staging** → AI maps column→variable, resolves source unit,
+  **deterministically converts to the Trait's canonical unit**, flags impossible values / unit mismatch /
+  typos → breeder confirms → commit). The raw upload + mapping + conversions are logged in the **import
+  record** (the audit trail; ADR-0003 reversible) — `observation` stores canonical, BrAPI-orthodox.
+- **Data quality** — the **analysis-time, pre-fit, value-level** audit of an assembled dataset (distinct from
+  **Ingest QC**, which is pre-commit at the front door, and from **data readiness**, which is structural and
+  never reads trait values). Assumes **unit-harmonized** input (Ingest QC's job), so it does only the
+  statistical/relative work that needs the whole assembled dataset + model context: **outliers** (robust, vs
+  genotype×env neighbours — MAD / studentized residual), **missingness** pattern, trait **distribution**
+  (skew / zero-inflation → transformation hint), and **factor-level sanity**. Surfaced in plain language
+  before any model runs; the AI narrates, the breeder confirms, nothing is auto-removed (AI proposes / R owns
+  / human confirms). Crop-agnostic — operates on the generic plot record, never on column names.
+  _Avoid_: "data validation" (ambiguous — could mean readiness, ingest QC, or quality).
+- **Model QC** — the **post-fit** validation of the fitted model (distinct from **data quality**, which is
+  pre-fit): residual diagnostics (normality, heteroscedasticity, spatial-residual autocorrelation — did the
+  spatial model actually remove the trend?), influential observations, variance-component sanity (Vg / h² at
+  a boundary, REML convergence warnings), reliability / SE distribution. Readiness says a model is
+  *feasible*; Model QC says it actually *worked*. Carried in the result bundle's per-trait `diagnostics`.
+- **Two-pass QC** — outlier detection runs twice, by design: a **pre-fit** crude-robust pass (Data Quality —
+  gross/structural errors that would wreck a fit: impossible values, dup coords, >5 MAD raw) and a **post-fit**
+  residual pass (Model QC — studentized/deletion residuals + influence, the statistically proper outliers only
+  visible relative to the model). The selection seam consumes flags from both.
+- **`data_overrides`** — the **analysis-scoped exclusion overlay**: a filter list on one analysis run
+  (targets: environment / observation-unit / germplasm / variable), never a deletion of `observation` rows.
+  The sibling of `model_overrides` (Model Studio) — the sole channel by which a *data* choice changes the
+  *model* (drop a site → connectivity changes → planner re-plans; decision-C). Each re-run is a new immutable
+  `analysis_run` (with/without is a comparison, not a destruction; ADR-0003 reversible). Each entry records
+  `source: manual | batch | auto_policy`.
+- **Disposition policy** — the breeder-set rule that turns advisory QC suggestions into an actual
+  `data_overrides` set: **mode** (review-each / batch-accept / auto-apply), a **per-trait cap** (max N or X%
+  excluded per trait — a statistical guardrail against heritability inflation, not just UX), and a **residual
+  threshold**. Lives in the web tier; the kernel stays **advisory-only** (emits findings + `suggested_exclusion`,
+  never removes). Self-contained so it can later be persisted as a **Breeder profile** default.
+- **Breeder profile** *(deferred — defer-the-tax)* — a future program/breeder-scoped preference container
+  (disposition policy, QC thresholds, Trait Library QC defaults, Selection Criteria, …; extends beyond traits).
+  Not built in MVP; the objects it will hold are kept self-contained so persisting them later is no refactor.
+  Its tenancy shape (per-user curated view vs shared UI + subset) is an open Phase-4 (multi-user) question.
 - **Model Plan** — the planner's declarative output *before* fitting: trial structure, spatial method
   per environment, genotype effect (random/fixed), **genotype structure** (opaque hybrid BLUP vs a
   GCA/SCA decomposition, plus its topology-selected parameterization), GxE include/skip, staging (single
