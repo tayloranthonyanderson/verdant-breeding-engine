@@ -55,16 +55,21 @@ adjust_one <- function(d) {
   list(est = mb$est, method = if (has_rep) "lsmeans" else "means", resid = mb$resid)
 }
 
-## per-plot residual frame from a fit's residuals (aligned to the finite-filtered rows of d).
-.resid_frame <- function(d, res) {
+## per-plot residual frame from a fit's residuals (aligned to the finite-filtered rows of d). Carries
+## the raw value and the fitted spatial-trend surface too (NA when no spatial model) for the field
+## triptych (raw → trend → residual), ADR-0021.
+.resid_frame <- function(d, res, trend = NULL) {
   res <- suppressWarnings(as.numeric(res))
   if (length(res) != nrow(d)) return(NULL)
   data.frame(plot_id = as.character(d$plot_id), genotype = as.character(d$germplasm),
              row = d$row, col = d$col, residual = res, fitted = d$value - res,
+             raw = d$value, trend = if (is.null(trend)) NA_real_ else suppressWarnings(as.numeric(trend)),
              stringsAsFactors = FALSE)
 }
 
-## SpATS 2D P-spline, genotype FIXED → BLUEs + SE + plot residuals (mirrors analyze.R::fit_spats).
+## SpATS 2D P-spline, genotype FIXED → BLUEs + SE + plot residuals + the fitted spatial-trend surface
+## (the smooth field trend SpATS estimated and removed) per plot, via obtain.spatialtrend. NB the trend
+## matrix is indexed [row.p, col.p] (verified). Mirrors analyze.R::fit_spats.
 spats_blue <- function(d, has_rep) {
   d$R <- as.numeric(d$row); d$C <- as.numeric(d$col)
   nseg <- c(min(20L, length(unique(d$C))), min(20L, length(unique(d$R))))
@@ -80,7 +85,12 @@ spats_blue <- function(d, has_rep) {
                     blue = pred$predicted.values, se = pred$standard.errors,
                     stringsAsFactors = FALSE)
   res <- tryCatch(stats::residuals(fit), error = function(e) fit$residuals)
-  list(est = est, resid = .resid_frame(d, res))
+  trend <- tryCatch({
+    st <- SpATS::obtain.spatialtrend(fit, grid = c(length(unique(d$C)), length(unique(d$R))))
+    cp <- st$col.p; rp <- st$row.p
+    vapply(seq_len(nrow(d)), function(i) st$fit[which.min(abs(rp - d$R[i])), which.min(abs(cp - d$C[i]))], numeric(1))
+  }, error = function(e) rep(NA_real_, nrow(d)))
+  list(est = est, resid = .resid_frame(d, res, trend))
 }
 
 ## Fallback when there is no usable grid: least-squares entry means (genotype fixed, + rep block if
@@ -168,7 +178,28 @@ main <- function() {
   }
   model_qc <- model_qc_from_residuals(rbt)
 
-  cat(jsonlite::toJSON(list(adjusted = adjusted, stage1 = prov, model_qc = model_qc),
+  ## Field triptych per trait (ADR-0021): raw → fitted spatial trend → residual, for the environment
+  ## with the strongest field trend (where SpATS corrected the most) — same env across all three panels,
+  ## so the breeder can SEE the trend in the raw data, the surface the model removed, and the clean
+  ## residual that's left. Only for envs where a spatial surface was actually fit (trend is non-NA).
+  FIELD_MAX_CELLS <- 1500L
+  field_trends <- list()
+  for (k in seq_len(K)) {
+    df <- resid_by_trait[[k]]
+    if (is.null(df) || nrow(df) == 0 || all(is.na(df$trend))) next
+    envs_k <- unique(df$environment[is.finite(df$trend)])
+    if (!length(envs_k)) next
+    vv <- vapply(envs_k, function(e) stats::var(df$trend[df$environment == e & is.finite(df$trend)]), numeric(1))
+    best <- envs_k[which.max(vv)]
+    sub <- df[df$environment == best & is.finite(df$row) & is.finite(df$col), , drop = FALSE]
+    if (nrow(sub) > FIELD_MAX_CELLS) sub <- sub[sort(sample(nrow(sub), FIELD_MAX_CELLS)), , drop = FALSE]
+    cells <- lapply(seq_len(nrow(sub)), function(i) list(
+      row = sub$row[i], col = sub$col[i], raw = round(sub$raw[i], 4),
+      trend = round(sub$trend[i], 4), resid = round(sub$residual[i], 4)))
+    field_trends[[vids[k]]] <- list(environment = best, n = nrow(sub), cells = cells)
+  }
+
+  cat(jsonlite::toJSON(list(adjusted = adjusted, stage1 = prov, model_qc = model_qc, field_trends = field_trends),
                        auto_unbox = TRUE, null = "null", na = "null", digits = NA))
 }
 

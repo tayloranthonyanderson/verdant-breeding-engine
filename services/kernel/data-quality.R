@@ -32,6 +32,18 @@ NEARDUP_MAX_FINDINGS <- 30L  # cap typo-pair findings (the rest summarised) — 
 MAX_OUTLIERS_PER_TRAIT <- 20L  # cap emitted outlier findings per trait; the rest are summarised, not dropped silently
 
 ## ---- helpers ---------------------------------------------------------------------------------
+## Robust outlier score: |x − median| / (1.4826·MAD). ONE definition used everywhere an outlier is
+## detected — the data-check findings AND the box-and-whisker dots — so what the breeder SEES flagged is
+## exactly what gets suggested for removal (score > MAD_K). NOT 1.5·IQR (too loose; would flag the
+## natural tail and over-suggest removal, inflating heritability).
+.mad_score <- function(x) {
+  x <- as.numeric(x)
+  med <- stats::median(x)
+  mad <- stats::median(abs(x - med)) * 1.4826
+  if (!is.finite(mad) || mad == 0) return(rep(0, length(x)))
+  abs(x - med) / mad
+}
+
 .skewness <- function(x) {
   x <- x[is.finite(x)]; n <- length(x)
   if (n < 3) return(NA_real_)
@@ -86,10 +98,8 @@ dq_outliers <- function(environment, plot_id, genotype, values_by_trait) {
     for (e in envs) {
       idx <- which(environment == e & is.finite(v))
       if (length(idx) < 5) next                     # too few to robustly estimate a spread
-      x <- v[idx]; med <- stats::median(x)
-      mad <- stats::median(abs(x - med)) * 1.4826
-      if (!is.finite(mad) || mad == 0) next
-      score <- abs(x - med) / mad
+      x <- v[idx]
+      score <- .mad_score(x)                        # shared scorer (same rule the box-and-whisker uses)
       hit <- which(score > MAD_K)
       for (h in hit) cand[[length(cand) + 1]] <- list(
         pid = plot_id[idx[h]], g = genotype[idx[h]], e = e, val = x[h], sc = score[h])
@@ -238,17 +248,20 @@ dq_distributions <- function(environment, values_by_trait) {
       x <- v[environment == e]; x <- x[is.finite(x)]
       if (length(x) < 5) next
       q <- stats::quantile(x, c(0.25, 0.5, 0.75), names = FALSE, type = 7)
-      iqr <- q[3] - q[1]
-      lo_w <- q[1] - 1.5 * iqr; hi_w <- q[3] + 1.5 * iqr
-      inb <- x[x >= lo_w & x <= hi_w]
-      outs <- x[x < lo_w | x > hi_w]
+      # Flag the SAME robust outliers the data-checks suggest (MAD_K), NOT a looser 1.5·IQR fence — so
+      # the rose dots a breeder sees are exactly the ones the app suggests removing. The box stays the
+      # middle 50% (Q1–Q3); the whiskers reach the furthest NON-flagged value (the real normal range).
+      flag <- .mad_score(x) > MAD_K
+      inb <- x[!flag]; outs <- x[flag]
       shown <- if (length(outs) > DIST_MAX_OUTLIERS) outs[order(-abs(outs - q[2]))][seq_len(DIST_MAX_OUTLIERS)] else outs
       per_env[[length(per_env) + 1]] <- list(
         environment = e, n = length(x),
         min = round(min(x), 4), q1 = round(q[1], 4), median = round(q[2], 4), q3 = round(q[3], 4), max = round(max(x), 4),
         whisker_lo = round(if (length(inb)) min(inb) else q[1], 4),
         whisker_hi = round(if (length(inb)) max(inb) else q[3], 4),
-        n_outliers = length(outs), outliers = if (length(shown)) round(shown, 4) else numeric(0))
+        # as.list so jsonlite ALWAYS emits a JSON array — a length-1 numeric vector would auto_unbox to a
+        # scalar and break the UI's array handling (common now that MAD flags few outliers per env).
+        n_outliers = length(outs), outliers = as.list(round(shown, 4)))
     }
     if (length(per_env)) out[[tr]] <- per_env
   }

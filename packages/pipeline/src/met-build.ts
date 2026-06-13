@@ -267,6 +267,8 @@ export async function runMetAnalysis(opts: RunMetOptions = {}): Promise<RunMetRe
   // Model QC from the REAL spatially-adjusted residuals when Stage 1 ran (two-stage); else null and we
   // fall back to reconstructing residuals from the BLUPs (one-stage). ADR-0021.
   let stage1ModelQc: ModelQcByTrait | undefined;
+  // Per-trait field triptych (raw → fitted spatial trend → residual) from Stage 1, for the field view.
+  let stage1FieldTrends: Record<string, unknown> | undefined;
   if (plan0.model_class === 'single_stage') {
     console.log(`Single-stage multi-trait AI-REML on plots${plan0.gxe.include ? ' (+ genotype×environment)' : ''} ...`);
     g = estimateGeneticCovariance({ variableIds: TRAITS, rows: records.map((r) => ({ genotype: r.genotype, environment: r.environment, values: r.values })), interaction: plan0.gxe.include });
@@ -274,6 +276,7 @@ export async function runMetAnalysis(opts: RunMetOptions = {}): Promise<RunMetRe
     console.log('Stage 1: within-environment spatial de-trending (SpATS) ...');
     const s1 = spatialStage1(variableIds, records);
     stage1ModelQc = s1.model_qc as ModelQcByTrait | undefined;
+    stage1FieldTrends = s1.field_trends;
     console.log('Stage 2: multi-trait AI-REML (BLUPF90) on adjusted means ...');
     g = estimateGeneticCovariance({ variableIds: TRAITS, rows: s1.adjusted.map((a) => ({ genotype: a.genotype, environment: a.environment, values: a.values })) });
   }
@@ -352,6 +355,11 @@ export async function runMetAnalysis(opts: RunMetOptions = {}): Promise<RunMetRe
     });
     modelQc = runModelQc(records, TRAITS, blupsByTrait);
     console.log('model-qc: reconstructed from BLUPs (one-stage)');
+  }
+  // Attach the field triptych (raw → trend → residual) to data_quality for the field view (ADR-0021).
+  if (dataQuality && stage1FieldTrends && Object.keys(stage1FieldTrends).length > 0) {
+    dataQuality.field_trends = stage1FieldTrends;
+    console.log(`field_trends: ${Object.keys(stage1FieldTrends).join(', ')}`);
   }
 
   const traits: ResultBundle['traits'] = TRAITS.map((id, j) => {

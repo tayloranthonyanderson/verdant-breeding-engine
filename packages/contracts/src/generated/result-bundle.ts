@@ -413,6 +413,12 @@ export interface ResultBundle {
     distributions?: {
       [k: string]: unknown;
     } | null;
+    /**
+     * Per-trait field triptych for the 'see the spatial correction' view (ADR-0021): the raw measurement, the fitted SpATS spatial-trend surface (the smooth field trend the model estimated and removed), and the residual — all by field position, for the most spatially-structured environment (same env across all three so it's a true before → correction → after). Keyed by variable_id; each is { environment, n, cells:[{row,col,raw,trend,resid}] }. Present only when a spatial model was fitted (two-stage SpATS).
+     */
+    field_trends?: {
+      [k: string]: unknown;
+    } | null;
   } | null;
   /**
    * Selection rankings. Both index kinds may appear so the GUI can show their DIVERGENCE as insight (ADR-0006). The transparent weighted index is also client-recomputable for live re-weighting (PRD §6).

@@ -16,6 +16,7 @@ import type { ResultBundle, AnalysisRequest } from "@verdant/contracts";
 import { rerunWithDataOverrides } from "@/app/actions";
 import TraitDiagnosticPlots from "@/components/TraitDiagnosticPlots";
 import RawDistributions from "@/components/RawDistributions";
+import FieldTrends from "@/components/FieldTrends";
 
 type Finding = NonNullable<NonNullable<ResultBundle["data_quality"]>["findings"]>[number];
 type Diagnostics = NonNullable<ResultBundle["traits"][number]["diagnostics"]>;
@@ -47,10 +48,16 @@ function candKey(kind: string, id: string, variable_id: string | null | undefine
 export default function DataQuality({
   bundle,
   activeExclusions = [],
+  phase = "data",
 }: {
   bundle: ResultBundle;
   activeExclusions?: Exclusion[];
+  // 'data' = pre-fit (raw findings + distributions, before the model); 'fit' = post-fit (residual
+  // diagnostics + field triptych, with the model). Split across the journey so the model-dependent
+  // checks follow model selection (ADR-0021 trust layer, journey IA).
+  phase?: "data" | "fit";
 }) {
+  const isFit = phase === "fit";
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -65,40 +72,43 @@ export default function DataQuality({
     return m;
   }, [bundle.traits]);
 
-  // Build candidates: excludable pre-fit findings + post-fit influential observations.
+  // Build the exclusion candidates for THIS phase: pre-fit findings (data) vs post-fit influential
+  // observations (fit). Each phase curates from its own evidence — that's the point of the split.
   const candidates = useMemo<Candidate[]>(() => {
     const out: Candidate[] = [];
-    for (const f of findings) {
-      if (!f.suggested_exclusion) continue;
-      if (f.target.kind !== "environment" && f.target.kind !== "observation_unit" && f.target.kind !== "germplasm") continue;
-      if (!f.target.id) continue;
-      out.push({
-        key: candKey(f.target.kind, f.target.id, f.variable_id),
-        kind: f.target.kind, id: f.target.id, variable_id: f.variable_id ?? null,
-        severity: f.severity, source: "pre",
-        label: shortTarget(f.target.kind, f.target.id), detail: f.detail, score: Number(f.value ?? 0),
-      });
-    }
-    for (const t of bundle.traits) {
-      for (const inf of t.diagnostics?.influential ?? []) {
+    if (!isFit) {
+      for (const f of findings) {
+        if (!f.suggested_exclusion) continue;
+        if (f.target.kind !== "environment" && f.target.kind !== "observation_unit" && f.target.kind !== "germplasm") continue;
+        if (!f.target.id) continue;
         out.push({
-          key: candKey("observation_unit", inf.observation_unit_id, t.variable_id),
-          kind: "observation_unit", id: inf.observation_unit_id, variable_id: t.variable_id,
-          severity: "warning", source: "post",
-          label: shortTarget("observation_unit", inf.observation_unit_id),
-          detail: `Residual outlier in ${t.variable_id}: ${inf.germplasm_id ?? ""}${inf.environment_id ? ` @ ${inf.environment_id}` : ""} reads ${fmt(inf.value)} (${fmt(inf.studentized_resid)} studentized residuals from the model).`,
-          score: Math.abs(Number(inf.studentized_resid ?? 0)),
+          key: candKey(f.target.kind, f.target.id, f.variable_id),
+          kind: f.target.kind, id: f.target.id, variable_id: f.variable_id ?? null,
+          severity: f.severity, source: "pre",
+          label: shortTarget(f.target.kind, f.target.id), detail: f.detail, score: Number(f.value ?? 0),
         });
       }
+    } else {
+      for (const t of bundle.traits) {
+        for (const inf of t.diagnostics?.influential ?? []) {
+          out.push({
+            key: candKey("observation_unit", inf.observation_unit_id, t.variable_id),
+            kind: "observation_unit", id: inf.observation_unit_id, variable_id: t.variable_id,
+            severity: "warning", source: "post",
+            label: shortTarget("observation_unit", inf.observation_unit_id),
+            detail: `Residual outlier in ${t.variable_id}: ${inf.germplasm_id ?? ""}${inf.environment_id ? ` @ ${inf.environment_id}` : ""} reads ${fmt(inf.value)} (${fmt(inf.studentized_resid)} studentized residuals from the model).`,
+            score: Math.abs(Number(inf.studentized_resid ?? 0)),
+          });
+        }
+      }
     }
-    // de-dupe identical keys (a plot flagged both pre and post), keeping the higher-severity one.
     const byKey = new Map<string, Candidate>();
     for (const c of out) {
       const prev = byKey.get(c.key);
       if (!prev || SEV_RANK[c.severity] < SEV_RANK[prev.severity]) byKey.set(c.key, c);
     }
     return [...byKey.values()];
-  }, [findings, bundle.traits]);
+  }, [findings, bundle.traits, isFit]);
 
   // disposition policy
   const [mode, setMode] = useState<Mode>("review");
@@ -165,19 +175,22 @@ export default function DataQuality({
       {/* Header + quiet summary */}
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex items-start gap-3">
-          <div className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-600 text-white shadow-sm"><ShieldCheck size={18} /></div>
+          <div className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-600 text-white shadow-sm">
+            {isFit ? <Microscope size={18} /> : <ShieldCheck size={18} />}
+          </div>
           <div className="flex-1">
-            <h3 className="text-sm font-semibold text-slate-800">Data quality</h3>
+            <h3 className="text-sm font-semibold text-slate-800">{isFit ? "Did the model work?" : "Is your data sound?"}</h3>
             <p className="mt-0.5 text-xs text-slate-500">
-              What a statistician checks before trusting the answer — raw outliers, missingness, layout and naming errors,
-              then the model&apos;s own residuals. Nothing is removed unless you choose to.
+              {isFit
+                ? "The fit checks for the model above: residual diagnostics, a normal Q-Q, and the field-trend correction. Did the chosen model actually fit? Nothing is removed unless you choose to."
+                : "Before any model runs — raw outliers, missingness, layout and naming errors, and the spread of your measurements. Look at the data first. Nothing is removed unless you choose to."}
             </p>
           </div>
-          <SeverityChips counts={counts} total={nFindings} />
+          {!isFit && <SeverityChips counts={counts} total={nFindings} />}
         </div>
-        {nFindings === 0 && (
+        {!isFit && nFindings === 0 && (
           <div className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">
-            <Check size={14} /> No data-quality issues found in the fitted data.
+            <Check size={14} /> No data-quality issues found.
           </div>
         )}
       </section>
@@ -202,7 +215,10 @@ export default function DataQuality({
             <div>
               <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">How to handle suggestions</div>
               <div className="mt-1.5 inline-flex rounded-lg border border-slate-200 p-0.5">
-                {([["review", "Review each"], ["batch", "Accept all"], ["auto", "Auto · residual"]] as [Mode, string][]).map(([m, lbl]) => (
+                {(isFit
+                  ? ([["review", "Review each"], ["batch", "Accept all"], ["auto", "Auto · residual"]] as [Mode, string][])
+                  : ([["review", "Review each"], ["batch", "Accept all"]] as [Mode, string][])
+                ).map(([m, lbl]) => (
                   <button key={m} onClick={() => applyPolicy(m, capPct, threshold)} disabled={pending}
                     className={["rounded-md px-3 py-1.5 text-xs font-medium transition",
                       mode === m ? "bg-emerald-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50"].join(" ")}>
@@ -240,7 +256,7 @@ export default function DataQuality({
           {/* plain-language help — what the active mode does + what the cap means */}
           <p className="mt-3 text-[12px] leading-snug text-slate-500">
             {mode === "review" && <><span className="font-medium text-slate-600">Review each:</span> nothing is pre-selected — tick the plots you want to drop.</>}
-            {mode === "batch" && <><span className="font-medium text-slate-600">Accept all:</span> pre-selects everything flagged — the data-check findings <em>and</em> every residual outlier.</>}
+            {mode === "batch" && <><span className="font-medium text-slate-600">Accept all:</span> pre-selects everything flagged {isFit ? "— every residual outlier from the fit" : "— the raw data-check findings (outliers, bad sites, etc.)"}.</>}
             {mode === "auto" && <><span className="font-medium text-slate-600">Auto:</span> pre-selects only residual outliers beyond the cutoff (stricter cutoff = fewer plots) — the conservative way to drop just the extreme points.</>}
             {mode !== "review" && (
               <> Limited to {capPct}% of each trait&apos;s plots (≈{Math.round((capPct / 100) * repNobs).toLocaleString()}) so a handful of points can&apos;t gut a trait; anything past the cap is left for you to review.</>
@@ -272,14 +288,23 @@ export default function DataQuality({
         </section>
       )}
 
-      {/* Pre-fit findings */}
-      <FindingsTable findings={findings} candidates={candidates} selected={selected} onToggle={toggle} disabled={pending} />
+      {!isFit && (
+        <>
+          {/* Pre-fit findings */}
+          <FindingsTable findings={findings} candidates={candidates} selected={selected} onToggle={toggle} disabled={pending} />
+          {/* Raw measurement distributions (pre-fit, data sanity) */}
+          <RawDistributions bundle={bundle} />
+        </>
+      )}
 
-      {/* Raw measurement distributions (pre-fit, data sanity) */}
-      <RawDistributions bundle={bundle} />
-
-      {/* Post-fit Model QC */}
-      <ModelQc bundle={bundle} selected={selected} onToggle={toggle} disabled={pending} />
+      {isFit && (
+        <>
+          {/* Post-fit Model QC: residual diagnostics + Q-Q */}
+          <ModelQc bundle={bundle} selected={selected} onToggle={toggle} disabled={pending} />
+          {/* Field trends — raw → fitted trend → residual triptych (the spatial correction) */}
+          <FieldTrends bundle={bundle} />
+        </>
+      )}
     </div>
   );
 }
@@ -402,7 +427,7 @@ function ModelQc({
                   </button>
                 )}
               </div>
-              {openPlots.has(t.variable_id) && <TraitDiagnosticPlots diagnostics={d} spatialCorrected={spatialCorrected} />}
+              {openPlots.has(t.variable_id) && <TraitDiagnosticPlots diagnostics={d} />}
               {infl.length > 0 && (
                 <div className="mt-2.5">
                   <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">

@@ -31,8 +31,10 @@ export default function RawDistributions({ bundle }: { bundle: ResultBundle }) {
       {open && (
         <div className="space-y-4 border-t border-slate-100 p-5 pt-4">
           <p className="text-[11px] leading-snug text-slate-400">
-            One box per environment: the box spans the middle 50% of plots, the line is the median, the whiskers
-            reach the furthest non-outlier, and rose dots are values beyond 1.5×IQR — likely the data points to inspect.
+            One box per environment: the box spans the middle 50% of plots, the line is the median, and the
+            whiskers reach the furthest normal value. The <span className="text-rose-500">rose dots</span> are
+            the <span className="font-medium text-slate-500">same outliers flagged in the data checks above</span> —
+            the points the app suggests removing (robust MAD rule, not a looser 1.5×IQR net).
           </p>
           {traits.map((tr) => (
             <TraitBoxPlot key={tr} trait={tr} envs={dist[tr]} />
@@ -43,13 +45,20 @@ export default function RawDistributions({ bundle }: { bundle: ResultBundle }) {
   );
 }
 
-function TraitBoxPlot({ trait, envs }: { trait: string; envs: EnvBox[] }) {
-  if (!envs || envs.length === 0) return null;
+// JSON auto-unbox can deliver a length-1 `outliers` as a scalar; coerce to an array everywhere.
+function outs(e: EnvBox): number[] {
+  const o = e.outliers as unknown;
+  return Array.isArray(o) ? (o as number[]) : o == null ? [] : [o as number];
+}
+
+function TraitBoxPlot({ trait, envs: rawEnvs }: { trait: string; envs: EnvBox[] }) {
+  if (!rawEnvs || rawEnvs.length === 0) return null;
+  const envs = rawEnvs.map((e) => ({ ...e, outliers: outs(e) }));
   const H = 150, padT = 8, padB = 34, padL = 38, slot = 46;
   const W = padL + envs.length * slot + 8;
   // global y-range over boxes + outliers
-  const lo = Math.min(...envs.map((e) => Math.min(e.min, ...(e.outliers ?? []))));
-  const hi = Math.max(...envs.map((e) => Math.max(e.max, ...(e.outliers ?? []))));
+  const lo = Math.min(...envs.map((e) => Math.min(e.min, ...e.outliers)));
+  const hi = Math.max(...envs.map((e) => Math.max(e.max, ...e.outliers)));
   const pad = (hi - lo) * 0.06 || 1;
   const yMin = lo - pad, yMax = hi + pad;
   const Y = (v: number) => padT + (1 - (v - yMin) / (yMax - yMin || 1)) * (H - padT - padB);

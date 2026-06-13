@@ -36,6 +36,9 @@ export interface Stage1Result {
   /** Per-trait Model QC computed from the REAL spatially-adjusted residuals (ADR-0021). Keyed by
    *  variable_id; shape matches model-qc.R's per-trait output (residual_source = 'fit'). */
   model_qc?: Record<string, unknown>;
+  /** Per-trait field triptych (raw → fitted spatial trend → residual, same env) for the "see the
+   *  spatial correction" view (ADR-0021). Keyed by variable_id. */
+  field_trends?: Record<string, unknown>;
 }
 
 /** Run the spatial de-trending kernel over plot records, returning adjusted entry means per env +

@@ -30,24 +30,21 @@ export default async function Home() {
   const steps: Step[] = result
     ? [
         {
-          id: "overview", label: "Overview", sublabel: "what this trial says", icon: <Compass size={14} />,
+          id: "overview", label: "Overview", sublabel: "trial & data at a glance", icon: <Compass size={14} />,
+          content: <OverviewSummary bundle={result.bundle} studyName={result.study?.name ?? null} />,
+        },
+        {
+          id: "data", label: "Data", sublabel: "is your data sound?", icon: <ShieldCheck size={14} />,
+          content: <DataQuality bundle={result.bundle} activeExclusions={activeExclusions} phase="data" />,
+        },
+        {
+          id: "model", label: "Model", sublabel: "choose, tune & check the fit", icon: <SlidersHorizontal size={14} />,
           content: (
             <div className="space-y-5">
-              <OverviewSummary bundle={result.bundle} studyName={result.study?.name ?? null} />
               <InsightBanner bundle={result.bundle} />
-            </div>
-          ),
-        },
-        {
-          id: "quality", label: "Quality", sublabel: "trust your data & the fit", icon: <ShieldCheck size={14} />,
-          content: <DataQuality bundle={result.bundle} activeExclusions={activeExclusions} />,
-        },
-        {
-          id: "model", label: "Model", sublabel: "trust & tune the fit", icon: <SlidersHorizontal size={14} />,
-          content: (
-            <div className="space-y-5">
               <ModelReadiness bundle={result.bundle} />
               <ModelStudio bundle={result.bundle} />
+              <DataQuality bundle={result.bundle} activeExclusions={activeExclusions} phase="fit" />
             </div>
           ),
         },
@@ -119,13 +116,18 @@ export default async function Home() {
   );
 }
 
-// At-a-glance summary for the Overview step.
+// At-a-glance summary for the Overview step — the trial + the SHAPE of the data (model detail lives in
+// the Model step now). A quick orientation before the breeder dives into Data / Model / Select.
 function OverviewSummary({ bundle, studyName }: { bundle: ResultBundle; studyName: string | null }) {
   const ca = getCombiningAbility(bundle);
   const nGeno = bundle.traits[0]?.effects.length ?? 0;
+  const scale = (bundle.data_readiness?.scale ?? {}) as { n_env?: number };
+  const nEnv = scale.n_env ?? null;
+  const nFindings = bundle.data_quality?.summary?.n_findings ?? null;
   const stats: Array<{ label: string; value: string; sub?: string }> = [
-    { label: "Trial", value: studyName ?? "—", sub: `${bundle.traits.length} traits` },
-    { label: "Hybrids", value: nGeno.toLocaleString(), sub: "genotypes analyzed" },
+    { label: "Trial", value: studyName ?? "—", sub: `${bundle.traits.length} traits${nEnv ? ` · ${nEnv} environments` : ""}` },
+    { label: "Genotypes", value: nGeno.toLocaleString(), sub: "analyzed" },
+    { label: "Data quality", value: nFindings == null ? "—" : nFindings === 0 ? "Clean" : `${nFindings} finding${nFindings === 1 ? "" : "s"}`, sub: nFindings ? "review in Data" : "no issues flagged" },
     { label: "Relationship", value: relLabel(bundle.chosen_model.relationship), sub: "breeding-value model" },
   ];
   if (ca) {

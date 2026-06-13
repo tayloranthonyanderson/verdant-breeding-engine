@@ -1,10 +1,9 @@
 "use client";
-// Per-trait residual diagnostic plots (ADR-0021) — "show me the data" behind one click. Three small,
+// Per-trait residual diagnostic plots (ADR-0021) — "show me the data" behind one click. Two small,
 // hand-rolled SVGs, each answering exactly ONE question with a reference for what good looks like:
-//   • Residual vs fitted   → equal variance + outliers (influential points in rose, the same ones you exclude)
-//   • Residual histogram    → normality / skew (a normal curve as the reference)
-//   • Field residual map     → spatial trend the model didn't remove (only shown when flagged)
-// Downsampled in the kernel; rendered with no charting dependency to stay light and on-palette.
+//   • Residual vs fitted → equal variance + outliers (influential points in rose, the same you exclude)
+//   • Normal Q-Q          → normality (the y=x line as the reference; tails curving away = heavy tails)
+// The field-residual map lives in the Data Quality "Field trends" triptych (raw → trend → residual).
 import type { ResultBundle } from "@verdant/contracts";
 
 type Diagnostics = NonNullable<ResultBundle["traits"][number]["diagnostics"]>;
@@ -13,17 +12,9 @@ type QQPt = { t: number; s: number; o?: number };
 type Viz = {
   scatter?: ScatterPt[] | null;
   qq?: { points?: QQPt[]; n?: number; n_outliers?: number } | null;
-  spatial?: { environment?: string; moran?: number; cells?: { row: number; col: number; r: number }[] } | null;
 };
 
-// House diverging scale (matches GrmHeatmap): ~0 slate, positive emerald, negative rose.
-function diverge(v: number, max: number): string {
-  const a = Math.min(1, Math.abs(v) / (max || 1));
-  if (v >= 0) return `rgb(${Math.round(241 + (5 - 241) * a)},${Math.round(245 + (150 - 245) * a)},${Math.round(249 + (105 - 249) * a)})`;
-  return `rgb(${Math.round(241 + (225 - 241) * a)},${Math.round(245 + (29 - 245) * a)},${Math.round(249 + (72 - 249) * a)})`;
-}
-
-export default function TraitDiagnosticPlots({ diagnostics, spatialCorrected }: { diagnostics: Diagnostics; spatialCorrected?: boolean }) {
+export default function TraitDiagnosticPlots({ diagnostics }: { diagnostics: Diagnostics }) {
   const viz = diagnostics.viz as Viz | null | undefined;
   if (!viz) return null;
   return (
@@ -36,15 +27,6 @@ export default function TraitDiagnosticPlots({ diagnostics, spatialCorrected }: 
       {viz.qq?.points && viz.qq.points.length > 0 && (
         <Plot title="Normal Q-Q" caption="Each dot is a residual vs. where it 'should' fall if perfectly normal. On the dashed line = normal. Ends curving away from the line = heavy tails; the rose dots are the flagged outliers.">
           <QQPlot points={viz.qq.points} />
-        </Plot>
-      )}
-      {viz.spatial?.cells && viz.spatial.cells.length > 0 && (
-        <Plot
-          title={`Field residuals · ${viz.spatial.environment ?? ""}`}
-          caption={spatialCorrected
-            ? "Each cell is a plot in its field position. You want random speckle. Smooth bands or a colored patch = a fertile/poor zone — your spatial model (SpATS) removes it from the BLUPs."
-            : "Each cell is a plot in its field position. You want random speckle. Smooth bands or a colored patch = a field zone biasing the BLUPs — consider turning on a spatial model in the Model step."}>
-          <FieldHeatmap spatial={viz.spatial} />
         </Plot>
       )}
     </div>
@@ -107,33 +89,5 @@ function QQPlot({ points }: { points: QQPt[] }) {
       ))}
       <text x={S / 2} y={S - 4} textAnchor="middle" fontSize={8} fill="#94a3b8">theoretical normal →</text>
     </svg>
-  );
-}
-
-function FieldHeatmap({ spatial }: { spatial: { moran?: number; cells?: { row: number; col: number; r: number }[] } }) {
-  const cells = spatial.cells ?? [];
-  const rows = cells.map((c) => c.row), cols = cells.map((c) => c.col);
-  const rMin = Math.min(...rows), rMax = Math.max(...rows);
-  const cMin = Math.min(...cols), cMax = Math.max(...cols);
-  const nR = rMax - rMin + 1, nC = cMax - cMin + 1;
-  const maxAbs = Math.max(1e-9, ...cells.map((c) => Math.abs(c.r)));
-  const side = Math.min(150, Math.max(90, Math.max(nR, nC) * 6));
-  const cw = side / nC, ch = side / nR;
-  return (
-    <div>
-      <svg viewBox={`0 0 ${side} ${side}`} width={side} height={side} role="img" aria-label="Field residual heatmap">
-        <rect x={0} y={0} width={side} height={side} fill="#f8fafc" />
-        {cells.map((c, i) => (
-          <rect key={i} x={(c.col - cMin) * cw} y={(c.row - rMin) * ch} width={Math.ceil(cw)} height={Math.ceil(ch)} fill={diverge(c.r, maxAbs)} />
-        ))}
-      </svg>
-      {/* legend: what the colors mean */}
-      <div className="mt-1 flex items-center gap-1.5">
-        <span className="text-[9px] text-slate-400">below</span>
-        <div className="h-2 flex-1 rounded" style={{ background: `linear-gradient(to right, ${diverge(-maxAbs, maxAbs)}, ${diverge(0, maxAbs)}, ${diverge(maxAbs, maxAbs)})` }} />
-        <span className="text-[9px] text-slate-400">above</span>
-      </div>
-      <div className="text-center text-[9px] text-slate-400">vs. expected for that genotype</div>
-    </div>
   );
 }

@@ -67,6 +67,15 @@ ok(has(f, "distribution", "info", function(x) identical(x$target$id, "Skewed")),
 ok(res$summary$n_findings == length(f) && res$summary$by_severity$error >= 1,
    "summary rolls up findings + severities")
 
+# CONSISTENCY: the box-and-whisker outlier dots must be the SAME points the findings flag (one MAD
+# rule, not findings=MAD vs boxplot=1.5*IQR). The planted yield=9999 must appear in the E1 distribution
+# outliers, and the whiskers must NOT reach it (it's flagged, not inside the normal range).
+e1y <- Filter(function(d) identical(d$environment, "E1"), res$distributions$Yield)[[1]]
+ok(any(abs(unlist(e1y$outliers) - 9999) < 1e-6),
+   "box-and-whisker flags the SAME outlier (yield 9999) the data-checks do")
+ok(e1y$whisker_hi < 9999,
+   "whisker stops at the furthest normal value, not the flagged outlier")
+
 ## a clean dataset (no planted errors) should produce no error/warning outliers
 clean <- compute_data_quality(sprintf("G%02d", rep_len(1:n_geno, 60)), rep(envs, each = 20),
   as.numeric(rep_len(1:6, 60)), as.numeric(rep_len(1:10, 60)), rep("1", 60),
