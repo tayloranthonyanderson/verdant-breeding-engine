@@ -120,8 +120,16 @@ Effort is relative (S/M/L/XL) at ~8–12 hrs/wk, not a date.
     `evals/groundedness` answerer contract. Surfaced as an **"Ask your results"** panel on the Understand
     step (LLM runs server-only). Auth resolves from the env; a keyless **offline answerer** covers common
     intents so it's demonstrable now and goes live on an Anthropic **API-key** drop (the Max *subscription*
-    is not an API key). Built/verified on the G2F bundle; the tomato corpus + eval-gate wiring + the
-    target-authoring assistant are the follow-ons.
+    is not an API key). **Live on Claude Sonnet 4.6.**
+  - ✅ **Runtime grounding guardrail — the no-fabrication promise enforced, not hoped:** every live answer
+    is verified before display by a shared checker (`grounding.ts`, used by BOTH the runtime path and the
+    CI eval gate so they can't drift). It grounds **numbers** (ignoring digits inside germplasm ids like
+    `B73/TX779`; handling commas/percentages) **and named entities** (no invented line/trait/market names).
+    On an ungrounded answer it **regenerates once**, then **withholds** the answer and shows a *verified
+    summary + a reliability warning* — the fabricated figure never reaches the breeder. The "Ask your
+    results" UI says exactly what's enforced. Demonstrated live: a unit-conversion trap made Sonnet
+    fabricate a bushels/acre value → caught → withheld → warned. The tomato corpus + target-authoring
+    assistant are the follow-ons.
 - **Validation suite (ADR-0008):** correctness vs. the tomato-flavored simulator's known truth; robustness vs.
   a battery of public/G2F trials.
 - **Done when:** a real G2F MET produces spatially-adjusted BLUPs, Cullis h², a GxE/stability view, both
