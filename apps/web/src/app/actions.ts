@@ -7,11 +7,17 @@
 // (relationship-only re-points GEBVs in seconds; a structural change refits in minutes).
 import { revalidatePath } from "next/cache";
 import { and, eq, inArray } from "drizzle-orm";
-import { db, analysisRun, advancementDecision } from "@verdant/db";
-import { runMetAnalysis, runTomatoCut, type ModelOverrides } from "@verdant/pipeline";
+import { db, analysisRun, resultBundle, study, advancementDecision } from "@verdant/db";
+import { runMetAnalysis, runTomatoCut, buildCustomCut, type ModelOverrides } from "@verdant/pipeline";
 import type { AnalysisRequest } from "@verdant/contracts";
 import { answer, type Answer } from "@verdant/ai";
 import { getLatestResult, getCutResult } from "@/lib/data";
+
+// Turn a preset name into a stable, url-safe cut id (re-saving the same name re-runs the same preset).
+function cutSlug(name: string): string {
+  const s = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+  return `cut-${s || "untitled"}`;
+}
 
 // --- Advancement (DOMAIN-MODEL §4) — record/withdraw the staging move that closes analysis→select→
 // advance. Persists to advancement_decision, scoped to the analysis it was made on; revalidates so the
@@ -49,9 +55,6 @@ export async function withdrawAdvancement(input: { analysisRunId: number; candid
   }
 }
 
-// silence unused import lints when only some helpers are used by a given build
-void inArray;
-
 // --- Grounded Q&A (ADR-0002/0004) — ask the freshest analysis a question; the AI explains the
 // bundle and may state only numbers present in it (evals/groundedness). The LLM call runs server-only.
 export type AskResult = { status: "ok"; answer: Answer } | { status: "error"; error: string };
@@ -68,11 +71,47 @@ export async function askResults(question: string, cutId?: string): Promise<AskR
   }
 }
 
-// Re-run the analysis for a data cut LIVE (assemble the cut's trials → multi-trait AI-REML → persist),
+// Re-run the analysis for a built-in template cut LIVE (assemble → multi-trait AI-REML → persist),
 // then revalidate so the page re-reads it. "Running the analysis on this cut" made literal (ADR-0023).
 export async function analyzeCut(cutId: string): Promise<{ status: "ok" | "error"; error?: string }> {
   try {
     await runTomatoCut(cutId, { persist: true });
+    revalidatePath("/");
+    return { status: "ok" };
+  } catch (e) {
+    return { status: "error", error: (e as Error).message };
+  }
+}
+
+// Save + run a BREEDER-DEFINED cut: the breeder picked the market and the exact trials; we fit them and
+// persist a re-runnable preset (a study, source='tomato-cut'). Re-saving the same name re-runs it.
+export async function saveAndRunCut(input: { name: string; market: string; trialIds: string[] }): Promise<{ status: "ok"; cutId: string } | { status: "error"; error: string }> {
+  try {
+    const name = (input.name ?? "").trim();
+    if (!name) return { status: "error", error: "Name your data cut so you can find it later." };
+    if (!input.trialIds?.length) return { status: "error", error: "Pick at least one trial for the cut." };
+    if (!input.market) return { status: "error", error: "Choose a market to rank the cut on." };
+    const id = cutSlug(name);
+    await buildCustomCut({ id, name, market: input.market, trialIds: input.trialIds });
+    revalidatePath("/");
+    return { status: "ok", cutId: id };
+  } catch (e) {
+    return { status: "error", error: (e as Error).message };
+  }
+}
+
+// Delete a saved preset (its study + runs + bundles). Built-in templates aren't deletable here.
+export async function deleteCut(cutId: string): Promise<{ status: "ok" | "error"; error?: string }> {
+  try {
+    const [s] = await db.select().from(study).where(and(eq(study.name, cutId), eq(study.source, "tomato-cut")));
+    if (!s) return { status: "error", error: "Saved cut not found." };
+    const runs = await db.select({ id: analysisRun.id }).from(analysisRun).where(eq(analysisRun.studyId, s.id));
+    const runIds = runs.map((r) => r.id);
+    if (runIds.length) {
+      await db.delete(resultBundle).where(inArray(resultBundle.analysisRunId, runIds));
+      await db.delete(analysisRun).where(inArray(analysisRun.id, runIds));
+    }
+    await db.delete(study).where(eq(study.id, s.id));
     revalidatePath("/");
     return { status: "ok" };
   } catch (e) {

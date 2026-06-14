@@ -58,6 +58,24 @@ export async function getG2fResult(): Promise<LoadedResult | null> {
   return { study: row.s, run: row.run, bundle: row.bundle as ResultBundle, advancements };
 }
 
+/** The breeder's saved cut presets (studies with source='tomato-cut'), newest first, each with the
+ *  scope recorded in its latest bundle. Powers the "your saved cuts" list. */
+export interface SavedCut { id: string; name: string; market: string; market_label: string; trialIds: string[]; n_geno: number; stages: string[]; years: number[] }
+export async function listSavedCuts(): Promise<SavedCut[]> {
+  const studies = await db.select().from(study).where(eq(study.source, "tomato-cut")).orderBy(desc(study.id));
+  const out: SavedCut[] = [];
+  for (const s of studies) {
+    const r = await getCutResult(s.name);
+    const dr = r?.bundle.data_readiness as { cut?: { market?: string; market_label?: string; trial_ids?: string[]; stages?: string[]; years?: number[] }; scale?: { n_geno?: number } } | undefined;
+    const c = dr?.cut;
+    out.push({
+      id: s.name, name: s.fieldLocation ?? s.name, market: c?.market ?? "", market_label: c?.market_label ?? "",
+      trialIds: c?.trial_ids ?? [], n_geno: dr?.scale?.n_geno ?? 0, stages: c?.stages ?? [], years: c?.years ?? [],
+    });
+  }
+  return out;
+}
+
 /** The latest analysis for a named data cut (a tomato study whose name === the cut id). The cut
  *  bundle carries its own data scope in data_readiness.cut, so this is "the analysis of this cut". */
 export async function getCutResult(cutId: string): Promise<LoadedResult | null> {

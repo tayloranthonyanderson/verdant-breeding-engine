@@ -70,6 +70,13 @@ export interface Cut {
   tpe: string;
   label: string;
   blurb: string;
+  /** true when the breeder hand-picked the trials (a saved preset), false for the built-in templates. */
+  custom?: boolean;
+}
+
+/** The markets a cut's index can rank on (id + label + signed weights), for the builder UI. */
+export function marketList(m: Manifest = loadManifest()): Array<{ id: string; label: string }> {
+  return Object.entries(m.markets).map(([id, d]) => ({ id, label: d.label }));
 }
 
 /** The canonical cuts the corpus ships: each market × {prediction-broad, advancement-narrow}. */
@@ -138,13 +145,11 @@ function readTrial(t: TrialMeta, traits: string[]): Array<{ genotype: string; en
   }));
 }
 
-/** Assemble a cut: its trials, the pooled plot records, and the derived germplasm + composition. */
-export function assembleCut(cut: Cut, m: Manifest = loadManifest()): AssembledCut {
+/** Assemble an explicit set of trials into a cut bundle input (pooled records + composition). */
+function assembleTrials(cut: Cut, trials: TrialMeta[], m: Manifest): AssembledCut {
   const traits = m.traits;
-  const trials = trialsForCut(cut, m);
   const records = trials.flatMap((t) => readTrial(t, traits));
-  const genoSet = new Set(records.map((r) => r.genotype));
-  const germplasm = [...genoSet];
+  const germplasm = [...new Set(records.map((r) => r.genotype))];
   return {
     cut, traits, weights: m.markets[cut.market].weights, trials, records, germplasm,
     composition: {
@@ -157,6 +162,30 @@ export function assembleCut(cut: Cut, m: Manifest = loadManifest()): AssembledCu
       years: [...new Set(trials.map((t) => t.year))].sort(),
     },
   };
+}
+
+/** Assemble a canonical cut: its trials (by the tag rule), records, derived germplasm + composition. */
+export function assembleCut(cut: Cut, m: Manifest = loadManifest()): AssembledCut {
+  return assembleTrials(cut, trialsForCut(cut, m), m);
+}
+
+/** Definition of a breeder-defined (saved) cut: a name, the market to rank on, and the exact trials. */
+export interface CutDef { id: string; name: string; market: string; trialIds: string[] }
+
+/** Assemble a custom cut from a hand-picked trial list (the saved-preset path). */
+export function assembleCustom(def: CutDef, m: Manifest = loadManifest()): AssembledCut {
+  const d = m.markets[def.market];
+  if (!d) throw new Error(`unknown market: ${def.market}`);
+  const trials = def.trialIds.map((id) => m.trials.find((t) => t.trial_id === id)).filter((t): t is TrialMeta => !!t);
+  if (trials.length === 0) throw new Error('a cut must include at least one trial');
+  // "broad" (a prediction-style pool) vs "narrow" follows the SELECTION, not a label: spanning >1 stage
+  // means it pools the funnel. The bundle's intent/warnings key off this downstream.
+  const multiStage = new Set(trials.map((t) => t.stage)).size > 1;
+  const cut: Cut = {
+    id: def.id, purpose: multiStage ? 'prediction' : 'advancement', market: def.market, market_label: d.label,
+    tpe: d.tpe, label: def.name, blurb: 'Breeder-defined cut — the trials you picked.', custom: true,
+  };
+  return assembleTrials(cut, trials, m);
 }
 
 /** The full trial catalog (for the "see all the data" view) — every trial, untouched by any cut. */

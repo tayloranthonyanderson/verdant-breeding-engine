@@ -106,3 +106,12 @@ without tagging germplasm or checking trials one by one:
 The durable schema this ADR sketches (a `segment` table, a `study`↔`segment` relevance tag, decisions
 carrying per-Segment scope) is still deferred to the selection-target/ingestion work; the corpus seeds
 the tags from a manifest. What's proven now is the *model*: tags on trials, lens on read, cut by purpose.
+
+**The breeder DEFINES the cut (2026-06-14).** The templates (purpose × market) are starting points, not
+the product. The `DataCutPicker` is a **builder**: seed from a template, then tick/untick the exact
+trials (the breeder's judgement is the relevance model — keep a correlated off-target trial, drop a
+noisy nursery), choose the market to rank on, **name it, and save it as a re-runnable preset**. A saved
+cut persists as its own study (`source='tomato-cut'`) carrying its trial list in the bundle's
+`data_readiness.cut`; it re-runs on current data and can be deleted (`saveAndRunCut` / `analyzeCut` /
+`deleteCut` server actions; `buildCustomCut` in the pipeline). This is the "saved trial set" primitive —
+the lightweight precursor to the durable `segment`/study-tag schema, validated against real fits.

@@ -13,7 +13,7 @@ import { validateResultBundle, type ResultBundle, type AnalysisRequest } from '@
 import { estimateGeneticCovariance } from './blupf90';
 import { runRKernel } from './kernel';
 import { isEntrypoint } from './entry';
-import { assembleCut, listCuts, cutById, loadManifest, type Cut, type AssembledCut } from './tomato-corpus';
+import { assembleCut, assembleCustom, listCuts, cutById, loadManifest, type Cut, type CutDef, type AssembledCut } from './tomato-corpus';
 
 const PROGRAM = 'Verdant tomato (synthetic)';
 
@@ -120,7 +120,8 @@ export function buildCutBundle(assembled: AssembledCut): ResultBundle {
       unlocks: broad ? [{ capability: 'Genomic prediction (GBLUP/ssGBLUP)', blocked_by: 'The wide cut is phenotype-only here; the marker scaffold isn\'t yet built into a GRM.', hint: 'Build a GRM from data/tomato/markers.csv to borrow strength across the unbalanced, cross-stage trials.' }] : [],
       // The cut descriptor — what data this analysis was run on (ADR-0023 provenance).
       cut: { id: cut.id, purpose: cut.purpose, market: cut.market, market_label: cut.market_label, tpe: cut.tpe,
-        label: cut.label, trials: trials.map((tt) => ({ trial_id: tt.trial_id, stage: tt.stage, year: tt.year, market_tag: tt.market_tag, n_entries: tt.n_entries, n_loc: tt.n_loc })),
+        label: cut.label, custom: cut.custom ?? false, trial_ids: trials.map((tt) => tt.trial_id),
+        trials: trials.map((tt) => ({ trial_id: tt.trial_id, stage: tt.stage, year: tt.year, market_tag: tt.market_tag, n_entries: tt.n_entries, n_loc: tt.n_loc })),
         stages: composition.stages, years: composition.years },
     } as unknown as ResultBundle['data_readiness'],
     indices: [t, gi.index],
@@ -131,17 +132,18 @@ export function buildCutBundle(assembled: AssembledCut): ResultBundle {
   return validateResultBundle(bundle);
 }
 
-async function tomatoStudyId(cut: Cut): Promise<{ programId: number; studyId: number }> {
+async function tomatoStudyId(cut: Cut, source: string): Promise<{ programId: number; studyId: number }> {
   await db.insert(program).values({ name: PROGRAM }).onConflictDoNothing();
   const [prog] = await db.select().from(program).where(eq(program.name, PROGRAM));
-  // One study per cut (name = cut.id) so getCutResult can find the latest bundle for a cut.
-  await db.insert(study).values({ programId: prog.id, name: cut.id, fieldLocation: cut.label, year: 2025, source: 'sim' }).onConflictDoNothing();
+  // One study per cut (name = cut.id) so getCutResult can find the latest bundle for a cut. source
+  // distinguishes the built-in templates ('sim') from breeder-saved presets ('tomato-cut').
+  await db.insert(study).values({ programId: prog.id, name: cut.id, fieldLocation: cut.label, year: 2025, source }).onConflictDoNothing();
   const [s] = await db.select().from(study).where(and(eq(study.programId, prog.id), eq(study.name, cut.id)));
   return { programId: prog.id, studyId: s.id };
 }
 
-export async function persistCutBundle(cut: Cut, bundle: ResultBundle): Promise<number> {
-  const { programId, studyId } = await tomatoStudyId(cut);
+export async function persistCutBundle(cut: Cut, bundle: ResultBundle, source = 'sim'): Promise<number> {
+  const { programId, studyId } = await tomatoStudyId(cut, source);
   const request: AnalysisRequest = {
     contract_version: 'v0', analysis_request_id: cut.id, intent: bundle.intent,
     variables: bundle.traits.map((t) => ({ variable_id: t.variable_id, name: t.variable_id, data_type: 'numeric' as const })) as AnalysisRequest['variables'],
@@ -153,7 +155,7 @@ export async function persistCutBundle(cut: Cut, bundle: ResultBundle): Promise<
   return run.id;
 }
 
-/** Build (and optionally persist) one cut by id — the entrypoint the web Server Action calls. */
+/** Build (and optionally persist) one built-in template cut by id — the Server Action's re-run path. */
 export async function runTomatoCut(cutId: string, opts: { persist?: boolean } = {}): Promise<{ bundle: ResultBundle; analysisRunId: number | null }> {
   const cut = cutById(cutId);
   if (!cut) throw new Error(`unknown tomato cut: ${cutId}`);
@@ -161,6 +163,15 @@ export async function runTomatoCut(cutId: string, opts: { persist?: boolean } = 
   const bundle = buildCutBundle(assembled);
   const analysisRunId = (opts.persist ?? true) ? await persistCutBundle(cut, bundle) : null;
   return { bundle, analysisRunId };
+}
+
+/** Build + persist a BREEDER-DEFINED cut (a saved preset): fit the hand-picked trials and store it as
+ *  its own re-runnable study (source='tomato-cut'). Returns the cut id the page loads by. */
+export async function buildCustomCut(def: CutDef): Promise<{ cutId: string; analysisRunId: number }> {
+  const assembled = assembleCustom(def);
+  const bundle = buildCutBundle(assembled);
+  const analysisRunId = await persistCutBundle(assembled.cut, bundle, 'tomato-cut');
+  return { cutId: def.id, analysisRunId };
 }
 
 async function cli() {

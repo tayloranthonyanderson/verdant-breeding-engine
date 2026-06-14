@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { Leaf, FlaskConical, Sprout, ClipboardCheck, Compass, SlidersHorizontal, Microscope, ListChecks, Dna, ShieldCheck, Layers, Trophy } from "lucide-react";
 import type { ResultBundle, AnalysisRequest } from "@verdant/contracts";
-import { getG2fResult, getCutResult } from "@/lib/data";
-import { listCuts, trialsForCut, trialCatalog } from "@verdant/pipeline";
+import { getG2fResult, getCutResult, listSavedCuts } from "@/lib/data";
+import { listCuts, trialsForCut, trialCatalog, marketList } from "@verdant/pipeline";
 import { getCombiningAbility } from "@/lib/ca";
 import InsightBanner from "@/components/InsightBanner";
 import ModelReadiness from "@/components/ModelReadiness";
@@ -38,27 +38,32 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
 async function CutExperience({ cutId }: { cutId: string }) {
   let cuts: CutCard[] = [];
   let catalog: CatalogTrial[] = [];
+  let markets: Array<{ id: string; label: string }> = [];
   try {
     cuts = listCuts().map((c) => {
       const tr = trialsForCut(c);
       return { ...c, trial_ids: tr.map((t) => t.trial_id), stages: [...new Set(tr.map((t) => t.stage))].sort(), years: [...new Set(tr.map((t) => t.year))].sort(), n_trials: tr.length };
     });
     catalog = trialCatalog().map((t) => ({ trial_id: t.trial_id, stage: t.stage, stage_label: t.stage_label, year: t.year, tpe: t.tpe, market_tag: t.market_tag, n_entries: t.n_entries, n_loc: t.n_loc, n_rep: t.n_rep, design: t.design }));
+    markets = marketList();
   } catch { /* corpus not generated — picker stays empty, page still renders */ }
+  const savedCuts = await listSavedCuts().catch(() => []);
 
   const result = (await getCutResult(cutId)) ?? (cuts[0] ? await getCutResult(cuts[0].id) : null);
-  const dr = (result?.bundle.data_readiness ?? {}) as { scale?: Record<string, number>; connectivity?: { n_checks?: number }; cut?: { trials?: unknown[]; stages?: string[]; years?: number[] } };
+  const dr = (result?.bundle.data_readiness ?? {}) as { scale?: Record<string, number>; connectivity?: { n_checks?: number }; cut?: { trials?: unknown[]; trial_ids?: string[]; market?: string; stages?: string[]; years?: number[] } };
   const composition: Composition | null = result && dr.cut ? {
     n_geno: dr.scale?.n_geno ?? 0, n_env: dr.scale?.n_env ?? 0, n_obs: dr.scale?.n_obs ?? 0,
     n_checks: dr.connectivity?.n_checks ?? 0, n_trials: dr.cut.trials?.length ?? 0,
     stages: dr.cut.stages ?? [], years: dr.cut.years ?? [],
   } : null;
   const activeCutId = result?.study?.name ?? cutId;
+  const currentTrialIds = dr.cut?.trial_ids ?? [];
+  const currentMarket = dr.cut?.market ?? markets[0]?.id ?? "";
 
   const steps: Step[] = result ? [
     {
-      id: "cut", label: "Data cut", sublabel: "choose what to analyze", icon: <Layers size={14} />,
-      content: <DataCutPicker cuts={cuts} catalog={catalog} selected={activeCutId} composition={composition} />,
+      id: "cut", label: "Data cut", sublabel: "define what to analyze", icon: <Layers size={14} />,
+      content: <DataCutPicker cuts={cuts} catalog={catalog} markets={markets} savedCuts={savedCuts} selected={activeCutId} composition={composition} currentTrialIds={currentTrialIds} currentMarket={currentMarket} />,
     },
     {
       id: "understand", label: "Understand", sublabel: "heritability & genetic correlations", icon: <Microscope size={14} />,
