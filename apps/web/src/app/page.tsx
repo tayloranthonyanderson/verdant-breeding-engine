@@ -9,6 +9,7 @@ import DataQuality from "@/components/DataQuality";
 import HeritabilityCards from "@/components/HeritabilityCards";
 import GeneticCorrelations from "@/components/GeneticCorrelations";
 import CombiningAbilityUnderstand from "@/components/CombiningAbilityUnderstand";
+import AskPanel from "@/components/AskPanel";
 import SelectionSection from "@/components/SelectionSection";
 import GenomicWorkspace from "@/components/GenomicWorkspace";
 import StepShell, { type Step } from "@/components/StepShell";
@@ -52,6 +53,7 @@ export default async function Home() {
           id: "understand", label: "Understand", sublabel: "heritability, correlations, combining ability", icon: <Microscope size={14} />,
           content: (
             <div className="space-y-5">
+              <AskPanel />
               <section>
                 <h3 className="mb-2 text-sm font-semibold text-slate-700">Heritability</h3>
                 <HeritabilityCards bundle={result.bundle} />

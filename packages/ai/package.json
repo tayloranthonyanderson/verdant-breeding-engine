@@ -1,0 +1,22 @@
+{
+  "name": "@verdant/ai",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The AI layer (ADR-0002/0004): grounded narration over the result bundle. A provider-abstracted LLM seam (Anthropic adapter) + a grounded answer(question, bundle) that may state only numbers present in the bundle. Conforms to the evals/groundedness VERDANT_ANSWERER contract. The AI explains; it never computes.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@verdant/contracts": "workspace:*",
+    "@anthropic-ai/sdk": "^0.69.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

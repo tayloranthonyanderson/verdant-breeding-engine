@@ -10,6 +10,8 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db, analysisRun, advancementDecision } from "@verdant/db";
 import { runMetAnalysis, type ModelOverrides } from "@verdant/pipeline";
 import type { AnalysisRequest } from "@verdant/contracts";
+import { answer, type Answer } from "@verdant/ai";
+import { getLatestResult } from "@/lib/data";
 
 // --- Advancement (DOMAIN-MODEL §4) — record/withdraw the staging move that closes analysis→select→
 // advance. Persists to advancement_decision, scoped to the analysis it was made on; revalidates so the
@@ -49,6 +51,21 @@ export async function withdrawAdvancement(input: { analysisRunId: number; candid
 
 // silence unused import lints when only some helpers are used by a given build
 void inArray;
+
+// --- Grounded Q&A (ADR-0002/0004) — ask the freshest analysis a question; the AI explains the
+// bundle and may state only numbers present in it (evals/groundedness). The LLM call runs server-only.
+export type AskResult = { status: "ok"; answer: Answer } | { status: "error"; error: string };
+export async function askResults(question: string): Promise<AskResult> {
+  try {
+    const q = (question ?? "").trim();
+    if (!q) return { status: "error", error: "Ask a question about the results." };
+    const result = await getLatestResult();
+    if (!result) return { status: "error", error: "No analysis available yet." };
+    return { status: "ok", answer: await answer(q, result.bundle) };
+  } catch (e) {
+    return { status: "error", error: (e as Error).message };
+  }
+}
 
 export interface Refusal {
   factor: string;
