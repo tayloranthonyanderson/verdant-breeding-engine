@@ -13,9 +13,28 @@ simulating the **breeding funnel** honestly. It also gives the AI insight layer 
 TPP-scoped Q&A) a realistic program to narrate, and — when the ingestion front door is built later —
 these same per-stage CSVs dogfood it.
 
+## The data cut is purpose-dependent (drives generation)
+
+There are **two** cuts, and the corpus must support both:
+
+- **Decision cut (narrow).** Advance-or-drop at a stage → that stage's trials, design-homogeneous, one
+  market lens. The Model Planner reacts to the stage's design.
+- **Prediction cut (wide) — the headline.** A training set for GEBVs. Relevance axis is the **TPE, not
+  the stage**: pool every record that samples the market's target environments, **across stages and across
+  years**. Validity comes from **genetic connectivity** (shared germplasm/checks/testers + **markers/GRM**
+  as the glue across unbalanced data). Noise is **modeled, not filtered** (heterogeneous error/weights per
+  stage design; loc×year environment random; GxE/FA structure down-weights crossover environments).
+  Inclusion rule: (1) in the TPE, (2) genetically connected, (3) concordant not crossover (genetic
+  correlation to the TPE is the relevance dial). Including the early-stage records that drove selection
+  **de-biases** variance components (Henderson). Material tested early for multiple markets is in **every**
+  relevant market's cut (many-to-many lens, ADR-0023). The user picks a **purpose**; the system proposes
+  the cut (pool, connectivity, each block's genetic correlation to the TPE) and lets them include/exclude
+  with the consequence shown — the "automate the expert" wedge.
+
 ## What to generate
 
-One tomato program, one cycle across the funnel (multi-cycle is a later extension — see Out of scope).
+One tomato program across the funnel, **≥2 years / cycles** with carried-over checks and survivors for
+connectivity, and a **marker scaffold on the inbreds** so the GRM can glue the wide prediction cut.
 
 | Stage | ~Entries | Locs × Reps | Traits measured (cumulative) | Planner should choose |
 |---|---|---|---|---|
@@ -67,11 +86,16 @@ seed), tagged with **Study→TPE**, flowing through the existing build path (mir
 the G2F path) — but onto **tomato**. This moves the whole product off hardcoded G2F maize and onto the
 beachhead/teaching crop.
 
+## In scope now (pulled in for the prediction cut — decided 2026-06-14)
+
+- **Markers on the synthetic inbreds** — the GRM glue that makes the wide cut valid. Extends the existing
+  loci scaffold (ADR-0017/0020), kept minimal (enough for a credible GRM, not a full genome).
+- **≥2 years/cycles with carried-over checks + survivors** — connectivity over time so cross-year pooling
+  is demonstrable; also begins the cycle-over-cycle genetic-gain track (toward ADR-0011 / M9).
+
 ## Out of scope (defer)
 
-- **Genomic markers** for the synthetic inbreds beyond the existing loci scaffold (ADR-0017/0020) —
-  add when genomic-on-tomato is demoed.
-- **Multi-cycle recurrent loop** — start with one cycle across the stages; add cycle-over-cycle
-  genetic-gain tracking later (the forward-simulation capability, ADR-0011 / M9).
+- **Full forward-simulation / many-cycle ΔG loop** — two cycles establish connectivity + a gain delta;
+  the long recurrent-selection projection stays at the M9 frontier (ADR-0011).
 - **The ingestion front door** — these CSVs are seeded directly for now; they become the dogfood
   corpus for the upload workflow when that thread is built (deferred — see this session's direction).
