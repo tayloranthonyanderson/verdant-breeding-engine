@@ -5,7 +5,7 @@ Criteria); the data-model corollary of ADR-0011's decision-support framing.
 
 ## Context
 
-A **Segment** (the breeder's *advancement target* — what material is bred for) drives market-specific
+A **Segment** (the breeder's *target market* — what material is bred for) drives market-specific
 selection: same data + different Segment ⇒ different ranking (CONTEXT; ADR-0020). Designing it
 surfaced three facts that break the naive `germplasm.segment_id` model:
 

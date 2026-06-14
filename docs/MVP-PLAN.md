@@ -105,8 +105,8 @@ Effort is relative (S/M/L/XL) at ~8–12 hrs/wk, not a date.
   mandatory human confirmation. Data model **aligned to BrAPI** naming.
 - **Selection (ADR-0006):** the **transparent weighted index** (sum-to-100% alignment tool, live sliders)
   *and* a **genetically-aware index** (Smith–Hazel / desired-gains); surface their **divergence** as insight.
-  - ✅ **Selection-target (Segment) frame (ADR-0023):** the Select step carries multiple **advancement
-    targets** (Segment = **TPP + TPE**); an "Advancement target" switcher re-ranks the same fit under
+  - ✅ **Selection-target (Segment) frame (ADR-0023):** the Select step carries multiple **target
+    markets** (Segment = **TPP + TPE**); a "Target market" switcher re-ranks the same fit under
     each target's objective — *same data, different Segment → different ranking*, live across all three
     lenses (stated / genetically-optimal / compare). Trait-defined Segments over one shared TPE built
     end-to-end on the G2F MET; the **environment-defined TPE partition** (own fit → GCA×E) is the next

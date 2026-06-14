@@ -47,7 +47,7 @@ export default function DesiredGainsExplorer({
   onRankingChange?: (ranking: Array<{ germplasm_id: string; rank: number }>) => void;
 }) {
   const gc = bundle.genetic_correlations;
-  // The desired-gains + transparent indices for the active Segment (advancement target); fall back to
+  // The desired-gains + transparent indices for the active Segment (target market); fall back to
   // the first of each kind for single-segment bundles.
   const inSeg = (k: string) => (i: NonNullable<ResultBundle["indices"]>[number]) =>
     i.kind === k && (!segmentId || i.segment_id === segmentId);

@@ -210,7 +210,7 @@ recorded advancement. Validated on G2F MET line×tester. See `.scratch/ux-archit
 - **Market / Segment** — a program-defined *commercial target*, grouped by whatever segments share
   (mechanization, climate, season, soil); no single defining axis; set by business strategy and
   **time-variant** (effective-dated). Faceted, not a rigid hierarchy. Breeders call this the
-  **advancement target** — *what material is bred for*; it is **never an attribute of the germplasm**
+  **target market** — *what material is bred for*; it is **never an attribute of the germplasm**
   but a lens applied to it (see **Segment membership** below). A Segment is two facets:
   a **TPP** (objective) + a **TPE** (analysis frame) — ADR-0023.
 - **Target Product Profile (TPP)** — a Segment's commercial-target definition (full gate set + trait

@@ -36,7 +36,7 @@ import {
 const GENO_WORK = join(homedir(), '.verdant', 'blupf90');
 
 const TRAITS = ['Plant_Height_cm', 'Ear_Height_cm', 'Yield_Mg_ha', 'Grain_Moisture'];
-// Advancement targets (Segments) — each is a TPP: a selection objective over the SAME data (one
+// Target markets (Segments) — each is a TPP: a selection objective over the SAME data (one
 // shared TPE = the whole 8-env MET here). Same data + different Segment → different ranking
 // (ADR-0023). The environment-defined facet (a Segment with its OWN TPE → a separate fit, so GCA×E
 // falls out) is the next increment; these trait-defined Segments share the one fit and differ only
@@ -391,8 +391,8 @@ export async function runMetAnalysis(opts: RunMetOptions = {}): Promise<RunMetRe
   const phenotypic = { genos: g.blups.map((b) => b.genotype), map: new Map(g.blups.map((b) => [b.genotype, b.values])) };
   const active = activeBreedingValues(relationship, plan.genomic_engine ?? 'rrblup', phenotypic, genomic);
 
-  // Per-Segment indices ranked by the CHOSEN model's breeding values; each Segment (advancement
-  // target) re-ranks the SAME values under its own objective (ADR-0023). Traits keep the field BLUPs.
+  // Per-Segment indices ranked by the CHOSEN model's breeding values; each Segment (target
+  // market) re-ranks the SAME values under its own objective (ADR-0023). Traits keep the field BLUPs.
   const { indices: segIdx, divergence: primaryDivergence } = segmentIndices(active, g.geneticCovariance);
 
   // Post-fit Model QC (ADR-0021): conditional residuals reconstructed from the field BLUPs (no refit)

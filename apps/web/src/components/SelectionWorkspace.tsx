@@ -19,7 +19,7 @@ export default function SelectionWorkspace({ bundle }: { bundle: ResultBundle })
     !!bundle.genetic_correlations?.matrix?.length &&
     !!bundle.indices?.some((i) => i.kind === "desired_gains");
 
-  // The Segments (advancement targets) the bundle carries — distinct segment_id on the weighted
+  // The Segments (target markets) the bundle carries — distinct segment_id on the weighted
   // indices, in bundle order. Each is a TPP applied to the same fit (ADR-0023): switching it re-ranks
   // the same data under that target's objective.
   const segments = useMemo(() => {
@@ -43,12 +43,12 @@ export default function SelectionWorkspace({ bundle }: { bundle: ResultBundle })
 
   return (
     <section className="space-y-4">
-      {/* Advancement target (Segment) switcher — the outermost scope: same data, different target →
+      {/* Target market (Segment) switcher — the outermost scope: same data, different target →
           different ranking. Only shown when the bundle carries more than one Segment. */}
       {segments.length > 1 && (
         <div className="flex flex-wrap items-center gap-3">
           <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-700">
-            <Target size={14} className="text-emerald-600" /> Advancement target
+            <Target size={14} className="text-emerald-600" /> Target market
           </span>
           <div className="inline-flex flex-wrap rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs">
             {segments.map((s) => (

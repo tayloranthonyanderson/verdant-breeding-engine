@@ -28,7 +28,7 @@ deliberately deferred until the slice above it is real and validated.
 > Understand → Select → Advance → Genomics**: pre-fit checks in the **Data** step, model-dependent
 > diagnostics in the **Model** step's fit-checks) — completing the previously-unchecked Phase-1
 > data-validation item. The **selection-target (Segment) frame (ADR-0023)** is now wired into the
-> **Select** step: the breeder switches **advancement target** and the same trial re-ranks under that
+> **Select** step: the breeder switches **target market** and the same trial re-ranks under that
 > market's objective (its TPP) — *same data, different Segment → different ranking*, live. Trait-defined
 > Segments over one shared TPE are built end-to-end on the MET; the **environment-defined TPE partition**
 > (a Segment with its own fit, so GCA×E falls out) is the next increment. **Next:** the

@@ -47,7 +47,7 @@ export default function IndexExplorer({
   segmentId?: string | null;
   onRankingChange?: (ranking: Array<{ germplasm_id: string; rank: number }>) => void;
 }) {
-  // The weighted index for the active Segment (advancement target) — its weights seed the sliders and
+  // The weighted index for the active Segment (target market) — its weights seed the sliders and
   // its gate decisions carry over. Falls back to the first weighted index for single-segment bundles.
   const idx = useMemo(
     () =>
