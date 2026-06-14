@@ -57,7 +57,12 @@ async function completeAnthropic(system: string, user: string): Promise<LlmResul
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mod: any = await import("@anthropic-ai/sdk");
   const Anthropic = mod.default;
-  const client = new Anthropic(); // resolves ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN from env
+  // Pin to the public API: ignore any ambient ANTHROPIC_BASE_URL (e.g. a Claude Code gateway) so the
+  // user's API key routes to api.anthropic.com. Override deliberately with VERDANT_ANTHROPIC_BASE_URL.
+  const client = new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY,
+    baseURL: process.env.VERDANT_ANTHROPIC_BASE_URL || "https://api.anthropic.com",
+  });
   const resp = await client.messages.create({
     model,
     max_tokens: 2048,
