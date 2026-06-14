@@ -79,6 +79,26 @@ export function marketList(m: Manifest = loadManifest()): Array<{ id: string; la
   return Object.entries(m.markets).map(([id, d]) => ({ id, label: d.label }));
 }
 
+/** The market taxonomy for the builder UI: the TPE groups, the rankable markets (leaves) under each,
+ *  and the trial-tag hierarchy (All > TPE) so the UI can show how early 'All' trials feed every market. */
+export interface CutTaxonomy {
+  root: { tag: string; label: string }; // the broad early-screen node (e.g. All)
+  tpes: Array<{ id: string; label: string; tag: string }>; // a tag-hierarchy node per TPE
+  markets: Array<{ id: string; label: string; tpe: string; tag: string }>; // leaves, ranked on
+}
+export function cutTaxonomy(m: Manifest = loadManifest()): CutTaxonomy {
+  // The root = the hierarchy node with no parent (the broad early-screen tag, 'All').
+  const rootEntry = Object.entries(m.market_hierarchy).find(([, n]) => n.parent == null);
+  const root = { tag: rootEntry?.[0] ?? 'All', label: rootEntry?.[1].label ?? 'All markets' };
+  // TPE nodes = hierarchy nodes that carry a tpe (their key is the trial tag).
+  const tpes = Object.entries(m.market_hierarchy)
+    .filter(([, n]) => n.tpe)
+    .map(([tag, n]) => ({ id: n.tpe as string, label: m.tpes[n.tpe as string]?.label ?? n.label, tag }));
+  const tagForTpe = (tpe: string) => tpes.find((t) => t.id === tpe)?.tag ?? root.tag;
+  const markets = Object.entries(m.markets).map(([id, d]) => ({ id, label: d.label, tpe: d.tpe, tag: tagForTpe(d.tpe) }));
+  return { root, tpes, markets };
+}
+
 /** The canonical cuts the corpus ships: each market × {prediction-broad, advancement-narrow}. */
 export function listCuts(m: Manifest = loadManifest()): Cut[] {
   const cuts: Cut[] = [];
