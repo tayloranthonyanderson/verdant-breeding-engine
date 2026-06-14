@@ -48,13 +48,21 @@ export default function DataCutPicker({
   }, [catalog]);
 
   const nodeTrials = (id: string) => trialsByTag.get(id) ?? [];
+  // A node + all its descendants (so clicking a parent cascades to the whole subtree).
+  const subtree = useMemo(() => {
+    const kids = new Map<string, string[]>();
+    for (const n of taxonomy.nodes) if (n.parent) (kids.get(n.parent) ?? kids.set(n.parent, []).get(n.parent)!).push(n.id);
+    const walk = (id: string): string[] => [id, ...(kids.get(id) ?? []).flatMap(walk)];
+    return new Map(taxonomy.nodes.map((n) => [n.id, walk(n.id)]));
+  }, [taxonomy]);
+  const subtreeTrials = (id: string) => (subtree.get(id) ?? [id]).flatMap(nodeTrials);
   const nodeState = (id: string) => {
-    const tr = nodeTrials(id);
+    const tr = subtreeTrials(id);
     const inN = tr.filter((t) => included.has(t.trial_id)).length;
     return { total: tr.length, in: inN, all: tr.length > 0 && inN === tr.length, some: inN > 0 };
   };
   const toggleNode = (id: string) => setIncluded((s) => {
-    const tr = nodeTrials(id); const n = new Set(s);
+    const tr = subtreeTrials(id); const n = new Set(s);
     const allIn = tr.length > 0 && tr.every((t) => n.has(t.trial_id));
     for (const t of tr) allIn ? n.delete(t.trial_id) : n.add(t.trial_id);
     return n;
