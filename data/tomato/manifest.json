@@ -4,15 +4,13 @@
   "traits": ["yield", "brix", "firmness", "fruit_wt", "maturity", "shelf_life"],
   "tpes": {
     "processing": {
-      "label": "Processing (arid CA)",
-      "description": "Arid California processing environments."
+      "label": "Processing (arid CA)"
     },
     "fresh-east": {
-      "label": "Fresh-market East (humid)",
-      "description": "Humid eastern fresh-market environments; own fit (GCA×E)."
+      "label": "Fresh-market East (humid)"
     }
   },
-  "market_hierarchy": {
+  "hierarchy": {
     "All": {
       "parent": null,
       "tpe": null,
@@ -21,17 +19,10 @@
     "Processing": {
       "parent": "All",
       "tpe": "processing",
-      "label": "Processing program"
+      "label": "Processing · arid CA"
     },
-    "Fresh-East": {
-      "parent": "All",
-      "tpe": "fresh-east",
-      "label": "Fresh-market East"
-    }
-  },
-  "markets": {
     "Proc-Brix": {
-      "tag": "Processing",
+      "parent": "Processing",
       "tpe": "processing",
       "label": "Processing · Brix",
       "weights": {
@@ -42,7 +33,7 @@
       }
     },
     "Proc-Firmness": {
-      "tag": "Processing",
+      "parent": "Processing",
       "tpe": "processing",
       "label": "Processing · Firmness",
       "weights": {
@@ -53,7 +44,12 @@
       }
     },
     "Fresh-East": {
-      "tag": "Fresh-East",
+      "parent": "All",
+      "tpe": "fresh-east",
+      "label": "Fresh-market East · humid"
+    },
+    "East": {
+      "parent": "Fresh-East",
       "tpe": "fresh-east",
       "label": "Fresh-market · East",
       "weights": {
@@ -111,19 +107,34 @@
       "file": "trials/S2-2024-FRESH.csv"
     },
     {
-      "trial_id": "S3-2024-PROC",
+      "trial_id": "S3-2024-BRIX",
       "stage": "S3",
       "stage_label": "AYT",
       "year": 2024,
       "tpe": "processing",
-      "market_tag": "Processing",
-      "location": "S3-2024-PROC",
-      "n_entries": 22,
+      "market_tag": "Proc-Brix",
+      "location": "S3-2024-BRIX",
+      "n_entries": 19,
       "n_loc": 6,
       "n_rep": 3,
       "design": "MET",
       "traits_measured": ["yield", "brix", "firmness", "fruit_wt", "maturity", "shelf_life"],
-      "file": "trials/S3-2024-PROC.csv"
+      "file": "trials/S3-2024-BRIX.csv"
+    },
+    {
+      "trial_id": "S3-2024-FIRM",
+      "stage": "S3",
+      "stage_label": "AYT",
+      "year": 2024,
+      "tpe": "processing",
+      "market_tag": "Proc-Firmness",
+      "location": "S3-2024-FIRM",
+      "n_entries": 19,
+      "n_loc": 6,
+      "n_rep": 3,
+      "design": "MET",
+      "traits_measured": ["yield", "brix", "firmness", "fruit_wt", "maturity", "shelf_life"],
+      "file": "trials/S3-2024-FIRM.csv"
     },
     {
       "trial_id": "S3-2024-FRESH",
@@ -131,7 +142,7 @@
       "stage_label": "AYT",
       "year": 2024,
       "tpe": "fresh-east",
-      "market_tag": "Fresh-East",
+      "market_tag": "East",
       "location": "S3-2024-FRESH",
       "n_entries": 16,
       "n_loc": 6,
@@ -141,19 +152,34 @@
       "file": "trials/S3-2024-FRESH.csv"
     },
     {
-      "trial_id": "S4-2025-PROC",
+      "trial_id": "S4-2025-BRIX",
       "stage": "S4",
       "stage_label": "Pre-commercial",
       "year": 2025,
       "tpe": "processing",
-      "market_tag": "Processing",
-      "location": "S4-2025-PROC",
+      "market_tag": "Proc-Brix",
+      "location": "S4-2025-BRIX",
       "n_entries": 11,
       "n_loc": 10,
       "n_rep": 2,
       "design": "on-farm strips",
       "traits_measured": ["yield", "brix", "firmness", "fruit_wt", "maturity", "shelf_life"],
-      "file": "trials/S4-2025-PROC.csv"
+      "file": "trials/S4-2025-BRIX.csv"
+    },
+    {
+      "trial_id": "S4-2025-FIRM",
+      "stage": "S4",
+      "stage_label": "Pre-commercial",
+      "year": 2025,
+      "tpe": "processing",
+      "market_tag": "Proc-Firmness",
+      "location": "S4-2025-FIRM",
+      "n_entries": 11,
+      "n_loc": 10,
+      "n_rep": 2,
+      "design": "on-farm strips",
+      "traits_measured": ["yield", "brix", "firmness", "fruit_wt", "maturity", "shelf_life"],
+      "file": "trials/S4-2025-FIRM.csv"
     },
     {
       "trial_id": "S4-2025-FRESH",
@@ -161,7 +187,7 @@
       "stage_label": "Pre-commercial",
       "year": 2025,
       "tpe": "fresh-east",
-      "market_tag": "Fresh-East",
+      "market_tag": "East",
       "location": "S4-2025-FRESH",
       "n_entries": 10,
       "n_loc": 8,

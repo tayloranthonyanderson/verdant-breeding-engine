@@ -186,38 +186,39 @@ add_trial("S2-2024-FRESH", "S2", "PYT", 2024, "fresh-east", "Fresh-East", 3, 2, 
 
 m2p <- geno_means(s2p[!s2p$genotype %in% CHECKS, ], c("yield", "brix", "firmness", "maturity"))
 m2f <- geno_means(s2f[!s2f$genotype %in% CHECKS, ], c("yield", "fruit_wt", "shelf_life", "maturity"))
-proc_s3 <- select_top(m2p, W_PROC, 16)
+## PROGRESSIVE NARROWING: at S3 the processing program clarifies into SPECIFIC market targets — a
+## Brix-focused AYT and a Firmness-focused AYT, each advancing the lines best for that target (with
+## natural overlap for all-rounders). Late trials are tagged at the LEAF market, not the TPE.
+brix_s3 <- select_top(m2p, c(yield = 1.0, brix = 1.3, maturity = -0.4), 13)
+firm_s3 <- select_top(m2p, c(yield = 1.0, firmness = 1.3, maturity = -0.4), 13)
 fresh_s3 <- select_top(m2f, W_FRESH, 10)
-selection_log[["S2-2024->S3"]] <- list(processing = proc_s3, `fresh-east` = fresh_s3)
+selection_log[["S2-2024->S3"]] <- list(`Proc-Brix` = brix_s3, `Proc-Firmness` = firm_s3, East = fresh_s3)
 
-## S3 AYT — full panel, many locs, more reps. Tagged at TPE node. (Brix vs Firmness are INDEX lenses
-## over the SAME processing trials — one fit, two markets — so no separate Brix/Firmness trials.)
-s3p <- sim_trial(c(proc_s3, CHECKS), "processing", 2024, locs = 6, reps = 3,
-                 measured = TRAITS, loc_prefix = "CA")
-add_trial("S3-2024-PROC", "S3", "AYT", 2024, "processing", "Processing", 6, 3, "MET",
-          TRAITS, s3p)
-s3f <- sim_trial(c(fresh_s3, CHECKS), "fresh-east", 2024, locs = 6, reps = 3,
-                 measured = TRAITS, loc_prefix = "EAST")
-add_trial("S3-2024-FRESH", "S3", "AYT", 2024, "fresh-east", "Fresh-East", 6, 3, "MET",
-          TRAITS, s3f)
+## S3 AYT — full panel, many locs. Processing splits into market-specific trials (tag = leaf market).
+s3b <- sim_trial(c(brix_s3, CHECKS), "processing", 2024, locs = 6, reps = 3, measured = TRAITS, loc_prefix = "CA")
+add_trial("S3-2024-BRIX", "S3", "AYT", 2024, "processing", "Proc-Brix", 6, 3, "MET", TRAITS, s3b)
+s3fm <- sim_trial(c(firm_s3, CHECKS), "processing", 2024, locs = 6, reps = 3, measured = TRAITS, loc_prefix = "CA")
+add_trial("S3-2024-FIRM", "S3", "AYT", 2024, "processing", "Proc-Firmness", 6, 3, "MET", TRAITS, s3fm)
+s3f <- sim_trial(c(fresh_s3, CHECKS), "fresh-east", 2024, locs = 6, reps = 3, measured = TRAITS, loc_prefix = "EAST")
+add_trial("S3-2024-FRESH", "S3", "AYT", 2024, "fresh-east", "East", 6, 3, "MET", TRAITS, s3f)
 
-m3p <- geno_means(s3p[!s3p$genotype %in% CHECKS, ], c("yield", "brix", "firmness", "maturity"))
+m3b <- geno_means(s3b[!s3b$genotype %in% CHECKS, ], c("yield", "brix", "firmness", "maturity"))
+m3fm <- geno_means(s3fm[!s3fm$genotype %in% CHECKS, ], c("yield", "brix", "firmness", "maturity"))
 m3f <- geno_means(s3f[!s3f$genotype %in% CHECKS, ], c("yield", "fruit_wt", "shelf_life", "maturity"))
-proc_s4 <- select_top(m3p, W_PROC, 5)
+brix_s4 <- select_top(m3b, c(yield = 1.0, brix = 1.3, maturity = -0.4), 5)
+firm_s4 <- select_top(m3fm, c(yield = 1.0, firmness = 1.3, maturity = -0.4), 5)
 fresh_s4 <- select_top(m3f, W_FRESH, 4)
-selection_log[["S3-2024->S4"]] <- list(processing = proc_s4, `fresh-east` = fresh_s4)
+selection_log[["S3-2024->S4"]] <- list(`Proc-Brix` = brix_s4, `Proc-Firmness` = firm_s4, East = fresh_s4)
 
 ## ===== Cycle 2025 =====
-## S4 Pre-commercial — 2024 survivors carried to wide on-farm strips (connectivity across YEARS via
-## survivors + checks). + processing/shelf traits emphasised.
-s4p <- sim_trial(c(proc_s4, CHECKS), "processing", 2025, locs = 10, reps = 2,
-                 measured = TRAITS, loc_prefix = "CAFARM")
-add_trial("S4-2025-PROC", "S4", "Pre-commercial", 2025, "processing", "Processing", 10, 2, "on-farm strips",
-          TRAITS, s4p)
-s4f <- sim_trial(c(fresh_s4, CHECKS), "fresh-east", 2025, locs = 8, reps = 2,
-                 measured = TRAITS, loc_prefix = "EASTFARM")
-add_trial("S4-2025-FRESH", "S4", "Pre-commercial", 2025, "fresh-east", "Fresh-East", 8, 2, "on-farm strips",
-          TRAITS, s4f)
+## S4 Pre-commercial — 2024 survivors to wide on-farm strips (cross-YEAR connectivity via survivors +
+## checks). Still market-specific (leaf tags).
+s4b <- sim_trial(c(brix_s4, CHECKS), "processing", 2025, locs = 10, reps = 2, measured = TRAITS, loc_prefix = "CAFARM")
+add_trial("S4-2025-BRIX", "S4", "Pre-commercial", 2025, "processing", "Proc-Brix", 10, 2, "on-farm strips", TRAITS, s4b)
+s4fm <- sim_trial(c(firm_s4, CHECKS), "processing", 2025, locs = 10, reps = 2, measured = TRAITS, loc_prefix = "CAFARM")
+add_trial("S4-2025-FIRM", "S4", "Pre-commercial", 2025, "processing", "Proc-Firmness", 10, 2, "on-farm strips", TRAITS, s4fm)
+s4f <- sim_trial(c(fresh_s4, CHECKS), "fresh-east", 2025, locs = 8, reps = 2, measured = TRAITS, loc_prefix = "EASTFARM")
+add_trial("S4-2025-FRESH", "S4", "Pre-commercial", 2025, "fresh-east", "East", 8, 2, "on-farm strips", TRAITS, s4f)
 
 ## New S1 for cycle 2025 (fresh germplasm enters the top of the funnel) — keeps the program "alive".
 found_c2 <- sprintf("TOM-%04d", 1000 + seq_len(n_found_c2))
@@ -239,27 +240,27 @@ for (id in names(trials)) write.csv(trials[[id]], file.path(outdir, "trials", pa
 mk_df <- data.frame(genotype = rownames(M), M, check.names = FALSE, stringsAsFactors = FALSE)
 write.csv(mk_df, file.path(outdir, "markers.csv"), row.names = FALSE)
 
-## manifest.json — the trial catalog + the market hierarchy the cut model reads.
+## manifest.json — the trial catalog + the MARKET-TARGET HIERARCHY (ADR-0023). A single tree of nodes;
+## trials are tagged to a node; the breeder composes a cut by multi-selecting any set of nodes (the cut
+## is the union of trials tagged to the selected nodes). Nodes carrying `weights` are RANKABLE markets
+## (the leaves); inner nodes (All, the TPEs) are grouping levels material narrows through.
 manifest <- list(
   program = "Verdant tomato (synthetic)",
   generated_by = "services/kernel/sim-corpus.R",
   traits = TRAITS,
   tpes = list(
-    processing = list(label = "Processing (arid CA)", description = "Arid California processing environments."),
-    `fresh-east` = list(label = "Fresh-market East (humid)", description = "Humid eastern fresh-market environments; own fit (GCA×E).")),
-  ## market hierarchy: trials are tagged at a NODE; a market cut = trials tagged with it or an ancestor.
-  ## Leaf processing markets (Brix/Firmness) are INDEX lenses over the shared Processing fit.
-  market_hierarchy = list(
-    All = list(parent = NA, tpe = NA, label = "All markets (early screen)"),
-    Processing = list(parent = "All", tpe = "processing", label = "Processing program"),
-    `Fresh-East` = list(parent = "All", tpe = "fresh-east", label = "Fresh-market East")),
-  markets = list(
-    `Proc-Brix`  = list(tag = "Processing", tpe = "processing", label = "Processing · Brix",
-                        weights = list(brix = 0.45, yield = 0.30, firmness = 0.15, maturity = -0.10)),
-    `Proc-Firmness` = list(tag = "Processing", tpe = "processing", label = "Processing · Firmness",
-                        weights = list(firmness = 0.45, yield = 0.30, brix = 0.15, maturity = -0.10)),
-    `Fresh-East` = list(tag = "Fresh-East", tpe = "fresh-east", label = "Fresh-market · East",
-                        weights = list(fruit_wt = 0.35, shelf_life = 0.30, yield = 0.25, maturity = -0.10))),
+    processing = list(label = "Processing (arid CA)"),
+    `fresh-east` = list(label = "Fresh-market East (humid)")),
+  hierarchy = list(
+    All            = list(parent = NA,           tpe = NA,           label = "All markets (early screen)"),
+    Processing     = list(parent = "All",        tpe = "processing", label = "Processing · arid CA"),
+    `Proc-Brix`    = list(parent = "Processing", tpe = "processing", label = "Processing · Brix",
+                          weights = list(brix = 0.45, yield = 0.30, firmness = 0.15, maturity = -0.10)),
+    `Proc-Firmness`= list(parent = "Processing", tpe = "processing", label = "Processing · Firmness",
+                          weights = list(firmness = 0.45, yield = 0.30, brix = 0.15, maturity = -0.10)),
+    `Fresh-East`   = list(parent = "All",        tpe = "fresh-east", label = "Fresh-market East · humid"),
+    East           = list(parent = "Fresh-East", tpe = "fresh-east", label = "Fresh-market · East",
+                          weights = list(fruit_wt = 0.35, shelf_life = 0.30, yield = 0.25, maturity = -0.10))),
   trials = unname(manifest_trials))
 write_json(manifest, file.path(outdir, "manifest.json"), auto_unbox = TRUE, pretty = TRUE, na = "null")
 

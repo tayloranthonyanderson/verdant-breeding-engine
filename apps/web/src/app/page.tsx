@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Leaf, FlaskConical, Sprout, ClipboardCheck, Compass, SlidersHorizontal, Microscope, ListChecks, Dna, ShieldCheck, Layers, Trophy } from "lucide-react";
 import type { ResultBundle, AnalysisRequest } from "@verdant/contracts";
 import { getG2fResult, getCutResult, listSavedCuts } from "@/lib/data";
-import { listCuts, trialsForCut, trialCatalog, cutTaxonomy, type CutTaxonomy } from "@verdant/pipeline";
+import { listCuts, trialsForTags, trialCatalog, cutTaxonomy, type CutTaxonomy } from "@verdant/pipeline";
 import { getCombiningAbility } from "@/lib/ca";
 import InsightBanner from "@/components/InsightBanner";
 import ModelReadiness from "@/components/ModelReadiness";
@@ -41,7 +41,7 @@ async function CutExperience({ cutId }: { cutId: string }) {
   let taxonomy: CutTaxonomy | null = null;
   try {
     cuts = listCuts().map((c) => {
-      const tr = trialsForCut(c);
+      const tr = trialsForTags(c.tags);
       return { ...c, trial_ids: tr.map((t) => t.trial_id), stages: [...new Set(tr.map((t) => t.stage))].sort(), years: [...new Set(tr.map((t) => t.year))].sort(), n_trials: tr.length };
     });
     catalog = trialCatalog().map((t) => ({ trial_id: t.trial_id, stage: t.stage, stage_label: t.stage_label, year: t.year, tpe: t.tpe, market_tag: t.market_tag, n_entries: t.n_entries, n_loc: t.n_loc, n_rep: t.n_rep, design: t.design }));
@@ -59,12 +59,11 @@ async function CutExperience({ cutId }: { cutId: string }) {
   const activeCutId = result?.study?.name ?? cutId;
   const currentTrialIds = dr.cut?.trial_ids ?? [];
   const currentMarket = dr.cut?.market ?? taxonomy?.markets[0]?.id ?? "";
-  const currentPurpose = (dr.cut?.purpose === "advancement" ? "advancement" : "prediction") as "prediction" | "advancement";
 
   const steps: Step[] = result && taxonomy ? [
     {
       id: "cut", label: "Data cut", sublabel: "define what to analyze", icon: <Layers size={14} />,
-      content: <DataCutPicker cuts={cuts} catalog={catalog} taxonomy={taxonomy} savedCuts={savedCuts} selected={activeCutId} composition={composition} currentTrialIds={currentTrialIds} currentMarket={currentMarket} currentPurpose={currentPurpose} />,
+      content: <DataCutPicker cuts={cuts} catalog={catalog} taxonomy={taxonomy} savedCuts={savedCuts} selected={activeCutId} composition={composition} currentTrialIds={currentTrialIds} currentMarket={currentMarket} />,
     },
     {
       id: "understand", label: "Understand", sublabel: "heritability & genetic correlations", icon: <Microscope size={14} />,

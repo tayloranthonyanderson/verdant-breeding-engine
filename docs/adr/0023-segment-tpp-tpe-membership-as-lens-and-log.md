@@ -116,10 +116,24 @@ cut persists as its own study (`source='tomato-cut'`) carrying its trial list in
 `deleteCut` server actions; `buildCustomCut` in the pipeline). This is the "saved trial set" primitive —
 the lightweight precursor to the durable `segment`/study-tag schema, validated against real fits.
 
-**The cut is chosen at the TPE level; the market is a lens (UI, 2026-06-14).** Making "one fit, many
-lenses" literal in the builder: the breeder picks the **TPE** (e.g. *Processing · arid CA*) as the data
-structure — the broad cut — and a **Rank by** toggle switches the leaf-market index (*Brix* / *Firmness*)
-over the *same* fit. The market hierarchy is drawn as `All > TPE > market` with the TPE marked "data cut"
-and the leaf marked "lens", and a "Now viewing" lens toggle flips the ranking on loaded results without
-re-cutting. `cutTaxonomy()` surfaces the TPE groups + tag hierarchy to the UI. This is the exact TPP/TPE
-split this ADR defines, now navigable: TPE = analysis frame (the data), TPP = the index lens.
+**A cut is a COMPOSITE multi-select over a progressive-narrowing tag tree (2026-06-14).** An earlier
+pass modelled the cut as "pick one TPE, market = a lens over the shared fit" — that was wrong, and the
+breeder corrected it: markets aren't just lenses, they're **distinct market targets** material is
+*progressively narrowed* into, and a cut is composed from **any combination** of them by strategy.
+
+The corrected model, now built:
+- **Trials are tagged to a node in a market-target tree** (`All` > TPE > specific market) that narrows
+  through the funnel: early screens tagged `All`, mid trials at the TPE (`Processing`/`Fresh-East`),
+  late market-specific trials at the leaf (`Proc-Brix`/`Proc-Firmness`/`East`). The corpus splits the
+  late processing AYT/pre-commercial into a Brix-focused and a Firmness-focused trial — so Brix and
+  Firmness are *separable data*, not one fit two lenses.
+- **The cut is a union over a multi-select.** The builder draws the tag tree as checkboxes; the breeder
+  ticks any set of nodes — a broad chain (`All`+`Processing`+`Brix`), a single leaf (`Brix`), or a
+  cross-strategy mix (`Brix`+`East`) — and the cut is the union of trials tagged to the checked nodes.
+  A separate **Rank by** picks which market index ranks the result. Per-trial fine-tuning underneath.
+- `cutTaxonomy()` surfaces the whole tree (each node's depth, whether it's a rankable market, and its
+  trial count); `trialsForTags()` / `assembleCustom()` resolve a node/trial set to a fit; templates are
+  just canonical composites (a market's ancestor chain = its broad cut; the leaf alone = its narrow cut).
+
+This is the faithful expression of "membership = a tag on the trial, composed on read by strategy" —
+the breeder's judgement is the relevance model, exactly as this ADR's lens/log split intends.

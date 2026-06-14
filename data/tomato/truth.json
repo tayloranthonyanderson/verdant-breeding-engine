@@ -8958,12 +8958,14 @@
       "fresh-east": ["TOM-0036", "TOM-0190", "TOM-0100", "TOM-0125", "TOM-0055", "TOM-0107", "TOM-0050", "TOM-0143", "TOM-0111", "TOM-0122", "TOM-0163", "TOM-0039", "TOM-0218", "TOM-0044", "TOM-0007", "TOM-0154", "TOM-0187", "TOM-0076", "TOM-0195", "TOM-0030", "TOM-0205", "TOM-0233", "TOM-0003", "TOM-0131", "TOM-0067", "TOM-0164", "TOM-0207", "TOM-0077", "TOM-0011", "TOM-0145"]
     },
     "S2-2024->S3": {
-      "processing": ["TOM-0064", "TOM-0067", "TOM-0158", "TOM-0195", "TOM-0148", "TOM-0200", "TOM-0002", "TOM-0097", "TOM-0081", "TOM-0125", "TOM-0154", "TOM-0032", "TOM-0222", "TOM-0111", "TOM-0156", "TOM-0205"],
-      "fresh-east": ["TOM-0125", "TOM-0100", "TOM-0067", "TOM-0122", "TOM-0233", "TOM-0050", "TOM-0195", "TOM-0076", "TOM-0143", "TOM-0055"]
+      "Proc-Brix": ["TOM-0064", "TOM-0148", "TOM-0207", "TOM-0081", "TOM-0200", "TOM-0205", "TOM-0125", "TOM-0158", "TOM-0002", "TOM-0156", "TOM-0154", "TOM-0036", "TOM-0105"],
+      "Proc-Firmness": ["TOM-0067", "TOM-0195", "TOM-0097", "TOM-0032", "TOM-0143", "TOM-0158", "TOM-0222", "TOM-0154", "TOM-0109", "TOM-0002", "TOM-0011", "TOM-0074", "TOM-0125"],
+      "East": ["TOM-0125", "TOM-0100", "TOM-0067", "TOM-0122", "TOM-0233", "TOM-0050", "TOM-0195", "TOM-0076", "TOM-0143", "TOM-0055"]
     },
     "S3-2024->S4": {
-      "processing": ["TOM-0064", "TOM-0067", "TOM-0125", "TOM-0097", "TOM-0205"],
-      "fresh-east": ["TOM-0067", "TOM-0125", "TOM-0100", "TOM-0122"]
+      "Proc-Brix": ["TOM-0064", "TOM-0205", "TOM-0207", "TOM-0125", "TOM-0148"],
+      "Proc-Firmness": ["TOM-0067", "TOM-0097", "TOM-0032", "TOM-0195", "TOM-0143"],
+      "East": ["TOM-0125", "TOM-0067", "TOM-0100", "TOM-0122"]
     }
   },
   "checks": ["CHK-01", "CHK-02", "CHK-03", "CHK-04", "CHK-05", "CHK-06"]

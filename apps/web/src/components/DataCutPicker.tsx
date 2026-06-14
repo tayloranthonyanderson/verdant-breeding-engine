@@ -1,91 +1,87 @@
 "use client";
-// The DATA-CUT BUILDER (ADR-0023) — a guided, scalable workflow for everyday breeding. The breeder
-// answers two questions as a sentence ("Build a cut to [predict|advance] for the [market]"), sees the
-// MARKET HIERARCHY that explains why early 'All' trials feed every market, then (optionally) refines the
-// exact trials and saves the result as a re-runnable preset. Dropdowns (not chip-walls) so it scales to
-// many markets. Germplasm is never tagged; a line's markets are derived from the trials it appears in.
+// The DATA-CUT BUILDER (ADR-0023) — compose a cut from the MARKET-TARGET HIERARCHY. Trials are tagged
+// to nodes in a tree (All > TPE > specific market) that narrows as material advances. The breeder
+// multi-selects ANY set of nodes — a broad chain, a single leaf, or a cross-strategy mix — and the cut
+// is the union of trials tagged to them. Then pick a market to rank by, name it, and save as a
+// re-runnable preset. Germplasm is never tagged; a line's markets are derived from the trials it's in.
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
-import { Target, FlaskConical, RefreshCw, Save, Trash2, Check, ChevronRight, ChevronDown, Eye, CornerDownRight } from "lucide-react";
+import { FlaskConical, RefreshCw, Save, Trash2, Check, Minus, ChevronRight, ChevronDown, Eye, CornerDownRight, Trophy } from "lucide-react";
 import { saveAndRunCut, deleteCut, analyzeCut } from "@/app/actions";
 
 export interface CutCard {
   id: string; purpose: "prediction" | "advancement"; market: string; market_label: string;
-  label: string; blurb: string; tpe: string; trial_ids: string[]; stages: string[]; years: number[]; n_trials: number;
+  label: string; blurb: string; tags: string[]; trial_ids: string[]; stages: string[]; years: number[]; n_trials: number;
 }
 export interface CatalogTrial {
   trial_id: string; stage: string; stage_label: string; year: number; tpe: string;
   market_tag: string; n_entries: number; n_loc: number; n_rep: number; design: string;
 }
-export interface Composition {
-  n_geno: number; n_env: number; n_obs: number; n_checks: number; n_trials: number; stages: string[]; years: number[];
-}
+export interface Composition { n_geno: number; n_env: number; n_obs: number; n_checks: number; n_trials: number; stages: string[]; years: number[] }
 export interface SavedCutCard { id: string; name: string; market: string; market_label: string; trialIds: string[]; n_geno: number; stages: string[]; years: number[] }
-export interface Taxonomy {
-  root: { tag: string; label: string };
-  tpes: Array<{ id: string; label: string; tag: string }>;
-  markets: Array<{ id: string; label: string; tpe: string; tag: string }>;
-}
-
-const PURPOSES = [
-  { id: "prediction" as const, verb: "predict", label: "Prediction", hint: "Broad — pool every relevant trial across stages & years (a training set)" },
-  { id: "advancement" as const, verb: "decide advancement", label: "Hybrid advancement", hint: "Narrow — only the latest-stage advance/drop decision set" },
-];
+export interface TaxNode { id: string; label: string; parent: string | null; tpe: string | null; depth: number; isMarket: boolean; trialCount: number }
+export interface Taxonomy { nodes: TaxNode[]; markets: Array<{ id: string; label: string; tpe: string | null }> }
 
 const sameSet = (a: Set<string>, b: string[]) => a.size === b.length && b.every((x) => a.has(x));
+const shortMarket = (s: string) => s.replace(/^Processing · |^Fresh-market · /, "");
 
 export default function DataCutPicker({
-  cuts, catalog, taxonomy, savedCuts, selected, composition, currentTrialIds, currentMarket, currentPurpose,
+  cuts, catalog, taxonomy, savedCuts, selected, composition, currentTrialIds, currentMarket,
 }: {
   cuts: CutCard[]; catalog: CatalogTrial[]; taxonomy: Taxonomy; savedCuts: SavedCutCard[];
   selected: string; composition: Composition | null; currentTrialIds: string[]; currentMarket: string;
-  currentPurpose: "prediction" | "advancement";
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  const [purpose, setPurpose] = useState<"prediction" | "advancement">(currentPurpose);
-  // The cut is chosen at the TPE level (the DATA / fit); the lens (leaf market) is the index it's
-  // ranked by — markets sharing a TPE share one fit, so the lens re-ranks the SAME data (ADR-0023).
-  const [tpe, setTpe] = useState<string>(() => taxonomy.markets.find((m) => m.id === currentMarket)?.tpe ?? taxonomy.tpes[0]?.id ?? "");
-  const [lens, setLens] = useState<string>(currentMarket || taxonomy.markets[0]?.id || "");
   const [included, setIncluded] = useState<Set<string>>(() => new Set(currentTrialIds));
+  const [rankMarket, setRankMarket] = useState<string>(currentMarket || taxonomy.markets[0]?.id || "");
   const [name, setName] = useState<string>("");
   const [refineOpen, setRefineOpen] = useState(false);
 
-  const tpeMarkets = useMemo(() => taxonomy.markets.filter((m) => m.tpe === tpe), [taxonomy, tpe]);
-  const market = tpeMarkets.some((m) => m.id === lens) ? lens : tpeMarkets[0]?.id ?? lens; // effective lens
-  const template = useMemo(() => cuts.find((c) => c.purpose === purpose && c.market === market), [cuts, purpose, market]);
-  const isTemplate = !!template && sameSet(included, template.trial_ids);
-  const mkt = taxonomy.markets.find((m) => m.id === market);
-  const tpeObj = taxonomy.tpes.find((t) => t.id === tpe);
+  const trialsByTag = useMemo(() => {
+    const m = new Map<string, CatalogTrial[]>();
+    for (const t of catalog) (m.get(t.market_tag) ?? m.set(t.market_tag, []).get(t.market_tag)!).push(t);
+    return m;
+  }, [catalog]);
 
-  // markets a trial tag feeds: same-TPE markets, or ALL markets if it's the broad 'root' (All) tag.
-  const feeds = (tag: string) => (tag === taxonomy.root.tag ? taxonomy.markets : taxonomy.markets.filter((m) => m.tag === tag));
+  const nodeTrials = (id: string) => trialsByTag.get(id) ?? [];
+  const nodeState = (id: string) => {
+    const tr = nodeTrials(id);
+    const inN = tr.filter((t) => included.has(t.trial_id)).length;
+    return { total: tr.length, in: inN, all: tr.length > 0 && inN === tr.length, some: inN > 0 };
+  };
+  const toggleNode = (id: string) => setIncluded((s) => {
+    const tr = nodeTrials(id); const n = new Set(s);
+    const allIn = tr.length > 0 && tr.every((t) => n.has(t.trial_id));
+    for (const t of tr) allIn ? n.delete(t.trial_id) : n.add(t.trial_id);
+    return n;
+  });
+  const toggleTrial = (id: string) => setIncluded((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const draftTrials = useMemo(() => catalog.filter((t) => included.has(t.trial_id)), [catalog, included]);
   const draft = useMemo(() => ({
     n_trials: draftTrials.length,
     n_env: draftTrials.reduce((a, t) => a + t.n_loc, 0),
-    entries: draftTrials.reduce((a, t) => a + t.n_entries, 0),
     stages: [...new Set(draftTrials.map((t) => t.stage))].sort(),
     years: [...new Set(draftTrials.map((t) => t.year))].sort(),
+    markets: [...new Set(draftTrials.map((t) => t.market_tag))],
   }), [draftTrials]);
 
-  // changing purpose/TPE/lens reseeds the selection to that template (the smart default to refine from).
-  const reseed = (p: "prediction" | "advancement", mk: string) => setIncluded(new Set(cuts.find((c) => c.purpose === p && c.market === mk)?.trial_ids ?? []));
-  const onPurpose = (p: "prediction" | "advancement") => { setPurpose(p); reseed(p, market); };
-  const onTpe = (t: string) => { const first = taxonomy.markets.find((m) => m.tpe === t)?.id ?? ""; setTpe(t); setLens(first); reseed(purpose, first); };
-  const onLens = (l: string) => { setLens(l); reseed(purpose, l); };
-  const toggle = (id: string) => setIncluded((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  // markets that actually have trials in this composite — the sensible ones to rank by.
+  const rankable = taxonomy.markets.filter((m) => nodeTrials(m.id).some((t) => included.has(t.trial_id)) || draft.n_trials === 0);
+  const effRank = rankable.some((m) => m.id === rankMarket) ? rankMarket : rankable[0]?.id ?? rankMarket;
 
+  const template = useMemo(() => cuts.find((c) => sameSet(included, c.trial_ids) && c.market === effRank), [cuts, included, effRank]);
+
+  const seedTemplate = (id: string) => { const t = cuts.find((c) => c.id === id); if (t) { setIncluded(new Set(t.trial_ids)); setRankMarket(t.market); } };
   const view = () => { if (template) router.push(`/?cut=${template.id}`); };
   const save = () => {
     setErr(null);
     start(async () => {
-      const res = await saveAndRunCut({ name, market, trialIds: [...included] });
+      const res = await saveAndRunCut({ name, market: effRank, trialIds: [...included] });
       if (res.status === "error") { setErr(res.error); return; }
       router.push(`/?cut=${res.cutId}`);
     });
@@ -94,116 +90,113 @@ export default function DataCutPicker({
   const remove = (id: string) => { setBusy(id); start(async () => { await deleteCut(id); setBusy(null); if (selected === id) router.push("/"); else router.refresh(); }); };
 
   const activeSaved = savedCuts.find((c) => c.id === selected);
-  // For the "Now viewing" lens toggle: the loaded template's sibling lenses on the same TPE fit.
-  const loadedIsTemplate = cuts.some((c) => c.id === selected);
-  const loadedTpe = taxonomy.markets.find((m) => m.id === currentMarket)?.tpe;
-  const loadedLenses = taxonomy.markets.filter((m) => m.tpe === loadedTpe);
   const stageGroups = useMemo(() => {
-    const order = ["S1", "S2", "S3", "S4"];
-    const by = new Map<string, CatalogTrial[]>();
-    for (const t of catalog) { (by.get(t.stage) ?? by.set(t.stage, []).get(t.stage)!).push(t); }
+    const order = ["S1", "S2", "S3", "S4"]; const by = new Map<string, CatalogTrial[]>();
+    for (const t of catalog) (by.get(t.stage) ?? by.set(t.stage, []).get(t.stage)!).push(t);
     return [...by.entries()].sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]));
   }, [catalog]);
 
   return (
     <section className="space-y-4">
-      {/* ── Builder ─────────────────────────────────────────────────────────────────────────── */}
       <div className="rounded-2xl border border-emerald-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold text-slate-800">Define your data cut</h3>
-          {savedCuts.length > 0 && (
-            <label className="flex items-center gap-1.5 text-[11px] text-slate-500">
-              Load a saved cut
-              <select value={savedCuts.some((c) => c.id === selected) ? selected : ""} onChange={(e) => e.target.value && router.push(`/?cut=${e.target.value}`)}
+          <h3 className="text-sm font-semibold text-slate-800">Compose your data cut</h3>
+          <div className="flex items-center gap-3 text-[11px] text-slate-500">
+            <label className="flex items-center gap-1.5">Start from
+              <select value="" onChange={(e) => e.target.value && seedTemplate(e.target.value)}
                 className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[12px] text-slate-700 outline-none focus:border-emerald-400">
-                <option value="">{savedCuts.length} saved…</option>
-                {savedCuts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                <option value="">a template…</option>
+                {cuts.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
               </select>
             </label>
-          )}
-        </div>
-
-        {/* the sentence: purpose + the TPE-level data structure (the broad cut) */}
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-700">
-          <span>Build a</span>
-          <Dropdown value={purpose} onChange={(v) => onPurpose(v as "prediction" | "advancement")}
-            options={PURPOSES.map((p) => ({ value: p.id, label: p.label }))} accent />
-          <span>cut for the</span>
-          <select value={tpe} onChange={(e) => onTpe(e.target.value)}
-            className="rounded-lg border border-emerald-300 bg-emerald-50/60 px-2.5 py-1.5 text-sm font-medium text-emerald-800 outline-none focus:border-emerald-500">
-            {taxonomy.tpes.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
-          </select>
-          <span>program.</span>
-        </div>
-        <p className="mt-1 text-[11px] text-slate-500">{PURPOSES.find((p) => p.id === purpose)?.hint}</p>
-
-        {/* lens — the broad/specific toggle: markets sharing this TPE re-rank the SAME data */}
-        <div className="mt-2.5 flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400"><Target size={12} /> Rank by</span>
-          {tpeMarkets.map((m) => (
-            <button key={m.id} type="button" onClick={() => onLens(m.id)}
-              className={`rounded-full border px-3 py-1 text-xs font-medium transition ${market === m.id ? "border-emerald-400 bg-emerald-600 text-white" : "border-slate-200 bg-slate-50 text-slate-600 hover:border-emerald-300"}`}>
-              {m.label.replace(/^Processing · |^Fresh-market · /, "")}
-            </button>
-          ))}
-          {tpeMarkets.length > 1 && <span className="text-[11px] text-slate-400">same data &amp; fit — the lens only re-ranks it</span>}
-        </div>
-
-        {/* hierarchy — the teaching surface: TPE = the data; lenses = the index over it */}
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
-            <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400"><Target size={12} /> Market hierarchy</div>
-            <Hierarchy taxonomy={taxonomy} selectedTpe={tpe} selectedMarket={market} />
+            {savedCuts.length > 0 && (
+              <label className="flex items-center gap-1.5">Load saved
+                <select value={savedCuts.some((c) => c.id === selected) ? selected : ""} onChange={(e) => e.target.value && router.push(`/?cut=${e.target.value}`)}
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[12px] text-slate-700 outline-none focus:border-emerald-400">
+                  <option value="">{savedCuts.length} saved…</option>
+                  {savedCuts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </label>
+            )}
           </div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-[12px] text-slate-600">
-            <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">What this assembles</div>
-            <p>
-              Data = the <b className="text-slate-800">{tpeObj?.label}</b> fit: every trial tagged{" "}
-              <Tag>{tpeObj?.tag}</Tag>{purpose === "prediction" && <> or <Tag>{taxonomy.root.tag}</Tag></>}
-              {purpose === "prediction"
-                ? <> across all stages &amp; years (the early <Tag>{taxonomy.root.tag}</Tag> screens feed it). </>
-                : <> at the latest stage only — the advance/drop set. </>}
-              Ranked by <b className="text-slate-800">{mkt?.label.replace(/^Processing · |^Fresh-market · /, "")}</b>
-              {tpeMarkets.length > 1 && <> (one of {tpeMarkets.length} lenses on this shared fit)</>}.
-            </p>
-            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
-              <Stat label="trials" value={draft.n_trials} />
-              <Stat label="environments" value={draft.n_env} />
-              <Stat label="stages" value={draft.stages.join("+") || "—"} />
-              <Stat label="years" value={draft.years.join("/") || "—"} />
+        </div>
+        <p className="mt-1 text-[11px] text-slate-500">Tick the market targets to include — a broad chain, a single market, or any mix. The cut is the union of their trials.</p>
+
+        <div className="mt-3 grid gap-3 lg:grid-cols-2">
+          {/* the market-target tree — the composer */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-2">
+            {taxonomy.nodes.map((n) => {
+              const st = nodeState(n.id);
+              return (
+                <button key={n.id} type="button" onClick={() => toggleNode(n.id)} disabled={st.total === 0}
+                  className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] transition disabled:opacity-40 ${st.all ? "bg-emerald-50" : st.some ? "bg-emerald-50/40" : "hover:bg-white"}`}
+                  style={{ paddingLeft: 8 + n.depth * 18 }}>
+                  <span className={`grid h-4 w-4 shrink-0 place-items-center rounded border ${st.all ? "border-emerald-500 bg-emerald-500 text-white" : st.some ? "border-emerald-500 bg-emerald-100 text-emerald-600" : "border-slate-300 bg-white"}`}>
+                    {st.all ? <Check size={11} /> : st.some ? <Minus size={11} /> : null}
+                  </span>
+                  <span className={n.isMarket ? "font-medium text-slate-800" : "font-semibold text-slate-700"}>{n.isMarket ? shortMarket(n.label) : n.label}</span>
+                  {n.isMarket && <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">market</span>}
+                  <span className="ml-auto text-[11px] text-slate-400">{st.total ? `${st.in}/${st.total} trials` : "—"}</span>
+                </button>
+              );
+            })}
+            <p className="px-2 pt-1.5 text-[11px] text-slate-400">Indent = how specific the target is. Inner nodes (All, the TPEs) carry the early/mid shared trials; leaves are the market-specific late trials.</p>
+          </div>
+
+          {/* rank-by + composition */}
+          <div className="space-y-3">
+            <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+              <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400"><Trophy size={12} /> Rank by market</div>
+              <div className="flex flex-wrap gap-1.5">
+                {taxonomy.markets.map((m) => {
+                  const inCut = nodeTrials(m.id).some((t) => included.has(t.trial_id));
+                  return (
+                    <button key={m.id} type="button" onClick={() => setRankMarket(m.id)}
+                      className={`rounded-full border px-3 py-1 text-xs font-medium transition ${effRank === m.id ? "border-emerald-400 bg-emerald-600 text-white" : inCut ? "border-slate-200 bg-white text-slate-600 hover:border-emerald-300" : "border-slate-200 bg-slate-50 text-slate-400"}`}>
+                      {shortMarket(m.label)}{!inCut && <span className="ml-1 text-[9px]">(not in cut)</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-1.5 text-[11px] text-slate-400">The index that ranks candidates. Pick a target that&rsquo;s in your cut.</p>
             </div>
-            <p className="mt-1 text-[11px] text-slate-400">{draft.stages.length > 1 ? "Spans the funnel → a broad, prediction-style cut." : draft.n_trials ? "Single stage → a narrow, decision-style cut." : "No trials selected."}</p>
+            <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 text-[12px] text-slate-600">
+              <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">This cut</div>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                <Stat label="trials" value={draft.n_trials} />
+                <Stat label="environments" value={draft.n_env} />
+                <Stat label="stages" value={draft.stages.join("+") || "—"} />
+                <Stat label="years" value={draft.years.join("/") || "—"} />
+              </div>
+              <p className="mt-1 text-[11px] text-slate-400">{draft.stages.length > 1 ? "Spans the funnel → a broad, prediction-style cut." : draft.n_trials ? "Single stage → a narrow, decision-style cut." : "No trials selected yet."}</p>
+            </div>
           </div>
         </div>
 
-        {/* refine — collapsed by default; most breeders accept the auto-assembly */}
+        {/* per-trial refine */}
         <button type="button" onClick={() => setRefineOpen((o) => !o)} className="mt-3 inline-flex items-center gap-1 text-[12px] font-medium text-slate-600 hover:text-emerald-700">
-          {refineOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />} Refine trials {isTemplate ? "(auto-selected)" : <span className="text-emerald-600">(edited)</span>}
+          {refineOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />} Fine-tune individual trials
         </button>
         {refineOpen && (
           <div className="mt-2 overflow-x-auto rounded-xl border border-slate-200">
-            <table className="w-full border-collapse text-[12px]">
-              <tbody>
-                {stageGroups.map(([stage, trials]) => (
-                  <FragmentRows key={stage} stage={stage} label={trials[0]?.stage_label ?? stage} trials={trials} included={included} toggle={toggle} feeds={feeds} rootTag={taxonomy.root.tag} />
-                ))}
-              </tbody>
-            </table>
+            <table className="w-full border-collapse text-[12px]"><tbody>
+              {stageGroups.map(([stage, trials]) => (
+                <FragmentRows key={stage} stage={stage} label={trials[0]?.stage_label ?? stage} trials={trials} included={included} toggle={toggleTrial} />
+              ))}
+            </tbody></table>
           </div>
         )}
 
-        {/* action — instant View for an unedited template; Save & run for a custom selection */}
+        {/* action */}
         <div className="mt-4 border-t border-slate-100 pt-3">
-          {isTemplate ? (
+          {template ? (
             <div className="flex flex-wrap items-center gap-3">
-              <button type="button" onClick={view} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-emerald-700">
-                <Eye size={14} /> View analysis
-              </button>
-              <span className="text-[12px] text-slate-500">Standard {PURPOSES.find((p) => p.id === purpose)?.label.toLowerCase()} cut — tick trials below to customize &amp; save.</span>
+              <button type="button" onClick={view} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"><Eye size={14} /> View analysis</button>
+              <span className="text-[12px] text-slate-500">This matches the <b>{template.label}</b> template — edit the selection to make it your own &amp; save.</span>
             </div>
           ) : (
             <div className="flex flex-wrap items-center gap-2">
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name this custom cut, e.g. “CA processing training set 24-25”"
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name this cut, e.g. “CA processing training set 24-25”"
                 className="min-w-[260px] flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-emerald-400" />
               <button type="button" onClick={save} disabled={pending || !included.size || !name.trim()}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:opacity-40">
@@ -215,7 +208,7 @@ export default function DataCutPicker({
         </div>
       </div>
 
-      {/* ── Now viewing ─────────────────────────────────────────────────────────────────────── */}
+      {/* Now viewing */}
       {composition && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[12px] text-slate-600 shadow-sm">
           <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400"><CornerDownRight size={12} /> Now viewing</span>
@@ -224,23 +217,6 @@ export default function DataCutPicker({
           <Stat label="genotypes" value={composition.n_geno} />
           <Stat label="environments" value={composition.n_env} />
           <Stat label="stages" value={composition.stages.join("+")} />
-          <Stat label="plots" value={composition.n_obs} />
-          {/* lens toggle: same data, switch the ranking index (only for the shared-fit templates) */}
-          {loadedIsTemplate && loadedLenses.length > 1 && (
-            <span className="inline-flex items-center gap-1">
-              <span className="text-[10px] text-slate-400">rank by</span>
-              {loadedLenses.map((m) => {
-                const sib = cuts.find((c) => c.purpose === currentPurpose && c.market === m.id);
-                const active = m.id === currentMarket;
-                return (
-                  <button key={m.id} type="button" onClick={() => sib && router.push(`/?cut=${sib.id}`)}
-                    className={`rounded-full px-2 py-0.5 text-[11px] font-medium transition ${active ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-emerald-50"}`}>
-                    {m.label.replace(/^Processing · |^Fresh-market · /, "")}
-                  </button>
-                );
-              })}
-            </span>
-          )}
           <span className="ml-auto flex items-center gap-1">
             <button type="button" title="Re-run on current data" onClick={() => rerun(selected, activeSaved)} disabled={pending} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-emerald-600 disabled:opacity-50"><RefreshCw size={13} className={busy === selected ? "animate-spin" : ""} /></button>
             {activeSaved && <button type="button" title="Delete preset" onClick={() => remove(selected)} disabled={pending} className="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"><Trash2 size={13} /></button>}
@@ -251,33 +227,18 @@ export default function DataCutPicker({
   );
 }
 
-// A stage group of trial rows in the refine table.
-function FragmentRows({ stage, label, trials, included, toggle, feeds, rootTag }: {
-  stage: string; label: string; trials: CatalogTrial[]; included: Set<string>;
-  toggle: (id: string) => void; feeds: (tag: string) => Array<{ id: string; label: string }>; rootTag: string;
-}) {
+function FragmentRows({ stage, label, trials, included, toggle }: { stage: string; label: string; trials: CatalogTrial[]; included: Set<string>; toggle: (id: string) => void }) {
   return (
     <>
-      <tr className="bg-slate-50/80">
-        <td colSpan={4} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{stage} · {label}</td>
-      </tr>
+      <tr className="bg-slate-50/80"><td colSpan={4} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{stage} · {label}</td></tr>
       {trials.map((t) => {
         const on = included.has(t.trial_id);
-        const f = feeds(t.market_tag);
         return (
           <tr key={t.trial_id} className={`cursor-pointer border-t border-slate-100 ${on ? "bg-emerald-50/50" : "hover:bg-slate-50"}`} onClick={() => toggle(t.trial_id)}>
-            <td className="w-8 py-1.5 pl-3 pr-2">
-              <span className={`grid h-4 w-4 place-items-center rounded border ${on ? "border-emerald-500 bg-emerald-500 text-white" : "border-slate-300 bg-white"}`}>{on && <Check size={11} />}</span>
-            </td>
-            <td className="py-1.5 pr-3">
-              <span className="font-medium text-slate-800"><FlaskConical size={11} className="mr-1 inline text-slate-400" />{t.trial_id}</span>
-              <span className="ml-2 text-[11px] text-slate-400">{t.year} · {t.n_entries} entries · {t.n_loc}loc×{t.n_rep}rep</span>
-            </td>
+            <td className="w-8 py-1.5 pl-3 pr-2"><span className={`grid h-4 w-4 place-items-center rounded border ${on ? "border-emerald-500 bg-emerald-500 text-white" : "border-slate-300 bg-white"}`}>{on && <Check size={11} />}</span></td>
+            <td className="py-1.5 pr-3"><span className="font-medium text-slate-800"><FlaskConical size={11} className="mr-1 inline text-slate-400" />{t.trial_id}</span><span className="ml-2 text-[11px] text-slate-400">{t.year} · {t.n_entries} entries · {t.n_loc}loc×{t.n_rep}rep</span></td>
             <td className="py-1.5 pr-3"><Tag>{t.market_tag}</Tag></td>
-            <td className="py-1.5 pr-3">
-              <span className="text-[10px] text-slate-400">feeds </span>
-              {f.map((m) => <span key={m.id} className="mr-1 inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">{m.label.replace(/^Processing · |^Fresh-market · /, "")}</span>)}
-            </td>
+            <td className="py-1.5 pr-3 text-[11px] text-slate-400">{t.tpe}</td>
           </tr>
         );
       })}
@@ -285,47 +246,9 @@ function FragmentRows({ stage, label, trials, included, toggle, feeds, rootTag }
   );
 }
 
-// A compact market hierarchy tree: All → TPE (the data/fit) → market (the index lens). The selected TPE
-// is the cut; the selected lens is the ranking. Both are highlighted so the broad/specific split is clear.
-function Hierarchy({ taxonomy, selectedTpe, selectedMarket }: { taxonomy: Taxonomy; selectedTpe: string; selectedMarket: string }) {
-  return (
-    <div className="text-[12px] leading-relaxed">
-      <div className="font-medium text-emerald-700">◆ {taxonomy.root.label}</div>
-      {taxonomy.tpes.map((tpe) => {
-        const onPath = tpe.id === selectedTpe;
-        const markets = taxonomy.markets.filter((m) => m.tpe === tpe.id);
-        return (
-          <div key={tpe.id} className="ml-2">
-            <div className={onPath ? "font-semibold text-emerald-700" : "text-slate-500"}>├─ {tpe.label}{onPath && " ◄ data cut"}</div>
-            {markets.map((m, i) => {
-              const isSel = m.id === selectedMarket && onPath;
-              return (
-                <div key={m.id} className={`ml-4 ${isSel ? "font-medium text-emerald-700" : onPath ? "text-slate-600" : "text-slate-400"}`}>
-                  {i === markets.length - 1 ? "└" : "├"}─ {m.label.replace(/^Processing · |^Fresh-market · /, "")}{isSel && " · lens"}
-                </div>
-              );
-            })}
-          </div>
-        );
-      })}
-      <p className="mt-1.5 text-[11px] text-slate-400">The <b>TPE</b> (program) is the data/fit — the broad cut. The <b>lens</b> beneath it re-ranks the same data; early <Tag>{taxonomy.root.tag}</Tag> trials feed every market.</p>
-    </div>
-  );
-}
-
-function Dropdown({ value, onChange, options, accent }: { value: string; onChange: (v: string) => void; options: Array<{ value: string; label: string }>; accent?: boolean }) {
-  return (
-    <select value={value} onChange={(e) => onChange(e.target.value)}
-      className={`rounded-lg border px-2.5 py-1.5 text-sm font-medium outline-none ${accent ? "border-emerald-300 bg-emerald-50/60 text-emerald-800 focus:border-emerald-500" : "border-slate-200 bg-white text-slate-700 focus:border-emerald-400"}`}>
-      {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
-  );
-}
-
 function Tag({ children }: { children: React.ReactNode }) {
   return <span className="rounded bg-slate-200/70 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">{children}</span>;
 }
-
 function Stat({ label, value }: { label: string; value: string | number }) {
   return <span className="inline-flex items-baseline gap-1"><b className="tnum text-slate-800">{value}</b><span className="text-[11px] text-slate-400">{label}</span></span>;
 }
