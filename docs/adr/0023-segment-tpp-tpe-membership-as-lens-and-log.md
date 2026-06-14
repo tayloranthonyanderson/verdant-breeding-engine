@@ -115,3 +115,11 @@ cut persists as its own study (`source='tomato-cut'`) carrying its trial list in
 `data_readiness.cut`; it re-runs on current data and can be deleted (`saveAndRunCut` / `analyzeCut` /
 `deleteCut` server actions; `buildCustomCut` in the pipeline). This is the "saved trial set" primitive —
 the lightweight precursor to the durable `segment`/study-tag schema, validated against real fits.
+
+**The cut is chosen at the TPE level; the market is a lens (UI, 2026-06-14).** Making "one fit, many
+lenses" literal in the builder: the breeder picks the **TPE** (e.g. *Processing · arid CA*) as the data
+structure — the broad cut — and a **Rank by** toggle switches the leaf-market index (*Brix* / *Firmness*)
+over the *same* fit. The market hierarchy is drawn as `All > TPE > market` with the TPE marked "data cut"
+and the leaf marked "lens", and a "Now viewing" lens toggle flips the ranking on loaded results without
+re-cutting. `cutTaxonomy()` surfaces the TPE groups + tag hierarchy to the UI. This is the exact TPP/TPE
+split this ADR defines, now navigable: TPE = analysis frame (the data), TPP = the index lens.
