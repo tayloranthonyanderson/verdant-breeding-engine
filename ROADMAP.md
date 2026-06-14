@@ -31,10 +31,14 @@ deliberately deferred until the slice above it is real and validated.
 > **Select** step: the breeder switches **target market** and the same trial re-ranks under that
 > market's objective (its TPP) — *same data, different Segment → different ranking*, live. Trait-defined
 > Segments over one shared TPE are built end-to-end on the MET; the **environment-defined TPE partition**
-> (a Segment with its own fit, so GCA×E falls out) is the next increment. **Next:** the
-> natural-language Q&A layer (Phase 2); the ingestion front door (Trait Library + unit harmonization,
-> Thread B / ADR-0022); a `relationship_set` cache table + `sample.germplasm_id` mapping; forward-year
-> predictive validation.
+> (a Segment with its own fit, so GCA×E falls out) is the next increment. The **grounded NL Q&A layer
+> (Phase 2 / ADR-0002/0004)** is now built end-to-end: an "Ask your results" panel narrates the bundle
+> in plain language and may state *only* numbers present in it (the AI explains, never computes), on a
+> provider-abstracted LLM seam (Claude Sonnet 4.6) with a keyless offline fallback — live on an Anthropic
+> API-key drop. **Next:** wire the answerer into the groundedness eval gate; the **target-authoring
+> assistant** (NL → TPP+TPE) once target markets are persistent; the ingestion front door (Trait Library
+> + unit harmonization, Thread B / ADR-0022); a `relationship_set` cache table + `sample.germplasm_id`
+> mapping; forward-year predictive validation.
 
 ## Phase 0 — Plan + thin slice  *(current)*
 - Product brief, this roadmap, analysis-engine workflow map.

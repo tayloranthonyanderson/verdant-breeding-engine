@@ -114,6 +114,14 @@ Effort is relative (S/M/L/XL) at ~8–12 hrs/wk, not a date.
 - **AI copilot core (ADR-0003):** GUI-first, pervasive; grounded Q&A; **auto-narrative** insight; lightweight
   **action-capable** AI over view-state (re-weight, what-if, filter) — visible + reversible; eval harness for
   groundedness. Provider-abstracted (ADR-0004), founder's model config only for now.
+  - ✅ **Grounded NL Q&A (ADR-0002/0004):** the `@verdant/ai` package — a provider-abstracted LLM seam
+    (Anthropic adapter, Claude Sonnet 4.6, adaptive thinking) + `answer(question, bundle)` that may state
+    only numbers present in the bundle (the AI explains, never computes); conforms to the
+    `evals/groundedness` answerer contract. Surfaced as an **"Ask your results"** panel on the Understand
+    step (LLM runs server-only). Auth resolves from the env; a keyless **offline answerer** covers common
+    intents so it's demonstrable now and goes live on an Anthropic **API-key** drop (the Max *subscription*
+    is not an API key). Built/verified on the G2F bundle; the tomato corpus + eval-gate wiring + the
+    target-authoring assistant are the follow-ons.
 - **Validation suite (ADR-0008):** correctness vs. the tomato-flavored simulator's known truth; robustness vs.
   a battery of public/G2F trials.
 - **Done when:** a real G2F MET produces spatially-adjusted BLUPs, Cullis h², a GxE/stability view, both
