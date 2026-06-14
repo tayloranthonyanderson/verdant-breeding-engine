@@ -11,7 +11,10 @@
     "contracts:test": "pnpm --filter @verdant/contracts test",
     "contracts:typecheck": "pnpm --filter @verdant/contracts typecheck",
     "test:kernel": "Rscript services/kernel/tests/correctness.R && Rscript services/kernel/tests/data-quality-test.R && Rscript services/kernel/tests/model-qc-test.R",
-    "test:evals": "node evals/groundedness/run.mjs",
+    "test:evals": "VERDANT_ANSWERER=evals/groundedness/answerer.ts node --import tsx evals/groundedness/run.mjs",
     "test": "pnpm contracts:test && pnpm test:kernel && pnpm test:evals"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
   }
 }

@@ -28,7 +28,7 @@ export async function answer(question: string, bundle: ResultBundle): Promise<An
   const system = `${GROUNDED_SYSTEM}\n\n=== RESULT BUNDLE DIGEST ===\n${bundleDigest(bundle)}`;
   const llm = await complete(system, question);
   if (llm) return { text: llm.text, mode: "live", model: llm.model };
-  return { text: offlineAnswer(question, bundle), mode: "offline", model: null };
+  return { text: answerOffline(question, bundle), mode: "offline", model: null };
 }
 
 /** The eval/CI entrypoint — plain string, deterministic, no credential needed. Conforms to the
@@ -48,7 +48,9 @@ function topForSegment(bundle: ResultBundle, seg: string | undefined, n = 5): st
   return rows.length ? rows.join(", ") : "no ranking available";
 }
 
-function offlineAnswer(question: string, bundle: ResultBundle): string {
+/** The deterministic, key-free answerer (also the CI groundedness gate's subject). Every number it
+ *  emits comes from the bundle, so its output is grounded by construction. */
+export function answerOffline(question: string, bundle: ResultBundle): string {
   const q = question.toLowerCase();
   const segs = segmentsOf(bundle);
   const seg = segs.find((s) => q.includes(s.toLowerCase()));
