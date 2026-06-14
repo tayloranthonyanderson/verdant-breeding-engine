@@ -63,11 +63,22 @@ export function bundleDigest(bundle: ResultBundle): string {
 
   // Combining ability, if attached (loosely typed in the bundle).
   const ca = (bundle as unknown as Record<string, unknown>).combining_ability as
-    | { topology?: { kind?: string; n_lines?: number }; traits?: Array<{ variable_id: string; baker_ratio: number | null }> }
+    | {
+        topology?: { kind?: string; n_lines?: number };
+        traits?: Array<{ variable_id: string; baker_ratio: number | null }>;
+        hybrids?: Array<{ tester: string }>;
+        pool_rankings?: Array<{ pool: string; ranking?: Array<{ line: string }> }>;
+      }
     | undefined;
   if (ca?.topology) {
     L.push("");
-    L.push(`COMBINING ABILITY: topology=${ca.topology.kind ?? "?"}, ${ca.topology.n_lines ?? "?"} lines.`);
+    const testers = [...new Set((ca.hybrids ?? []).map((h) => h.tester))].filter((t) => t && t !== "NA");
+    L.push(`COMBINING ABILITY: topology=${ca.topology.kind ?? "?"}, ${ca.topology.n_lines ?? "?"} lines${testers.length ? `, ${testers.length} testers` : ""}.`);
+    if (testers.length) L.push(`Testers (the common-parent tools): ${testers.join(", ")}.`);
+    for (const pr of ca.pool_rankings ?? []) {
+      const top = (pr.ranking ?? []).slice(0, 8).map((r) => r.line).filter(Boolean);
+      if (top.length) L.push(`Pool ${pr.pool} — top GCA lines: ${top.join(", ")}.`);
+    }
     for (const t of ca.traits ?? []) L.push(`- ${t.variable_id}: Baker's ratio=${fmt(t.baker_ratio, 2)}`);
   }
 

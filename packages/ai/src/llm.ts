@@ -65,7 +65,8 @@ async function completeAnthropic(system: string, user: string): Promise<LlmResul
   });
   const resp = await client.messages.create({
     model,
-    max_tokens: 2048,
+    // Generous headroom so adaptive thinking can't consume the whole budget and leave no answer text.
+    max_tokens: 4096,
     thinking: { type: "adaptive" },
     system,
     messages: [{ role: "user", content: user }],

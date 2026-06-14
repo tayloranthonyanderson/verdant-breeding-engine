@@ -53,24 +53,38 @@ export async function answer(question: string, bundle: ResultBundle): Promise<An
     // No credential → the deterministic offline answerer (grounded by construction).
     return { text: answerOffline(question, bundle), mode: "offline", model: null, verified: true, flagged: false };
   }
+  const model = first.model;
+  const offline = (): Answer => ({ text: answerOffline(question, bundle), mode: "offline", model, verified: true, flagged: false });
 
-  let g = checkGrounding(first.text, bundle);
-  if (g.grounded) return { text: first.text, mode: "live", model: first.model, verified: true, flagged: false };
+  const firstText = first.text.trim();
+
+  // Empty model output (e.g. the token budget was spent on thinking) — retry once for a concise answer;
+  // if still empty, fall back to a grounded summary. An empty answer must never render as "verified".
+  if (!firstText) {
+    const retry = (await complete(system, `${question}\n\nAnswer concisely in plain text. If the results don't contain what's needed, say so briefly.`))?.text.trim() ?? "";
+    if (!retry) return offline();
+    const gr = checkGrounding(retry, bundle);
+    if (gr.grounded) return { text: retry, mode: "live", model, verified: true, flagged: false };
+    return { text: answerOffline(question, bundle), mode: "offline", model, verified: false, flagged: true, unverified: [...gr.unverifiedNumbers, ...gr.unverifiedEntities] };
+  }
+
+  let g = checkGrounding(firstText, bundle);
+  if (g.grounded) return { text: firstText, mode: "live", model, verified: true, flagged: false };
 
   // Regenerate ONCE, telling the model exactly what failed.
   const offenders = [...g.unverifiedNumbers, ...g.unverifiedEntities];
   const correction = `${question}\n\n[Verification failed] Your previous answer referenced values or names not present in the results: ${offenders.join(", ")}. Answer again using ONLY figures and germplasm/trait/market names that appear verbatim in the results above. Do not compute or estimate; if a figure isn't present, say it isn't available.`;
-  const second = await complete(system, correction);
+  const second = (await complete(system, correction))?.text.trim() ?? "";
   if (second) {
-    g = checkGrounding(second.text, bundle);
-    if (g.grounded) return { text: second.text, mode: "live", model: second.model, verified: true, flagged: false };
+    g = checkGrounding(second, bundle);
+    if (g.grounded) return { text: second, mode: "live", model, verified: true, flagged: false };
   }
 
   // Still unverifiable → never show it. Surface a verified summary and flag it for the breeder.
   return {
     text: answerOffline(question, bundle),
     mode: "offline",
-    model: first.model,
+    model,
     verified: false,
     flagged: true,
     unverified: [...new Set(offenders)],

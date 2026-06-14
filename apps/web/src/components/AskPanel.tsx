@@ -97,7 +97,8 @@ export default function AskPanel() {
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1 text-emerald-600">
-                  <ShieldCheck size={12} /> Verified summary — grounded in your results (no API key for full answers)
+                  <ShieldCheck size={12} /> Verified summary — grounded in your results
+                  {res.answer.model ? "" : " (add an API key for full natural-language answers)"}
                 </span>
               )}
             </div>
