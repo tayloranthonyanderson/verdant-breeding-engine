@@ -36,19 +36,56 @@ import {
 const GENO_WORK = join(homedir(), '.verdant', 'blupf90');
 
 const TRAITS = ['Plant_Height_cm', 'Ear_Height_cm', 'Yield_Mg_ha', 'Grain_Moisture'];
-// Objective for the seed transparent index (mode + relative weight per trait).
-const WEIGHTS = [
-  { variable_id: 'Yield_Mg_ha', mode: 'max' as const, weight: 0.4 },
-  { variable_id: 'Grain_Moisture', mode: 'min' as const, weight: 0.25 },
-  { variable_id: 'Plant_Height_cm', mode: 'max' as const, weight: 0.2 },
-  { variable_id: 'Ear_Height_cm', mode: 'min' as const, weight: 0.15 },
+// Advancement targets (Segments) — each is a TPP: a selection objective over the SAME data (one
+// shared TPE = the whole 8-env MET here). Same data + different Segment → different ranking
+// (ADR-0023). The environment-defined facet (a Segment with its OWN TPE → a separate fit, so GCA×E
+// falls out) is the next increment; these trait-defined Segments share the one fit and differ only
+// in their objective. TRAITS order: [Plant_Height_cm, Ear_Height_cm, Yield_Mg_ha, Grain_Moisture].
+type IndexWeight = { variable_id: string; mode: 'max' | 'min'; weight: number };
+interface SegmentDef {
+  id: string; // segment_id; also the UI switcher label
+  definition: 'trait'; // 'environment' (own-TPE, separate fit) deferred
+  weights: IndexWeight[]; // the weighted-index TPP
+  desiredGains: number[]; // genetic-sd gains aligned to TRAITS, for the genetically-aware lens
+}
+const SEGMENTS: SegmentDef[] = [
+  {
+    id: 'Yield-first market', definition: 'trait',
+    weights: [
+      { variable_id: 'Yield_Mg_ha', mode: 'max', weight: 0.4 },
+      { variable_id: 'Grain_Moisture', mode: 'min', weight: 0.25 },
+      { variable_id: 'Plant_Height_cm', mode: 'max', weight: 0.2 },
+      { variable_id: 'Ear_Height_cm', mode: 'min', weight: 0.15 },
+    ],
+    desiredGains: [0.5, -0.5, 1, -1],
+  },
+  {
+    id: 'Fast dry-down', definition: 'trait',
+    weights: [
+      { variable_id: 'Grain_Moisture', mode: 'min', weight: 0.5 },
+      { variable_id: 'Yield_Mg_ha', mode: 'max', weight: 0.3 },
+      { variable_id: 'Plant_Height_cm', mode: 'max', weight: 0.1 },
+      { variable_id: 'Ear_Height_cm', mode: 'min', weight: 0.1 },
+    ],
+    desiredGains: [0.2, -0.3, 0.6, -1.5],
+  },
+  {
+    id: 'Standability', definition: 'trait',
+    weights: [
+      { variable_id: 'Ear_Height_cm', mode: 'min', weight: 0.35 },
+      { variable_id: 'Plant_Height_cm', mode: 'min', weight: 0.25 },
+      { variable_id: 'Yield_Mg_ha', mode: 'max', weight: 0.3 },
+      { variable_id: 'Grain_Moisture', mode: 'min', weight: 0.1 },
+    ],
+    desiredGains: [-0.6, -1.2, 0.8, -0.3],
+  },
 ];
 
-/** Transparent weighted index (ADR-0013): z-standardize each trait, merit by mode, normalize each
- *  merit column to unit spread, weight, sum. Seed only — the client recomputes live. */
-function transparentIndex(genoBlups: Map<string, Array<number | null>>) {
+/** Transparent weighted index (ADR-0013) for ONE Segment's objective: z-standardize each trait,
+ *  merit by mode, normalize each merit column to unit spread, weight, sum. Seed only — the client
+ *  recomputes live; switching Segment re-seeds it with that target's weights. */
+function transparentIndex(genoBlups: Map<string, Array<number | null>>, weights: IndexWeight[], segmentId: string) {
   const genos = [...genoBlups.keys()];
-  const n = TRAITS.length;
   // z per trait (empirical sample sd)
   const z: number[][] = TRAITS.map((_, j) => {
     const vals = genos.map((g) => genoBlups.get(g)![j]).filter((v): v is number => v != null);
@@ -56,10 +93,11 @@ function transparentIndex(genoBlups: Map<string, Array<number | null>>) {
     const sd = Math.sqrt(vals.reduce((a, b) => a + (b - mean) ** 2, 0) / ((vals.length - 1) || 1)) || 1;
     return genos.map((g) => { const v = genoBlups.get(g)![j]; return v == null ? 0 : (v - mean) / sd; });
   });
-  const totalW = WEIGHTS.reduce((a, w) => a + w.weight, 0) || 1;
+  const totalW = weights.reduce((a, w) => a + w.weight, 0) || 1;
   const contrib: number[] = genos.map(() => 0);
-  for (const w of WEIGHTS) {
+  for (const w of weights) {
     const j = TRAITS.indexOf(w.variable_id);
+    if (j < 0) continue;
     const merit = z[j].map((zz) => (w.mode === 'min' ? -zz : zz)); // max/min (no target in seed)
     const mean = merit.reduce((a, b) => a + b, 0) / (merit.length || 1);
     const sd = Math.sqrt(merit.reduce((a, b) => a + (b - mean) ** 2, 0) / ((merit.length - 1) || 1)) || 1;
@@ -71,35 +109,54 @@ function transparentIndex(genoBlups: Map<string, Array<number | null>>) {
     .map((r, i) => ({ germplasm_id: r.germplasm_id, rank: i + 1, score: r.score, gated_out: false, gate_failures: [] }));
   return {
     kind: 'weighted' as const,
-    segment_id: 'g2f-met-2019',
+    segment_id: segmentId,
     ranking,
-    weights_used: WEIGHTS.map((w) => ({ variable_id: w.variable_id, mode: w.mode, direction: (w.mode === 'min' ? -1 : 1) as 1 | -1, weight: w.weight })),
+    weights_used: weights.map((w) => ({ variable_id: w.variable_id, mode: w.mode, direction: (w.mode === 'min' ? -1 : 1) as 1 | -1, weight: w.weight })),
   };
 }
 
-/** Genetically-aware desired-gains index + divergence, computed in R (science layer). Default gains
- *  (genetic-sd units): yield +1, moisture −1, height neutral. */
+/** Genetically-aware desired-gains index + divergence, computed in R (science layer), for ONE
+ *  Segment's desired gains (genetic-sd units, aligned to TRAITS). */
 function geneticIndex(
   G: number[][],
   germplasmIds: string[],
   blups: Array<Array<number | null>>,
   transparentRanking: Array<{ germplasm_id: string; rank: number }>,
+  desiredGains: number[],
+  segmentId: string,
 ) {
   const input = {
     variable_ids: TRAITS,
     genetic_covariance: G,
     germplasm_ids: germplasmIds,
     blups,
-    // [Plant_Height_cm, Ear_Height_cm, Yield_Mg_ha, Grain_Moisture] in genetic-sd units.
-    // Decent height but LOW ear placement (lodging resistance) deliberately fights the strong
-    // height–ear genetic correlation — that's what makes the genetic-aware index diverge.
-    desired_gains: [0.5, -0.5, 1, -1],
+    desired_gains: desiredGains,
     transparent_ranking: transparentRanking.map((r) => ({ germplasm_id: r.germplasm_id, rank: r.rank })),
   };
-  return runRKernel<{ index: NonNullable<ResultBundle['indices']>[number]; divergence: ResultBundle['divergence'] }>(
+  const out = runRKernel<{ index: NonNullable<ResultBundle['indices']>[number]; divergence: ResultBundle['divergence'] }>(
     'select-index.R',
     input,
   );
+  out.index.segment_id = segmentId; // select-index.R stamps a fixed id; override with the Segment's
+  return out;
+}
+
+/** Every Segment's indices (weighted + genetically-aware) over the SAME shared fit — same data,
+ *  different Segment → different ranking (ADR-0023) — plus the primary Segment's divergence for the
+ *  bundle-level field. Trait-defined Segments here; env-defined (own-TPE) fits are the next increment. */
+function segmentIndices(
+  active: { genos: string[]; map: Map<string, Array<number | null>> },
+  G: number[][],
+): { indices: NonNullable<ResultBundle['indices']>; divergence: ResultBundle['divergence'] } {
+  const indices: NonNullable<ResultBundle['indices']> = [];
+  let divergence: ResultBundle['divergence'] = null;
+  SEGMENTS.forEach((seg, si) => {
+    const t = transparentIndex(active.map, seg.weights, seg.id);
+    const gi = geneticIndex(G, active.genos, active.genos.map((gn) => active.map.get(gn)!), t.ranking, seg.desiredGains, seg.id);
+    indices.push(t, gi.index);
+    if (si === 0) divergence = gi.divergence;
+  });
+  return { indices, divergence };
 }
 
 const PROG = 'G2F (public dev data)';
@@ -334,9 +391,9 @@ export async function runMetAnalysis(opts: RunMetOptions = {}): Promise<RunMetRe
   const phenotypic = { genos: g.blups.map((b) => b.genotype), map: new Map(g.blups.map((b) => [b.genotype, b.values])) };
   const active = activeBreedingValues(relationship, plan.genomic_engine ?? 'rrblup', phenotypic, genomic);
 
-  // Indices ranked by the CHOSEN model's breeding values; traits keep the field BLUPs (the per-trait estimates).
-  const transIdx = transparentIndex(active.map);
-  const gi = geneticIndex(g.geneticCovariance, active.genos, active.genos.map((gn) => active.map.get(gn)!), transIdx.ranking);
+  // Per-Segment indices ranked by the CHOSEN model's breeding values; each Segment (advancement
+  // target) re-ranks the SAME values under its own objective (ADR-0023). Traits keep the field BLUPs.
+  const { indices: segIdx, divergence: primaryDivergence } = segmentIndices(active, g.geneticCovariance);
 
   // Post-fit Model QC (ADR-0021): conditional residuals reconstructed from the field BLUPs (no refit)
   // → per-trait residual diagnostics. The BLUPs are the genotype contribution the residuals subtract.
@@ -396,8 +453,8 @@ export async function runMetAnalysis(opts: RunMetOptions = {}): Promise<RunMetRe
     gxe: g.gxeCovariance ? { variable_ids: TRAITS, covariance: g.gxeCovariance, correlation: g.gxeCorrelation, variances: g.gxeVariances } : null,
     data_readiness: { scale: struct.readiness.scale, connectivity: struct.readiness.connectivity, replication: struct.readiness.replication, grids: struct.readiness.grids, unlocks: plan.unlocks },
     data_quality: dataQuality ?? null,
-    indices: [transIdx, gi.index],
-    divergence: gi.divergence,
+    indices: segIdx,
+    divergence: primaryDivergence,
     ...(genomic ? { genomic: genomic as unknown as ResultBundle['genomic'] } : {}),
     warnings,
     provenance: { contract_version: 'v0', engine_versions: { blupf90: 'blupf90+', genomic: 'rrBLUP' } },
@@ -447,8 +504,7 @@ async function rerunRelationshipOnly(opts: RunMetOptions): Promise<RunMetResult>
     map: new Map((base.traits[0]?.effects ?? []).map((e) => [e.germplasm_id, TRAITS.map((id) => base.traits.find((t) => t.variable_id === id)?.effects.find((x) => x.germplasm_id === e.germplasm_id)?.value ?? null)])),
   };
   const active = activeBreedingValues(relationship, plan.genomic_engine ?? 'rrblup', phenotypic, genomic);
-  const transIdx = transparentIndex(active.map);
-  const gi = geneticIndex(G, active.genos, active.genos.map((gn) => active.map.get(gn)!), transIdx.ranking);
+  const { indices: segIdx, divergence: primaryDivergence } = segmentIndices(active, G);
 
   const warnings = (base.warnings ?? []).filter((w) => w.code !== 'ranking_genotyped_subset');
   if (active.subset && phenotypic.genos.length > active.genos.length)
@@ -457,8 +513,8 @@ async function rerunRelationshipOnly(opts: RunMetOptions): Promise<RunMetResult>
   const bundle: ResultBundle = {
     ...base,
     chosen_model: chosenModel(plan, relationship),
-    indices: [transIdx, gi.index],
-    divergence: gi.divergence,
+    indices: segIdx,
+    divergence: primaryDivergence,
     data_readiness: { ...base.data_readiness, unlocks: plan.unlocks } as ResultBundle['data_readiness'],
     warnings,
   };

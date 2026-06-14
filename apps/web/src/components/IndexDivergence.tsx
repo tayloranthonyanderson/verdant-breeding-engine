@@ -24,16 +24,19 @@ type Ranked = Array<{ germplasm_id: string; rank: number }>;
 
 export default function IndexDivergence({
   bundle,
+  segmentId,
   transparentRanking,
   geneticRanking,
 }: {
   bundle: ResultBundle;
+  segmentId?: string | null;
   transparentRanking?: Ranked;
   geneticRanking?: Ranked;
 }) {
   const live = !!(transparentRanking?.length && geneticRanking?.length);
-  const bundleT = bundle.indices?.find((i) => i.kind === "weighted")?.ranking;
-  const bundleG = bundle.indices?.find((i) => i.kind === "desired_gains" || i.kind === "smith_hazel")?.ranking;
+  const seg = (i: NonNullable<ResultBundle["indices"]>[number]) => !segmentId || i.segment_id === segmentId;
+  const bundleT = (bundle.indices?.find((i) => i.kind === "weighted" && seg(i)) ?? bundle.indices?.find((i) => i.kind === "weighted"))?.ranking;
+  const bundleG = (bundle.indices?.find((i) => (i.kind === "desired_gains" || i.kind === "smith_hazel") && seg(i)) ?? bundle.indices?.find((i) => i.kind === "desired_gains" || i.kind === "smith_hazel"))?.ranking;
 
   const { points, movers, n, rho } = useMemo(() => {
     const tRanking = live ? transparentRanking! : bundleT;

@@ -40,11 +40,23 @@ type Mode = "max" | "min" | "target";
 
 export default function IndexExplorer({
   bundle,
+  segmentId,
   onRankingChange,
 }: {
   bundle: ResultBundle;
+  segmentId?: string | null;
   onRankingChange?: (ranking: Array<{ germplasm_id: string; rank: number }>) => void;
 }) {
+  // The weighted index for the active Segment (advancement target) — its weights seed the sliders and
+  // its gate decisions carry over. Falls back to the first weighted index for single-segment bundles.
+  const idx = useMemo(
+    () =>
+      (segmentId ? bundle.indices?.find((i) => i.kind === "weighted" && i.segment_id === segmentId) : null) ??
+      bundle.indices?.find((i) => i.kind === "weighted") ??
+      bundle.indices?.[0] ??
+      null,
+    [bundle, segmentId],
+  );
   // Precompute, once per bundle: per-trait mean/sd, genotype z-scores, raw BLUPs, and gate flags
   // (gates are independent of weights, so we keep the kernel's gate decisions).
   const { traitIds, genos, z, blup, stats, gated } = useMemo(() => {
@@ -84,13 +96,13 @@ export default function IndexExplorer({
       z[id] = zm;
     }
     const gated = new Map<string, { gated: boolean; fails: string[] }>();
-    for (const r of bundle.indices?.[0]?.ranking ?? []) {
+    for (const r of idx?.ranking ?? []) {
       gated.set(r.germplasm_id, { gated: !!r.gated_out, fails: r.gate_failures ?? [] });
     }
     return { traitIds, genos, z, blup, stats, gated };
-  }, [bundle]);
+  }, [bundle, idx]);
 
-  const initial = bundle.indices?.[0]?.weights_used ?? [];
+  const initial = idx?.weights_used ?? [];
   // Weights are stored as PERCENTAGES that always sum to 100. The sliders are coupled: moving one
   // trait redistributes the remaining share across the others in proportion to their current
   // weights, so every thumb stays in sync and the panel always visibly sums to 100%.
@@ -365,7 +377,7 @@ export default function IndexExplorer({
           </table>
           <div className="border-t border-slate-100 px-3 py-2 text-[11px] text-slate-400">
             Top {Math.min(TABLE_N, ranking.length)} of {ranking.length} · transparent weighted index
-            {bundle.indices?.[0]?.segment_id ? ` · ${bundle.indices[0].segment_id}` : ""}
+            {idx?.segment_id ? ` · ${idx.segment_id}` : ""}
           </div>
         </div>
       </div>

@@ -39,14 +39,20 @@ function solve(A: number[][], rhs: number[]): number[] {
 
 export default function DesiredGainsExplorer({
   bundle,
+  segmentId,
   onRankingChange,
 }: {
   bundle: ResultBundle;
+  segmentId?: string | null;
   onRankingChange?: (ranking: Array<{ germplasm_id: string; rank: number }>) => void;
 }) {
   const gc = bundle.genetic_correlations;
-  const seed = bundle.indices?.find((i) => i.kind === "desired_gains");
-  const transparent = bundle.indices?.find((i) => i.kind === "weighted");
+  // The desired-gains + transparent indices for the active Segment (advancement target); fall back to
+  // the first of each kind for single-segment bundles.
+  const inSeg = (k: string) => (i: NonNullable<ResultBundle["indices"]>[number]) =>
+    i.kind === k && (!segmentId || i.segment_id === segmentId);
+  const seed = bundle.indices?.find(inSeg("desired_gains")) ?? bundle.indices?.find((i) => i.kind === "desired_gains");
+  const transparent = bundle.indices?.find(inSeg("weighted")) ?? bundle.indices?.find((i) => i.kind === "weighted");
 
   // Only renders for a multi-trait bundle that carries G + a desired-gains seed.
   const pre = useMemo(() => {

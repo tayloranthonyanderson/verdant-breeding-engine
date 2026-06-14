@@ -3,7 +3,7 @@
 Captured so nothing is lost — but only Phase 1 is "now." Everything below it is
 deliberately deferred until the slice above it is real and validated.
 
-> **Status (2026-06-12).** The Phase-1 analysis engine is built + validated on G2F,
+> **Status (2026-06-14).** The Phase-1 analysis engine is built + validated on G2F,
 > and Phase-7 genomic prediction is now built end-to-end with a full model-selection
 > UI. **Done:** two-stage MET (SpATS → multi-trait AI-REML, validated vs lme4 to 3
 > sig figs); the **deterministic Model Planner** + data-readiness gating (ADR-0016);
@@ -27,7 +27,11 @@ deliberately deferred until the slice above it is real and validated.
 > re-plans on re-run and never deletes data. Split across the journey (**Overview → Data → Model →
 > Understand → Select → Advance → Genomics**: pre-fit checks in the **Data** step, model-dependent
 > diagnostics in the **Model** step's fit-checks) — completing the previously-unchecked Phase-1
-> data-validation item. **Next:** the
+> data-validation item. The **selection-target (Segment) frame (ADR-0023)** is now wired into the
+> **Select** step: the breeder switches **advancement target** and the same trial re-ranks under that
+> market's objective (its TPP) — *same data, different Segment → different ranking*, live. Trait-defined
+> Segments over one shared TPE are built end-to-end on the MET; the **environment-defined TPE partition**
+> (a Segment with its own fit, so GCA×E falls out) is the next increment. **Next:** the
 > natural-language Q&A layer (Phase 2); the ingestion front door (Trait Library + unit harmonization,
 > Thread B / ADR-0022); a `relationship_set` cache table + `sample.germplasm_id` mapping; forward-year
 > predictive validation.
