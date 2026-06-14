@@ -1,6 +1,8 @@
-import { Leaf, FlaskConical, Sprout, ClipboardCheck, Compass, SlidersHorizontal, Microscope, ListChecks, Dna, ShieldCheck } from "lucide-react";
+import Link from "next/link";
+import { Leaf, FlaskConical, Sprout, ClipboardCheck, Compass, SlidersHorizontal, Microscope, ListChecks, Dna, ShieldCheck, Layers, Trophy } from "lucide-react";
 import type { ResultBundle, AnalysisRequest } from "@verdant/contracts";
-import { getLatestResult } from "@/lib/data";
+import { getG2fResult, getCutResult } from "@/lib/data";
+import { listCuts, trialsForCut, trialCatalog } from "@verdant/pipeline";
 import { getCombiningAbility } from "@/lib/ca";
 import InsightBanner from "@/components/InsightBanner";
 import ModelReadiness from "@/components/ModelReadiness";
@@ -12,6 +14,8 @@ import CombiningAbilityUnderstand from "@/components/CombiningAbilityUnderstand"
 import AskPanel from "@/components/AskPanel";
 import SelectionSection from "@/components/SelectionSection";
 import GenomicWorkspace from "@/components/GenomicWorkspace";
+import DataCutPicker, { type CutCard, type CatalogTrial, type Composition } from "@/components/DataCutPicker";
+import CutRanking from "@/components/CutRanking";
 import StepShell, { type Step } from "@/components/StepShell";
 
 // Always read the freshest persisted result from Postgres.
@@ -19,13 +23,74 @@ export const dynamic = "force-dynamic";
 // A synchronous override re-run (ADR-0018) can refit the model; give the Server Action headroom.
 export const maxDuration = 300;
 
-// One trial → one analysis → many facets, presented as a WORKFLOW of focused steps (not an endless
-// scroll): Overview → Model → Understand → Select → Advance → (Genomics).
-export default async function Home() {
-  const result = await getLatestResult();
+const DEFAULT_CUT = "predict-proc-brix";
+
+// The front door is the tomato PROGRAM with the data-cut model (ADR-0023): pick a purpose + market,
+// the cut assembles itself, the analysis runs on exactly that data. The rich G2F MET demo is preserved
+// behind ?view=g2f.
+export default async function Home({ searchParams }: { searchParams: Promise<{ cut?: string; view?: string }> }) {
+  const sp = await searchParams;
+  if (sp.view !== "g2f") return <CutExperience cutId={sp.cut ?? DEFAULT_CUT} />;
+  return <G2fExperience />;
+}
+
+// ---- Tomato data-cut experience -----------------------------------------------------------------
+async function CutExperience({ cutId }: { cutId: string }) {
+  let cuts: CutCard[] = [];
+  let catalog: CatalogTrial[] = [];
+  try {
+    cuts = listCuts().map((c) => {
+      const tr = trialsForCut(c);
+      return { ...c, trial_ids: tr.map((t) => t.trial_id), stages: [...new Set(tr.map((t) => t.stage))].sort(), years: [...new Set(tr.map((t) => t.year))].sort(), n_trials: tr.length };
+    });
+    catalog = trialCatalog().map((t) => ({ trial_id: t.trial_id, stage: t.stage, stage_label: t.stage_label, year: t.year, tpe: t.tpe, market_tag: t.market_tag, n_entries: t.n_entries, n_loc: t.n_loc, n_rep: t.n_rep, design: t.design }));
+  } catch { /* corpus not generated — picker stays empty, page still renders */ }
+
+  const result = (await getCutResult(cutId)) ?? (cuts[0] ? await getCutResult(cuts[0].id) : null);
+  const dr = (result?.bundle.data_readiness ?? {}) as { scale?: Record<string, number>; connectivity?: { n_checks?: number }; cut?: { trials?: unknown[]; stages?: string[]; years?: number[] } };
+  const composition: Composition | null = result && dr.cut ? {
+    n_geno: dr.scale?.n_geno ?? 0, n_env: dr.scale?.n_env ?? 0, n_obs: dr.scale?.n_obs ?? 0,
+    n_checks: dr.connectivity?.n_checks ?? 0, n_trials: dr.cut.trials?.length ?? 0,
+    stages: dr.cut.stages ?? [], years: dr.cut.years ?? [],
+  } : null;
+  const activeCutId = result?.study?.name ?? cutId;
+
+  const steps: Step[] = result ? [
+    {
+      id: "cut", label: "Data cut", sublabel: "choose what to analyze", icon: <Layers size={14} />,
+      content: <DataCutPicker cuts={cuts} catalog={catalog} selected={activeCutId} composition={composition} />,
+    },
+    {
+      id: "understand", label: "Understand", sublabel: "heritability & genetic correlations", icon: <Microscope size={14} />,
+      content: (
+        <div className="space-y-5">
+          <AskPanel cutId={activeCutId} />
+          <section>
+            <h3 className="mb-2 text-sm font-semibold text-slate-700">Heritability on this cut</h3>
+            <HeritabilityCards bundle={result.bundle} />
+          </section>
+          <GeneticCorrelations bundle={result.bundle} />
+        </div>
+      ),
+    },
+    {
+      id: "select", label: "Select", sublabel: "rank for the market", icon: <Trophy size={14} />,
+      content: <CutRanking bundle={result.bundle} />,
+    },
+  ] : [];
+
+  return (
+    <Shell badge={result?.study?.name ?? "tomato program"} altHref="/?view=g2f" altLabel="G2F MET demo">
+      {steps.length ? <StepShell steps={steps} /> : <EmptyState />}
+    </Shell>
+  );
+}
+
+// ---- G2F MET experience (the original rich maize demo) ------------------------------------------
+async function G2fExperience() {
+  const result = await getG2fResult();
   const ca = result ? getCombiningAbility(result.bundle) : null;
   const hasGenomic = !!(result?.bundle as { genomic?: unknown } | undefined)?.genomic;
-  // The exclusion overlay the current run was fit with (for the with/without comparison).
   const activeExclusions = (result?.run.request as AnalysisRequest | null)?.data_overrides?.exclusions ?? [];
 
   const steps: Step[] = result
@@ -87,6 +152,15 @@ export default async function Home() {
     : [];
 
   return (
+    <Shell badge={result?.study?.name ?? null} altHref="/" altLabel="← Tomato program" extra={ca ? "combining ability" : null}>
+      {!result ? <EmptyState /> : <StepShell steps={steps} />}
+    </Shell>
+  );
+}
+
+// Shared chrome for both experiences, with a link to switch between them.
+function Shell({ children, badge, altHref, altLabel, extra }: { children: React.ReactNode; badge: string | null; altHref: string; altLabel: string; extra?: string | null }) {
+  return (
     <div className="flex min-h-screen flex-col">
       <header className="border-b border-slate-200 bg-white/80 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center gap-3 px-6 py-3">
@@ -97,23 +171,20 @@ export default async function Home() {
             <div className="text-base font-semibold tracking-tight text-slate-900">Verdant</div>
             <div className="text-[11px] text-slate-500">Breeding Analytics</div>
           </div>
-          {result?.study && (
+          {badge && (
             <span className="ml-3 inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
-              <FlaskConical size={11} /> {result.study.name}
+              <FlaskConical size={11} /> {badge}
             </span>
           )}
-          {ca && (
+          {extra && (
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700">
-              <Sprout size={11} /> combining ability
+              <Sprout size={11} /> {extra}
             </span>
           )}
-          <div className="ml-auto text-xs text-slate-400">AI-native · trustworthy by design</div>
+          <Link href={altHref} className="ml-auto text-xs text-slate-400 hover:text-emerald-600">{altLabel}</Link>
         </div>
       </header>
-
-      <main className="mx-auto w-full max-w-7xl flex-1 px-6 py-6">
-        {!result ? <EmptyState /> : <StepShell steps={steps} />}
-      </main>
+      <main className="mx-auto w-full max-w-7xl flex-1 px-6 py-6">{children}</main>
     </div>
   );
 }

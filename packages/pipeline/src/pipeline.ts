@@ -30,6 +30,10 @@ import { runRKernel } from './kernel';
 export { runMetAnalysis, type RunMetOptions, type RunMetResult } from './met-build';
 export { computeCombiningAbility, buildCombinedAnalysis, attachCombiningAbility, type CombiningAbility } from './combining-ability-build';
 export type { ModelOverrides, ModelDecision, OverridableFactor } from './planner';
+// The synthetic-tomato data-cut model (ADR-0023): the cut catalog + assembly the web tier reads, and
+// the on-demand cut analyzer the Server Action calls to (re)build a cut's bundle.
+export { listCuts, cutById, trialsForCut, trialCatalog, loadManifest, type Cut, type Purpose, type TrialMeta, type Manifest } from './tomato-corpus';
+export { runTomatoCut } from './tomato-build';
 
 const PROGRAM_NAME = 'G2F (public dev data)';
 

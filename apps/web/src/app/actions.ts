@@ -8,10 +8,10 @@
 import { revalidatePath } from "next/cache";
 import { and, eq, inArray } from "drizzle-orm";
 import { db, analysisRun, advancementDecision } from "@verdant/db";
-import { runMetAnalysis, type ModelOverrides } from "@verdant/pipeline";
+import { runMetAnalysis, runTomatoCut, type ModelOverrides } from "@verdant/pipeline";
 import type { AnalysisRequest } from "@verdant/contracts";
 import { answer, type Answer } from "@verdant/ai";
-import { getLatestResult } from "@/lib/data";
+import { getLatestResult, getCutResult } from "@/lib/data";
 
 // --- Advancement (DOMAIN-MODEL §4) — record/withdraw the staging move that closes analysis→select→
 // advance. Persists to advancement_decision, scoped to the analysis it was made on; revalidates so the
@@ -55,13 +55,26 @@ void inArray;
 // --- Grounded Q&A (ADR-0002/0004) — ask the freshest analysis a question; the AI explains the
 // bundle and may state only numbers present in it (evals/groundedness). The LLM call runs server-only.
 export type AskResult = { status: "ok"; answer: Answer } | { status: "error"; error: string };
-export async function askResults(question: string): Promise<AskResult> {
+export async function askResults(question: string, cutId?: string): Promise<AskResult> {
   try {
     const q = (question ?? "").trim();
     if (!q) return { status: "error", error: "Ask a question about the results." };
-    const result = await getLatestResult();
+    // Answer against the cut currently being viewed (its own data scope), else the latest analysis.
+    const result = cutId ? await getCutResult(cutId) : await getLatestResult();
     if (!result) return { status: "error", error: "No analysis available yet." };
     return { status: "ok", answer: await answer(q, result.bundle) };
+  } catch (e) {
+    return { status: "error", error: (e as Error).message };
+  }
+}
+
+// Re-run the analysis for a data cut LIVE (assemble the cut's trials → multi-trait AI-REML → persist),
+// then revalidate so the page re-reads it. "Running the analysis on this cut" made literal (ADR-0023).
+export async function analyzeCut(cutId: string): Promise<{ status: "ok" | "error"; error?: string }> {
+  try {
+    await runTomatoCut(cutId, { persist: true });
+    revalidatePath("/");
+    return { status: "ok" };
   } catch (e) {
     return { status: "error", error: (e as Error).message };
   }

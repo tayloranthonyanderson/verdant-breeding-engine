@@ -133,6 +133,19 @@ Effort is relative (S/M/L/XL) at ~8–12 hrs/wk, not a date.
     answers from a **broadened digest** (testers + per-pool top-GCA lines, not just topology) and honestly
     flags when a requested table isn't in the bundle. The tomato corpus + target-authoring assistant are
     the follow-ons.
+  - ✅ **Staged tomato corpus + the data-cut model (the program, not a single trial) — 2026-06-14:** the
+    product moves off hardcoded G2F maize onto a synthetic **tomato program** (`sim-corpus.R` → 8 trials
+    across stages S1–S4 over 2 cycles, 446 genotypes, marker-based breeding values, GCA×TPE). On it, the
+    **data cut** is the new primitive (ADR-0023 amendment): trials carry a stage-defaulted market tag,
+    germplasm is never tagged, and the breeder picks a **purpose** — **Prediction** (broad: pool every
+    relevant trial across stages & years) or **Hybrid advancement** (narrow: the latest-stage decision
+    set) — and the cut assembles itself. Each cut runs through the *same* multi-trait AI-REML engine as
+    the maize MET; markets sharing a TPE share one fit (Brix/Firmness), an env-defined market gets its
+    own (Fresh-East, GCA×E). **Verified in-UI:** prediction (446 geno, S1–S4, both years) vs advancement
+    (11 geno, S4) re-rank live, the full trial catalog shows what's in/out of the cut, heritability +
+    genetic correlations + the market ranking render per cut, and the grounded Q&A answers against the
+    selected cut (Sonnet 4.6, every figure verified). The maize MET demo is preserved at `?view=g2f`.
+    Next: genomic GBLUP on the wide cut (markers present, GRM unwired) and the target-authoring assistant.
 - **Validation suite (ADR-0008):** correctness vs. the tomato-flavored simulator's known truth; robustness vs.
   a battery of public/G2F trials.
 - **Done when:** a real G2F MET produces spatially-adjusted BLUPs, Cullis h², a GxE/stability view, both

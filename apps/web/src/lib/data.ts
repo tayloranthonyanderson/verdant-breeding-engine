@@ -39,3 +39,37 @@ export async function getLatestResult(): Promise<LoadedResult | null> {
 
   return { study: s ?? null, run, bundle: rb.bundle as ResultBundle, advancements };
 }
+
+/** The latest G2F MET analysis (the rich maize demo), regardless of any newer tomato cuts. */
+export async function getG2fResult(): Promise<LoadedResult | null> {
+  const [row] = await db
+    .select({ bundle: resultBundle.bundle, run: analysisRun, s: study })
+    .from(resultBundle)
+    .innerJoin(analysisRun, eq(resultBundle.analysisRunId, analysisRun.id))
+    .innerJoin(study, eq(analysisRun.studyId, study.id))
+    .where(eq(study.source, "g2f"))
+    .orderBy(desc(resultBundle.id))
+    .limit(1);
+  if (!row) return null;
+  const advancements = await db
+    .select().from(advancementDecision)
+    .where(eq(advancementDecision.analysisRunId, row.run.id))
+    .orderBy(desc(advancementDecision.id));
+  return { study: row.s, run: row.run, bundle: row.bundle as ResultBundle, advancements };
+}
+
+/** The latest analysis for a named data cut (a tomato study whose name === the cut id). The cut
+ *  bundle carries its own data scope in data_readiness.cut, so this is "the analysis of this cut". */
+export async function getCutResult(cutId: string): Promise<LoadedResult | null> {
+  const [s] = await db.select().from(study).where(eq(study.name, cutId));
+  if (!s) return null;
+  const [row] = await db
+    .select({ bundle: resultBundle.bundle, run: analysisRun })
+    .from(resultBundle)
+    .innerJoin(analysisRun, eq(resultBundle.analysisRunId, analysisRun.id))
+    .where(eq(analysisRun.studyId, s.id))
+    .orderBy(desc(resultBundle.id))
+    .limit(1);
+  if (!row) return null;
+  return { study: s, run: row.run, bundle: row.bundle as ResultBundle, advancements: [] };
+}

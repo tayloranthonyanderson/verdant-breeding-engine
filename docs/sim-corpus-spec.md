@@ -1,5 +1,14 @@
 # Synthetic tomato pipeline — simulation corpus spec
 
+> **BUILT 2026-06-14.** Generator: `services/kernel/sim-corpus.R` → `data/tomato/` (8 trials across
+> S1–S4 over 2 cycles, 446 genotypes, 200 markers, marker-based breeding values with the yield↔brix
+> trade-off and GCA×TPE). Cut model: `packages/pipeline/src/tomato-corpus.ts`; per-cut analysis +
+> persisted bundles: `packages/pipeline/src/tomato-build.ts`; UI: `DataCutPicker` on the tomato front
+> door (`?view=g2f` preserves the maize MET demo). The data-cut model is recorded in ADR-0023's
+> amendment. Deferred from this pass: genomic GBLUP on the wide cut (markers generated, GRM not yet
+> wired), and correlation/covariate weighting of off-target proxy environments.
+
+
 **Purpose.** The development + demo + teaching corpus. IP-clean — public/self-funded only, never
 employer germplasm (ADR-0008, BUSINESS-STRATEGY). `services/kernel/sim.R` already generates **one**
 tomato MET with known truth (yield/brix/fruit_wt/maturity, the yield↔brix −0.45 genetic trade-off,

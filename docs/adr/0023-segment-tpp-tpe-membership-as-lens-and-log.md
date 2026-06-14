@@ -74,3 +74,35 @@ Segment's business meaning.
 - Schema, when built: a `segment` table (TPP = gates+index ref; TPE = an effective-dated study-tag
   query), a `study`↔`segment` relevance tag, and Advancement Decisions carry their already-specified
   per-Segment scope. **Mapped now, built with the selection-target work — not the ingestion thread.**
+
+## Amendment (2026-06-14) — the data-cut model, built on the synthetic tomato program
+
+The first concrete realization of "membership = tag + lens, never on germplasm." On the staged tomato
+corpus (`docs/sim-corpus-spec.md`, `services/kernel/sim-corpus.R`), the breeder selects a **data cut**
+without tagging germplasm or checking trials one by one:
+
+- **Trials carry a market tag in a shallow hierarchy** (`All` > `Processing` / `Fresh-East`),
+  **defaulted by stage**: early stages tag the broad parent (`All`), advanced stages tag the TPE node.
+  Tagging a parent automatically covers its children — one tag, no per-trial work, "broad early /
+  narrow late" emerges from *which level you tagged*, which tracks the stage.
+- **Germplasm is never tagged.** A line's markets are **derived** — the markets of the trials it
+  appears in. Early `All`-tagged trials surface a line under every market; once it only appears in a
+  TPE-tagged trial, it narrows. No `germplasm.segment_id`, exactly as this ADR requires.
+- **Two purposes assemble two cuts from the same tags** (`packages/pipeline/src/tomato-corpus.ts`):
+  - **Prediction (broad)** — relevance is the **TPE, not the stage**: pool every trial tagged with the
+    market's node *or an ancestor*, across all stages and years. The TPE is the target you predict
+    *into*; testing environments are informants. (Correlation/covariate weighting of off-target
+    proxies is the documented next increment — here the tag is the first-order relevance filter.)
+  - **Advancement (narrow)** — only the latest-stage trials for that TPE node: the focused
+    advance/drop decision set.
+- **Markets sharing a TPE share one fit, differ only by index lens** (Proc·Brix and Proc·Firmness pool
+  identical trials, ranked by different weights); an environment-defined market (Fresh-East) gets its
+  own fit, carrying GCA×E. Demonstrated end-to-end: the cut's plots → multi-trait AI-REML
+  (`tomato-build.ts`, the same crop-agnostic BLUPF90 engine as the G2F MET) → market index → bundle,
+  with the cut's data scope recorded in `data_readiness.cut`. UI: `DataCutPicker` (pick purpose +
+  market; see the full trial catalog with in/out highlighting) on the tomato front door; the grounded
+  Q&A answers against the selected cut's bundle.
+
+The durable schema this ADR sketches (a `segment` table, a `study`↔`segment` relevance tag, decisions
+carrying per-Segment scope) is still deferred to the selection-target/ingestion work; the corpus seeds
+the tags from a manifest. What's proven now is the *model*: tags on trials, lens on read, cut by purpose.

@@ -32,3 +32,5 @@ export function repoRoot(): string {
 export const kernelDir = (): string => resolve(repoRoot(), 'services/kernel');
 /** The G2F dev fixture CSV (ADR-0015: a fixture, not a built-in). */
 export const metFixture = (): string => resolve(repoRoot(), 'data/g2f/MET_2019.csv');
+/** The synthetic tomato program corpus (services/kernel/sim-corpus.R output). */
+export const tomatoCorpusDir = (): string => resolve(repoRoot(), 'data/tomato');

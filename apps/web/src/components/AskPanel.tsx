@@ -13,7 +13,7 @@ const SUGGESTIONS = [
   "Where do the transparent and genetically-aware indices disagree?",
 ];
 
-export default function AskPanel() {
+export default function AskPanel({ cutId }: { cutId?: string }) {
   const [q, setQ] = useState("");
   const [res, setRes] = useState<AskResult | null>(null);
   const [pending, start] = useTransition();
@@ -22,7 +22,7 @@ export default function AskPanel() {
     const text = question.trim();
     if (!text || pending) return;
     setQ(text);
-    start(async () => setRes(await askResults(text)));
+    start(async () => setRes(await askResults(text, cutId)));
   }
 
   return (
