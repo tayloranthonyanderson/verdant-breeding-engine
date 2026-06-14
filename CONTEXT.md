@@ -209,10 +209,27 @@ recorded advancement. Validated on G2F MET line×tester. See `.scratch/ux-archit
   (R&D software). *Not* growth/phenological stage.
 - **Market / Segment** — a program-defined *commercial target*, grouped by whatever segments share
   (mechanization, climate, season, soil); no single defining axis; set by business strategy and
-  **time-variant** (effective-dated). Faceted, not a rigid hierarchy.
+  **time-variant** (effective-dated). Faceted, not a rigid hierarchy. Breeders call this the
+  **advancement target** — *what material is bred for*; it is **never an attribute of the germplasm**
+  but a lens applied to it (see **Segment membership** below). A Segment is two facets:
+  a **TPP** (objective) + a **TPE** (analysis frame) — ADR-0023.
 - **Target Product Profile (TPP)** — a Segment's commercial-target definition (full gate set + trait
   priorities; the north star); drives **market-specific selection** (same data + different Segment ⇒
-  different ranking).
+  different ranking). The *objective* facet of a Segment (its Selection Criteria); always present.
+- **Target Population of Environments (TPE)** — a Segment's **analysis frame**: the environment
+  envelope its varieties are deployed into, which the trial network *samples* — *what data pools
+  meaningfully*. The other facet of a Segment: **Segment = TPP + TPE** (ADR-0023). **Trait-defined**
+  Segments differ in TPP and **share** a TPE; **environment-defined** Segments differ in TPE; most
+  differ in both. Fits key on the **distinct TPE** — compute the mixed model once, reuse it across
+  index lenses; a Segment with its own TPE gets its own fit, so **GCA×E / G×E falls out of the
+  partitioning** natively. The same boundary as **Discovery isolation** (training-set relevance).
+- **Segment membership** — a Segment is **never germplasm state**; membership is derived three ways
+  (ADR-0023): an **evaluation lens** (any candidate scored against any Segment's TPP — a query, fully
+  many-to-many), the **Advancement Decision** log (the recorded per-(candidate, Segment, Stage)
+  membership; the broad→specific **narrowing is emergent** from accumulated per-Segment drop/advance
+  decisions, not a stored "current segment" field), and the **Study→TPE tag** (which trials pool for a
+  Segment). An **inbred** serves many Segments durably (a reusable combiner — never narrows); a
+  **hybrid** narrows toward one (the product). _Avoid_: a `germplasm.segment_id` column.
 - **Selection Criteria** — the operational `{gates, index}` applied at a **(Segment × Stage)**;
   selection = cull on **gates** (independent culling on must-have traits) then rank survivors by the
   **index**. Both vary by Stage: gates tighten toward commercial status (early stages stay loose to
@@ -226,6 +243,17 @@ recorded advancement. Validated on G2F MET line×tester. See `.scratch/ux-archit
 - **Advancement Decision** — the recorded staging move: candidate, from→to Stage, **disposition**
   (advance/hold/drop/recycle-as-parent/…), **per Segment**, rationale, source analysis. The capstone
   of the analysis→select→advance arc; the basis of genetic-gain tracking and institutional memory.
+- **Breeding cycle (recurrent selection)** — the program's repeating spine: *define target
+  (Segment/TPP) → evaluate & select within target → advance (Advancement Decision) → design crosses
+  for the target → next cycle*. Each turn raises the population mean toward the TPP (**genetic gain**).
+  The frame that makes a trial analysis part of a *program*, not a one-shot.
+- **Breeding funnel (selection pyramid)** — across Stages toward commercialization the number of
+  unique germplasm **shrinks** while design intensity (reps × locations × **trait panel**) **grows**
+  on the survivors (measurement economics). Survivors carry forward as a *selected subset* of the
+  prior Stage — correlated, with **compressed genetic variance** (Bulmer). Couples with the
+  **segment funnel** (broad early → specific late). Drives the simulation corpus
+  ([docs/sim-corpus-spec.md](docs/sim-corpus-spec.md)) and makes the **Model Planner** correctly do
+  different things at each Stage (single-plot / no-GxE early → MET / GxE / stability late).
 - **List** — a built set of germplasm (crossing block, nursery, trial entries, selection candidates),
   saved or dynamic, assembled by querying Stage + Segment + provenance + performance; **diversity-aware**
   (coancestry/effective-population-size) — how σ_A is actively managed.
