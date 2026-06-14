@@ -126,10 +126,13 @@ Effort is relative (S/M/L/XL) at ~8–12 hrs/wk, not a date.
     CI eval gate so they can't drift). It grounds **numbers** (ignoring digits inside germplasm ids like
     `B73/TX779`; handling commas/percentages) **and named entities** (no invented line/trait/market names).
     On an ungrounded answer it **regenerates once**, then **withholds** the answer and shows a *verified
-    summary + a reliability warning* — the fabricated figure never reaches the breeder. The "Ask your
-    results" UI says exactly what's enforced. Demonstrated live: a unit-conversion trap made Sonnet
-    fabricate a bushels/acre value → caught → withheld → warned. The tomato corpus + target-authoring
-    assistant are the follow-ons.
+    summary + a reliability warning* — the fabricated figure never reaches the breeder. An **empty** model
+    answer (e.g. thinking spent the token budget) is treated as unverified, never rendered as "verified".
+    The "Ask your results" UI says exactly what's enforced. Demonstrated live: a unit-conversion trap made
+    Sonnet fabricate a bushels/acre value → caught → withheld → warned; a combining-ability question now
+    answers from a **broadened digest** (testers + per-pool top-GCA lines, not just topology) and honestly
+    flags when a requested table isn't in the bundle. The tomato corpus + target-authoring assistant are
+    the follow-ons.
 - **Validation suite (ADR-0008):** correctness vs. the tomato-flavored simulator's known truth; robustness vs.
   a battery of public/G2F trials.
 - **Done when:** a real G2F MET produces spatially-adjusted BLUPs, Cullis h², a GxE/stability view, both
