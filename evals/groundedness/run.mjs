@@ -4,30 +4,12 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
+// The checker is SHARED with the runtime guardrail (packages/ai/src/grounding) — run under tsx — so
+// the CI gate and the production guardrail can never drift. Run via: pnpm test:evals.
+import { bundleNumbers, ungroundedNumbers, checkGrounding } from '../../packages/ai/src/grounding';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CASES_DIR = join(HERE, 'cases');
-
-// Collect every numeric value anywhere in the bundle.
-function bundleNumbers(node, acc = []) {
-  if (typeof node === 'number') acc.push(node);
-  else if (Array.isArray(node)) for (const x of node) bundleNumbers(x, acc);
-  else if (node && typeof node === 'object') for (const v of Object.values(node)) bundleNumbers(v, acc);
-  return acc;
-}
-
-// A number in the answer is grounded if the same value (to its stated precision) is in the bundle.
-function ungroundedNumbers(answer, numbers) {
-  const tokens = answer.match(/-?\d+(?:\.\d+)?/g) ?? [];
-  const bad = [];
-  for (const tok of tokens) {
-    const a = Number(tok);
-    const dp = tok.includes('.') ? tok.split('.')[1].length : 0;
-    const tol = 0.5 * 10 ** -dp;
-    if (!numbers.some((b) => Math.abs(a - b) <= tol)) bad.push(tok);
-  }
-  return bad;
-}
 
 async function loadAnswerer() {
   const ref = process.env.VERDANT_ANSWERER;
@@ -60,10 +42,12 @@ for (const c of cases) {
   // 2. The values a correct answer should surface are actually in this bundle.
   for (const v of c.must_reference ?? []) ok(numbers.some((b) => Math.abs(b - v) < 1e-9), `${c.id}: bundle contains ${v}`);
 
-  // 3. If an answerer is wired, ground-check its real output.
+  // 3. If an answerer is wired, ground-check its real output — numbers AND named entities, via the
+  //    same checker the runtime guardrail uses.
   if (answerer) {
     const out = await answerer(c.question, bundle);
-    const bad = ungroundedNumbers(out, numbers);
+    const g = checkGrounding(out, bundle);
+    const bad = [...g.unverifiedNumbers, ...g.unverifiedEntities];
     ok(bad.length === 0, `${c.id}: answerer output is grounded${bad.length ? ` (ungrounded: ${JSON.stringify(bad)})` : ''}`);
   }
 }

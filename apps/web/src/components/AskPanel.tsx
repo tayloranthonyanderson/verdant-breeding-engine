@@ -4,7 +4,7 @@
 // answer is generated server-side; every number it states comes from the bundle (the AI explains,
 // never computes). Shows whether the answer came from the live model or the offline fallback.
 import { useState, useTransition } from "react";
-import { Sparkles, CornerDownLeft, AlertCircle } from "lucide-react";
+import { Sparkles, CornerDownLeft, AlertCircle, ShieldCheck, ShieldAlert } from "lucide-react";
 import { askResults, type AskResult } from "@/app/actions";
 
 const SUGGESTIONS = [
@@ -32,7 +32,7 @@ export default function AskPanel() {
           <Sparkles size={15} />
         </span>
         <h3 className="text-sm font-semibold text-slate-800">Ask your results</h3>
-        <span className="text-[11px] text-slate-400">Plain-language answers, grounded in this analysis — never fabricated.</span>
+        <span className="text-[11px] text-slate-400">Every figure is checked against your results before you see it — unverified claims are withheld.</span>
       </div>
 
       <div className="mt-3 flex items-end gap-2">
@@ -74,12 +74,33 @@ export default function AskPanel() {
         </div>
       )}
       {res?.status === "ok" && (
-        <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2.5">
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">{res.answer.text}</p>
-          <div className="mt-2 border-t border-slate-100 pt-1.5 text-[11px] text-slate-400">
-            {res.answer.mode === "live"
-              ? `answered by ${res.answer.model} · grounded in the result bundle`
-              : "offline answer · grounded in the result bundle · add an Anthropic API key for full natural-language answers"}
+        <div className="mt-3 space-y-2">
+          {res.answer.flagged && (
+            <div className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-[13px] leading-relaxed text-amber-800">
+              <ShieldAlert size={15} className="mt-0.5 shrink-0" />
+              <span>
+                <b>Flagged for reliability.</b>{" "}The AI&rsquo;s answer referenced a figure that couldn&rsquo;t be
+                verified against your results, so it was withheld. A verified summary is shown below instead.
+              </span>
+            </div>
+          )}
+          <div className="rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2.5">
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">{res.answer.text}</p>
+            <div className="mt-2 border-t border-slate-100 pt-1.5 text-[11px]">
+              {res.answer.flagged ? (
+                <span className="inline-flex items-center gap-1 text-amber-600">
+                  <ShieldCheck size={12} /> Verified summary shown — the model&rsquo;s unverified answer was withheld
+                </span>
+              ) : res.answer.mode === "live" ? (
+                <span className="inline-flex items-center gap-1 text-emerald-600">
+                  <ShieldCheck size={12} /> Verified — every figure checked against your results · {res.answer.model}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-emerald-600">
+                  <ShieldCheck size={12} /> Verified summary — grounded in your results (no API key for full answers)
+                </span>
+              )}
+            </div>
           </div>
         </div>
       )}

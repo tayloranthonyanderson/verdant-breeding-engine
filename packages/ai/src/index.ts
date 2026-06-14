@@ -2,3 +2,4 @@
 export { answer, answerText, answerOffline, type Answer } from "./answer";
 export { bundleDigest, segmentsOf } from "./digest";
 export { complete, llmConfigured, DEFAULT_MODEL, type LlmResult } from "./llm";
+export { checkGrounding, bundleNumbers, bundleEntities, ungroundedNumbers, type GroundingResult } from "./grounding";
