@@ -91,8 +91,9 @@ export function cutById(id: string, m: Manifest = loadManifest()): Cut | null {
 export interface CutMarket { id: string; label: string; weights: Record<string, number> }
 export interface AssembledCut {
   cut: Cut; traits: string[]; weights: Record<string, number>; trials: TrialMeta[];
-  /** Full plot records (row/col null — tomato has no field grid; rep carried for the planner). */
-  records: Array<{ genotype: string; environment: string; row: number | null; col: number | null; rep: string | number | null; values: Array<number | null> }>;
+  /** Full plot records. row/col carry the field grid; parent1/parent2 are set on F1-hybrid testcross
+   *  trials (null on inbred-line trials) and drive the combining-ability facet. */
+  records: Array<{ genotype: string; environment: string; row: number | null; col: number | null; rep: string | number | null; parent1: string | null; parent2: string | null; values: Array<number | null> }>;
   germplasm: string[];
   /** Every market whose TPE is represented in the cut — the cut is ranked under EACH (one fit, many
    *  lenses); the Select step switches between them. */
@@ -110,8 +111,29 @@ function readTrial(t: TrialMeta, traits: string[]): AssembledCut['records'] {
     environment: `${t.trial_id}/${r.env}`, // namespace so distinct trials never merge into one env
     row: num(r.row), col: num(r.col), // real field grid → planner can recommend SpATS / two-stage
     rep: r.rep ?? null,
+    parent1: r.parent1 || null, parent2: r.parent2 || null, // F1 testcross trials carry parentage
     values: traits.map((tr) => num(r[tr])),
   }));
+}
+
+// ---- combining-ability inbred fixture (ADR-0019/0020) -------------------------------------------
+export interface InbredFact { name: string; role: string; pool: string; per_se: number | null; nclb: number | null }
+let _inbreds: Map<string, InbredFact> | null = null;
+/** The testcross lines' inbred facts (heterotic pool / per-se merit / native disease trait) from
+ *  data/tomato/inbreds.csv — the combining-ability driver's parent-level data. */
+export function loadInbreds(): Map<string, InbredFact> {
+  if (_inbreds) return _inbreds;
+  const path = join(tomatoCorpusDir(), 'inbreds.csv');
+  const m = new Map<string, InbredFact>();
+  try {
+    const rows = parse(readFileSync(path), { columns: true, skip_empty_lines: true }) as Record<string, string>[];
+    for (const r of rows) m.set(r.name, {
+      name: r.name, role: r.role, pool: r.pool,
+      per_se: r.per_se === '' || r.per_se === 'NA' ? null : Number(r.per_se),
+      nclb: r.nclb === '' || r.nclb === 'NA' ? null : Number(r.nclb),
+    });
+  } catch { /* no inbred fixture → combining ability simply won't run */ }
+  return (_inbreds = m);
 }
 
 /** Markets (leaf nodes with weights) whose TPE appears among the cut's trials. */

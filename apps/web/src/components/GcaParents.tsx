@@ -35,11 +35,17 @@ export default function GcaParents({
 
   // --- interactive index controls (weights to 100%, mode per trait) -------------------------------
   const seed = useMemo(() => {
-    // seed from the bundle's first index weights_used, else yield-max / moisture-min.
+    // seed from the CA objective the kernel actually used (weight → %, mode → max/min); dataset-agnostic.
     const w: Record<string, number> = {}; const m: Record<string, Mode> = {};
-    traits.forEach((t, i) => { w[t] = i === 0 ? 70 : 30; m[t] = /moist/i.test(t) ? "min" : "max"; });
+    const byId = new Map((ca.index_weights ?? []).map((x) => [x.variable_id, x]));
+    const total = (ca.index_weights ?? []).reduce((a, x) => a + Math.abs(x.weight), 0) || 1;
+    traits.forEach((t, i) => {
+      const spec = byId.get(t);
+      w[t] = spec ? Math.max(1, Math.round((Math.abs(spec.weight) / total) * 100)) : (i === 0 ? 70 : 30);
+      m[t] = spec ? spec.mode : "max";
+    });
     return { w, m };
-  }, [traits]);
+  }, [traits, ca]);
   const [weights, setWeights] = useState<Record<string, number>>(seed.w);
   const [modes, setModes] = useState<Record<string, Mode>>(seed.m);
 
@@ -100,10 +106,10 @@ export default function GcaParents({
   const survivors = ranking.filter((r) => !r.gated);
   const maxAbs = Math.max(0.01, ...ranking.map((r) => Math.abs(r.score)));
   const shown = showAll ? ranking : ranking.slice(0, 60);
-  const yieldTrait = traits[0]; const moistTrait = traits[1];
+  const primaryTrait = traits[0]; const secondaryTrait = traits[1];
 
   const scatterData = ranking.map((r) => ({
-    x: r.g.values[yieldTrait] ?? 0, y: moistTrait ? r.g.values[moistTrait] ?? 0 : 0,
+    x: r.g.values[primaryTrait] ?? 0, y: secondaryTrait ? r.g.values[secondaryTrait] ?? 0 : 0,
     z: r.g.cross_degree.n_plots, line: r.g.line, gated: r.gated,
     advanced: advancedKeys.get(`inbred:${r.g.line}`) === "advance",
   }));
@@ -179,8 +185,8 @@ export default function GcaParents({
                   <th className="px-3 py-2 font-medium">#</th>
                   <th className="px-3 py-2 font-medium">Line</th>
                   <th className="px-3 py-2 font-medium">GCA index</th>
-                  <th className="px-3 py-2 text-right font-medium">{shortTrait(yieldTrait)}</th>
-                  {moistTrait && <th className="px-3 py-2 text-right font-medium">{shortTrait(moistTrait)}</th>}
+                  <th className="px-3 py-2 text-right font-medium">{shortTrait(primaryTrait)}</th>
+                  {secondaryTrait && <th className="px-3 py-2 text-right font-medium">{shortTrait(secondaryTrait)}</th>}
                   <th className="px-3 py-2 text-center font-medium">Tested</th>
                   <th className="px-3 py-2 text-center font-medium">Markers</th>
                   <th className="px-3 py-2 text-right font-medium">Advance</th>
@@ -198,8 +204,8 @@ export default function GcaParents({
                         {r.gated && <span className="ml-1.5 rounded bg-rose-100 px-1 py-0.5 text-[9px] font-medium text-rose-600">gate</span>}
                       </td>
                       <td className="px-3 py-1.5"><ScoreBar score={r.score} maxAbs={maxAbs} dim={r.gated} /></td>
-                      <td className="px-3 py-1.5 text-right tabular-nums">{gcaCell(r.g.values[yieldTrait])}</td>
-                      {moistTrait && <td className="px-3 py-1.5 text-right tabular-nums">{gcaCell(r.g.values[moistTrait])}</td>}
+                      <td className="px-3 py-1.5 text-right tabular-nums">{gcaCell(r.g.values[primaryTrait])}</td>
+                      {secondaryTrait && <td className="px-3 py-1.5 text-right tabular-nums">{gcaCell(r.g.values[secondaryTrait])}</td>}
                       <td className="px-3 py-1.5"><div className="flex justify-center"><DegreeDot g={r.g} /></div></td>
                       <td className="px-3 py-1.5 text-center"><MarkerProfile loci={r.g.loci} catalog={catalog} /></td>
                       <td className="px-3 py-1.5 text-right">
@@ -233,7 +239,7 @@ export default function GcaParents({
                   <ReferenceLine x={0} stroke="#cbd5e1" />
                   <ReferenceLine y={0} stroke="#cbd5e1" />
                   <XAxis type="number" dataKey="x" name="GCA yield" tick={{ fontSize: 10, fill: "#94a3b8" }}
-                    label={{ value: `GCA ${shortTrait(yieldTrait)}`, position: "bottom", offset: 0, fontSize: 10, fill: "#64748b" }} />
+                    label={{ value: `GCA ${shortTrait(primaryTrait)}`, position: "bottom", offset: 0, fontSize: 10, fill: "#64748b" }} />
                   <YAxis type="number" dataKey="y" name="GCA moisture" tick={{ fontSize: 10, fill: "#94a3b8" }} width={36} />
                   <ZAxis type="number" dataKey="z" range={[20, 220]} />
                   <Tooltip cursor={{ strokeDasharray: "3 3" }} content={<DotTip />} />

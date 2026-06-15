@@ -40,6 +40,9 @@ IB <- req$inbred
 ib_pool <- setNames(as.character(IB$pool), as.character(IB$name))
 ib_perse <- setNames(suppressWarnings(as.numeric(IB$per_se)), as.character(IB$name))
 ib_nclb <- setNames(suppressWarnings(as.numeric(IB$nclb)), as.character(IB$name))
+## the native-trait gate's variable id is crop-specific (NCLB for maize, e.g. bacterial-speck for tomato);
+## the driver may name it, else default to the maize key for back-compat.
+native_id <- if (!is.null(IB$native_id)) as.character(IB$native_id)[1] else "nctlb_resistant"
 pool_of <- function(l) { p <- ib_pool[l]; ifelse(is.na(p), "Unassigned", p) }
 
 ## ---- cross-graph diagnostics (ADR-0019 cross-connectivity + cross-replication) ----------------
@@ -186,7 +189,7 @@ gate_df <- if (is.null(gates) || NROW(gates) == 0) NULL else
 
 ## gate value source: native-trait / per-se gates read inbred-level values; trait gates read GCA.
 gate_value <- function(l, vid) {
-  if (vid == "nctlb_resistant") return(unname(ib_nclb[l]))
+  if (vid == native_id || vid == "nctlb_resistant") return(unname(ib_nclb[l]))
   if (vid == "per_se") return(unname(ib_perse[l]))
   unname(gca_mat[l, vid])
 }
@@ -327,6 +330,10 @@ out <- list(
     traits = trait_summ,
     gca_genetic_correlations = list(variable_ids = as.list(traits), matrix = gca_corr_mat),
     index_traits = as.list(spec$variable_id),
+    ## the signed objective (variable_id / mode / weight) so the UI's desired-gains GCA lens is
+    ## dataset-agnostic (direction + magnitude come from the data, not a hardcoded maize default).
+    index_weights = lapply(seq_len(nrow(spec)), function(i) list(
+      variable_id = spec$variable_id[i], mode = spec$mode[i], weight = round(spec$weight[i], 4))),
     gca = unname(gca_list),
     pool_rankings = pool_rankings,
     hybrids = hybrids_out,

@@ -34,6 +34,7 @@ export interface CaDivergence {
   compared: string[]; rank_correlation: number | null;
   notable_movers: Array<{ line: string; pool: string; rank_delta: number; per_se: number; gca_score: number }>;
 }
+export interface CaIndexWeight { variable_id: string; mode: "max" | "min"; weight: number }
 export interface CombiningAbility {
   topology: CaTopology;
   diagnostics: CaDiagnostics;
@@ -41,6 +42,7 @@ export interface CombiningAbility {
   gca_genetic_correlations: { variable_ids: string[]; matrix: number[][] };
   loci_catalog?: CaLocus[];
   index_traits: string[];
+  index_weights?: CaIndexWeight[];
   gca: CaGca[];
   pool_rankings: CaPoolRanking[];
   hybrids: CaHybrid[];
@@ -94,12 +96,21 @@ export const fmt = (v: number | null | undefined, d = 2): string =>
 // --- Genetic (desired-gains) GCA lens: synthesize a per-pool bundle so the EXISTING
 // DesiredGainsExplorer / IndexDivergence run on GCA verbatim (within pool). ---------------------
 
-/** Default desired gains (genetic-SD units) per CA trait — mirrors the hybrid seed: push yield up &
- *  moisture down, modest height up / ear-height down (the height–ear genetic correlation makes it
- *  diverge). Keyed by trait so order-independent. */
+/** Fallback desired gains (genetic-SD units) for legacy G2F bundles that don't carry the signed
+ *  objective. Keyed by trait so order-independent. */
 export const DEFAULT_GCA_GAINS: Record<string, number> = {
   Yield_Mg_ha: 1, Grain_Moisture: -1, Plant_Height_cm: 0.5, Ear_Height_cm: -0.5,
 };
+
+/** Desired gains derived from the CA objective the kernel actually used (direction from mode, magnitude
+ *  from weight) — dataset-agnostic. Falls back to the maize default for bundles without index_weights. */
+export function gcaGains(ca: CombiningAbility): Record<string, number> {
+  const iw = ca.index_weights;
+  if (!iw?.length) return DEFAULT_GCA_GAINS;
+  const out: Record<string, number> = {};
+  for (const w of iw) out[w.variable_id] = (w.mode === "min" ? -1 : 1) * (w.weight || 1);
+  return out;
+}
 
 /** The kernel's within-pool transparent (stated) GCA ranking as {germplasm_id, rank}, gated lines culled. */
 export function statedRankingForPool(ca: CombiningAbility, pool: string, exclude?: Set<string>): Array<{ germplasm_id: string; rank: number }> {
@@ -121,7 +132,7 @@ function solveLin(A: number[][], rhs: number[]): number[] {
 }
 
 /** The genetically-aware (desired-gains) within-pool GCA ranking: b = G⁻¹(d·σ), rank on b·GCA. */
-export function geneticRankingForPool(ca: CombiningAbility, pool: string, gains = DEFAULT_GCA_GAINS, exclude?: Set<string>): Array<{ germplasm_id: string; rank: number }> {
+export function geneticRankingForPool(ca: CombiningAbility, pool: string, gains = gcaGains(ca), exclude?: Set<string>): Array<{ germplasm_id: string; rank: number }> {
   const traits = ca.gca_genetic_correlations.variable_ids;
   const sd = traits.map((id) => ca.traits.find((t) => t.variable_id === id)?.genetic_sd ?? 1);
   const C = ca.gca_genetic_correlations.matrix;
@@ -153,7 +164,7 @@ export function gcaBundleForPool(ca: CombiningAbility, pool: string, exclude?: S
     genetic_correlations: { variable_ids: traits, matrix: ca.gca_genetic_correlations.matrix },
     indices: [
       { kind: "weighted", segment_id: `pool-${pool}`, ranking: statedRankingForPool(ca, pool, exclude).map((r) => ({ ...r, score: null, gated_out: false, gate_failures: [] })) },
-      { kind: "desired_gains", segment_id: `pool-${pool}`, ranking: [], weights_used: traits.map((id) => ({ variable_id: id, weight: DEFAULT_GCA_GAINS[id] ?? 0, direction: (DEFAULT_GCA_GAINS[id] ?? 0) < 0 ? -1 : 1 })) },
+      { kind: "desired_gains", segment_id: `pool-${pool}`, ranking: [], weights_used: traits.map((id) => { const g = gcaGains(ca); return { variable_id: id, weight: g[id] ?? 0, direction: ((g[id] ?? 0) < 0 ? -1 : 1) as 1 | -1 }; }) },
     ],
     divergence: null, warnings: [], provenance: { contract_version: "v0" },
   };

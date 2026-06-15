@@ -13,6 +13,7 @@ import { validateResultBundle, type ResultBundle, type AnalysisRequest } from '@
 import { estimateGeneticCovariance } from './blupf90';
 import { spatialStage1 } from './stage1';
 import { buildGenomicBlock, markerReadiness } from './tomato-genomic';
+import { buildTomatoCombiningAbility, cutHasCrosses } from './tomato-combining-ability';
 import { runRKernel } from './kernel';
 import { isEntrypoint } from './entry';
 import { runPlanner, type ModelPlan, type ModelOverrides } from './planner';
@@ -228,6 +229,15 @@ export function buildCutBundle(assembled: AssembledCut, opts: CutRunOpts = {}): 
     } catch (e) { console.log(`genomic block skipped: ${(e as Error).message}`); }
   }
 
+  // Combining-ability facet — when the cut includes an F1 testcross trial (records carry parent1/parent2),
+  // decompose the hybrids into GCA (the parent selection target) + SCA. Lights up the Understand
+  // combining-ability panel and the Select Parents·GCA / Hybrids switcher (incl. the marker/native gates).
+  let combiningAbility: ReturnType<typeof buildTomatoCombiningAbility> = null;
+  if (cutHasCrosses(assembled)) {
+    try { combiningAbility = buildTomatoCombiningAbility(assembled); }
+    catch (e) { console.log(`combining ability skipped: ${(e as Error).message}`); }
+  }
+
   // One transparent + genetically-aware index PER market the cut touches (one fit, many lenses); the
   // Select-step target-market switcher flips between them (ADR-0023). Ranked on the chosen relationship's
   // breeding values (phenotypic BLUPs, or genomic_G GEBVs when relationship = G).
@@ -279,6 +289,7 @@ export function buildCutBundle(assembled: AssembledCut, opts: CutRunOpts = {}): 
   if (broad) warnings.push({ code: 'cut_pools_stages', message: `This prediction cut pools ${composition.n_trials} trials across stages ${composition.stages.join('+')} and years ${composition.years.join('+')}, connected by ${composition.n_checks} common checks. Including the early-stage records the selection used de-biases the variance components.`, severity: 'info' });
   else warnings.push({ code: 'cut_is_narrow', message: `This advancement cut is the latest-stage decision set (${composition.n_geno} entries); variance components from so few lines are less precise than the broad prediction cut.`, severity: 'info' });
   if (wantGxe && !fittedGxe) warnings.push({ code: 'gxe_not_separated', message: 'GxE was requested but not estimable for this cut (early-stage founders appear in a single environment); fit uses phenotypic BLUPs.', severity: 'info' });
+  if (combiningAbility) warnings.push({ code: 'synthetic_inbred_data', message: 'Combining-ability inbred facts (heterotic pool, per-se merit, native disease trait) are SYNTHETIC scaffolding (ADR-0020). Real tomato inbred genotyping replaces them.', severity: 'info' });
 
   const bundle: ResultBundle = {
     contract_version: 'v0', status: 'ok', intent: broad ? 'prediction' : 'selection',
@@ -287,6 +298,7 @@ export function buildCutBundle(assembled: AssembledCut, opts: CutRunOpts = {}): 
     genetic_correlations: { variable_ids: traits, matrix: g.geneticCorrelation },
     gxe: fittedGxe && g.gxeCovariance ? { variable_ids: traits, covariance: g.gxeCovariance, correlation: g.gxeCorrelation, variances: g.gxeVariances } : null,
     ...(genomic ? { genomic: genomic as unknown as ResultBundle['genomic'] } : {}),
+    ...(combiningAbility ? { combining_ability: combiningAbility as unknown as ResultBundle['combining_ability'] } : {}),
     data_readiness: readinessBlock(assembled, readiness, plan),
     data_quality: dataQuality ?? null,
     indices,

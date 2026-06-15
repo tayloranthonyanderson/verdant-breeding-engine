@@ -1,0 +1,25 @@
+"name","role","pool","per_se","nclb"
+"TOM-0004","line","Pool A",1.55,1
+"TOM-0097","line","Pool B",0.875,1
+"TOM-0144","line","Pool A",0.425,0
+"TOM-0158","line","Pool B",1.569,0
+"TOM-0081","line","Pool A",-0.746,1
+"TOM-0146","line","Pool B",0.594,1
+"TOM-0067","line","Pool A",1.611,1
+"TOM-0185","line","Pool B",0.436,1
+"TOM-0047","line","Pool A",1.162,1
+"TOM-0174","line","Pool B",0.458,0
+"TOM-0209","line","Pool A",0.72,0
+"TOM-0002","line","Pool B",-0.165,1
+"TOM-0233","line","Pool A",-1.442,1
+"TOM-0195","line","Pool B",0.57,1
+"TOM-0154","line","Pool A",-0.492,1
+"TOM-0165","line","Pool B",-1.788,0
+"TOM-0019","line","Pool A",-0.278,0
+"TOM-0125","line","Pool B",0.542,0
+"TOM-0017","line","Pool A",-0.794,0
+"TOM-0102","line","Pool B",-0.185,1
+"TOM-0076","line","Pool A",-1.21,1
+"TOM-0159","line","Pool B",-0.999,0
+"TOM-0105","line","Pool A",-0.901,1
+"TOM-0054","line","Pool B",-1.512,1

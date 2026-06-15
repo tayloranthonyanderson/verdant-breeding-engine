@@ -241,6 +241,65 @@ s1b <- sim_trial(c(found_c2, CHECKS), "processing", 2025, locs = 1, reps = 1,
 add_trial("S1-2025-OBS", "S1", "Observation", 2025, "processing", "All", 1, 1, "single-plot",
           c("yield", "maturity", "fruit_wt"), s1b)
 
+## ===== Hybrid testcross (line × tester) — combining ability (ADR-0019/0020) =====
+## Tomato processing & fresh markets are F1-HYBRID. Elite inbreds are evaluated as HYBRID PARENTS: each
+## candidate line is crossed to a few common testers and the F1 trial decomposes into GCA (the parent's
+## general combining ability — the selection target, ~additive) and SCA (specific-cross deviation). The
+## F1 phenotype is mid-parent + the parents' GCA + a small SCA + heterosis + the usual MET noise, so the
+## kernel recovers a high Baker's ratio and a per-se↔GCA divergence (a line good per se can combine
+## poorly). Drawn LAST so every earlier trial's RNG (and CSV) is unchanged.
+elite      <- select_top(m2p, c(yield = 1.0, brix = 0.8, firmness = 0.8, maturity = -0.4), 24)  # candidate lines
+ht_pool    <- setNames(rep(c("Pool A", "Pool B"), length.out = length(elite)), elite)           # 2 heterotic pools
+tester_ids <- setdiff(found_c1, elite)[1:3]                                                       # 3 common testers (inbreds)
+RES_LOCUS  <- "m007"   # the marker standing in for the native disease-resistance gene (the native-trait gate)
+
+sim_hybrid <- function(lines, testers, year, locs, reps, measured, loc_prefix) {
+  bvt    <- BV[["processing"]]
+  het    <- c(yield = 7, brix = 0.05, firmness = 0.5, fruit_wt = 5, maturity = -1, shelf_life = 0.3)  # F1 vigour
+  sca_sd <- c(yield = 2.0, brix = 0.12, firmness = 1.3, fruit_wt = 1.8, maturity = 0.9, shelf_life = 0.6)
+  cr  <- expand.grid(line = lines, tester = testers, stringsAsFactors = FALSE)
+  sca <- sapply(TRAITS, function(tr) stats::rnorm(nrow(cr), 0, sca_sd[[tr]]))   # fixed SCA per cross×trait
+  rownames(sca) <- paste(cr$line, cr$tester, sep = "x")
+  env_names <- sprintf("%s-%d-L%d", loc_prefix, year, seq_len(locs))
+  env_eff <- .rmvn(locs, rep(0, length(TRAITS)),
+                   diag((c(yield = 12, brix = 0.6, firmness = 5, fruit_wt = 6, maturity = 4, shelf_life = 3))^2))
+  rows <- list(); k <- 0
+  for (e in seq_len(locs)) {
+    np <- nrow(cr) * reps; ncol <- ceiling(sqrt(np)); nrowg <- ceiling(np / ncol)
+    w <- stats::rnorm(3); plot_order <- sample.int(np)
+    block_shift <- lapply(seq_len(reps), function(r) stats::rnorm(length(TRAITS), 0, c(2.5, 0.12, 1.5, 1.5, 0.8, 0.6)))
+    p <- 0
+    for (r in seq_len(reps)) for (ci in seq_len(nrow(cr))) {
+      k <- k + 1; p <- p + 1; pos <- plot_order[p]
+      rr <- ((pos - 1) %/% ncol) + 1L; cc <- ((pos - 1) %% ncol) + 1L
+      surf <- sin(pi * rr / (nrowg + 1)) * w[1] + sin(pi * cc / (ncol + 1)) * w[2] +
+              sin(pi * rr / (nrowg + 1)) * sin(2 * pi * cc / (ncol + 1)) * w[3]
+      L <- cr$line[ci]; Tt <- cr$tester[ci]
+      gca <- 0.5 * (bvt[L, ] - g_mean) + 0.5 * (bvt[Tt, ] - g_mean)   # F1 inherits half of each parent
+      ge  <- stats::rnorm(length(TRAITS), 0, ge_sd); res <- stats::rnorm(length(TRAITS), 0, res_sd)
+      vals <- g_mean + het + gca + sca[paste(L, Tt, sep = "x"), ] + env_eff[e, ] + block_shift[[r]] + surf * spat_sd + res
+      names(vals) <- TRAITS
+      row <- data.frame(genotype = paste(L, Tt, sep = "x"), parent1 = L, parent2 = Tt, env = env_names[e],
+                        block = sprintf("%s-B%d", env_names[e], r), rep = r, row = rr, col = cc, stringsAsFactors = FALSE)
+      for (tr in TRAITS) row[[tr]] <- if (tr %in% measured) round(vals[[tr]], 2) else NA_real_
+      rows[[k]] <- row
+    }
+  }
+  do.call(rbind, rows)
+}
+ht <- sim_hybrid(elite, tester_ids, 2024, locs = 3, reps = 2, measured = TRAITS, loc_prefix = "CAHYB")
+add_trial("S3-2024-TXH", "S3", "Testcross (GCA)", 2024, "processing", "Proc-Hybrid", 3, 2, "line×tester MET", TRAITS, ht)
+
+## inbred-line facts for combining ability (heterotic pool / per-se merit / native disease trait). per_se
+## is the line's OWN processing merit (z-index on its breeding value); the native trait is carriage of the
+## resistance allele at RES_LOCUS — the dual-source gate (ADR-0020): GCA index ranks, native trait culls.
+elite_bv <- BV[["processing"]][elite, , drop = FALSE]
+perse_z  <- { z <- sapply(names(W_PROC), function(tr) { v <- elite_bv[, tr]; (v - mean(v)) / (sd(v) + 1e-9) })
+             rowSums(sweep(z, 2, W_PROC, "*")) }
+inbreds <- data.frame(name = elite, role = "line", pool = unname(ht_pool[elite]),
+                      per_se = round(perse_z, 3), nclb = as.integer(M[elite, RES_LOCUS] >= 1),
+                      stringsAsFactors = FALSE)
+
 ## ---- write outputs ------------------------------------------------------------------------------
 args <- commandArgs(trailingOnly = TRUE)
 self_dir <- { a <- commandArgs(FALSE); f <- sub("^--file=", "", a[grep("^--file=", a)])
@@ -253,6 +312,9 @@ for (id in names(trials)) write.csv(trials[[id]], file.path(outdir, "trials", pa
 ## markers.csv (genotype, m001..mNNN)
 mk_df <- data.frame(genotype = rownames(M), M, check.names = FALSE, stringsAsFactors = FALSE)
 write.csv(mk_df, file.path(outdir, "markers.csv"), row.names = FALSE)
+
+## inbreds.csv — combining-ability inbred facts for the testcross lines (pool / per-se / native trait).
+write.csv(inbreds, file.path(outdir, "inbreds.csv"), row.names = FALSE)
 
 ## manifest.json — the trial catalog + the MARKET-TARGET HIERARCHY (ADR-0023). A single tree of nodes;
 ## trials are tagged to a node; the breeder composes a cut by multi-selecting any set of nodes (the cut
@@ -272,6 +334,8 @@ manifest <- list(
                           weights = list(brix = 0.45, yield = 0.30, firmness = 0.15, maturity = -0.10)),
     `Proc-Firmness`= list(parent = "Processing", tpe = "processing", label = "Processing · Firmness",
                           weights = list(firmness = 0.45, yield = 0.30, brix = 0.15, maturity = -0.10)),
+    `Proc-Hybrid`  = list(parent = "Processing", tpe = "processing", label = "Processing · hybrid testcross (GCA)",
+                          weights = list(yield = 0.40, brix = 0.25, firmness = 0.20, maturity = -0.15)),
     `Fresh-East`   = list(parent = "All",        tpe = "fresh-east", label = "Fresh-market East · humid"),
     East           = list(parent = "Fresh-East", tpe = "fresh-east", label = "Fresh-market · East",
                           weights = list(fruit_wt = 0.35, shelf_life = 0.30, yield = 0.25, maturity = -0.10))),
