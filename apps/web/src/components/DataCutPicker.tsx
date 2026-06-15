@@ -5,7 +5,7 @@
 // is the union of trials tagged to them. Then pick a market to rank by, name it, and save as a
 // re-runnable preset. Germplasm is never tagged; a line's markets are derived from the trials it's in.
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { FlaskConical, RefreshCw, Save, Trash2, Check, Minus, ChevronRight, ChevronDown, Eye, CornerDownRight, Trophy } from "lucide-react";
 import { saveAndRunCut, deleteCut, analyzeCut } from "@/app/actions";
 
@@ -26,10 +26,14 @@ const sameSet = (a: Set<string>, b: string[]) => a.size === b.length && b.every(
 const shortMarket = (s: string) => s.replace(/^Processing · |^Fresh-market · /, "");
 
 export default function DataCutPicker({
-  cuts, catalog, taxonomy, savedCuts, selected, composition, currentTrialIds,
+  cuts, catalog, taxonomy, savedCuts, selected, composition, currentTrialIds, embedded, onComposition,
 }: {
   cuts: CutCard[]; catalog: CatalogTrial[]; taxonomy: Taxonomy; savedCuts: SavedCutCard[];
   selected: string; composition: Composition | null; currentTrialIds: string[];
+  /** Embedded in the analysis workbench: the picker is PURE composition (the workbench owns Run/Save). */
+  embedded?: boolean;
+  /** Fired (with the included trial ids) whenever the composition changes — for the workbench. */
+  onComposition?: (trialIds: string[]) => void;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -39,6 +43,9 @@ export default function DataCutPicker({
   const [included, setIncluded] = useState<Set<string>>(() => new Set(currentTrialIds));
   const [name, setName] = useState<string>("");
   const [refineOpen, setRefineOpen] = useState(false);
+
+  // In embedded mode, publish the composition to the workbench whenever it changes.
+  useEffect(() => { if (embedded) onComposition?.([...included]); }, [included]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const trialsByTag = useMemo(() => {
     const m = new Map<string, CatalogTrial[]>();
@@ -188,8 +195,8 @@ export default function DataCutPicker({
           </div>
         )}
 
-        {/* action */}
-        <div className="mt-4 border-t border-slate-100 pt-3">
+        {/* action (standalone mode only — the workbench owns Run/Save when embedded) */}
+        {!embedded && <div className="mt-4 border-t border-slate-100 pt-3">
           {template ? (
             <div className="flex flex-wrap items-center gap-3">
               <button type="button" onClick={view} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"><Eye size={14} /> View analysis</button>
@@ -206,11 +213,11 @@ export default function DataCutPicker({
             </div>
           )}
           {err && <p className="mt-2 text-[12px] text-rose-600">{err}</p>}
-        </div>
+        </div>}
       </div>
 
       {/* Now viewing */}
-      {composition && (
+      {!embedded && composition && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[12px] text-slate-600 shadow-sm">
           <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400"><CornerDownRight size={12} /> Now viewing</span>
           <span className="font-medium text-slate-800">{activeSaved?.name ?? cuts.find((c) => c.id === selected)?.label ?? selected}</span>

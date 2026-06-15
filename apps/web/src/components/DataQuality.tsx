@@ -49,6 +49,7 @@ export default function DataQuality({
   bundle,
   activeExclusions = [],
   phase = "data",
+  reviewOnly = false,
 }: {
   bundle: ResultBundle;
   activeExclusions?: Exclusion[];
@@ -56,6 +57,9 @@ export default function DataQuality({
   // diagnostics + field triptych, with the model). Split across the journey so the model-dependent
   // checks follow model selection (ADR-0021 trust layer, journey IA).
   phase?: "data" | "fit";
+  // reviewOnly hides the exclude-and-re-run action bar (the cut workbench owns the Run, and its
+  // rerun action is tomato-aware — not the G2F path this component's button calls).
+  reviewOnly?: boolean;
 }) {
   const isFit = phase === "fit";
   const router = useRouter();
@@ -208,8 +212,8 @@ export default function DataQuality({
         </div>
       )}
 
-      {/* Disposition + action bar (only when there are candidates to act on) */}
-      {candidates.length > 0 && (
+      {/* Disposition + action bar (only when there are candidates to act on; hidden in review-only) */}
+      {!reviewOnly && candidates.length > 0 && (
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>

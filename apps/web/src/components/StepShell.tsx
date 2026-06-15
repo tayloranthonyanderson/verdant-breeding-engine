@@ -9,8 +9,10 @@ import { ChevronLeft, ChevronRight, Check } from "lucide-react";
 
 export interface Step { id: string; label: string; sublabel?: string; icon?: React.ReactNode; content: React.ReactNode }
 
-export default function StepShell({ steps }: { steps: Step[] }) {
-  const [active, setActive] = useState(0);
+export default function StepShell({ steps, active: activeProp, onActiveChange }: { steps: Step[]; active?: number; onActiveChange?: (i: number) => void }) {
+  const [internal, setInternal] = useState(0);
+  const active = activeProp ?? internal;
+  const setActive = (i: number) => { const c = Math.min(Math.max(0, i), steps.length - 1); if (onActiveChange) onActiveChange(c); else setInternal(c); };
   const cur = Math.min(Math.max(0, active), steps.length - 1);
 
   return (

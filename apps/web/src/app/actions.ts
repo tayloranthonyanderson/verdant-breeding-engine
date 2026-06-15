@@ -8,7 +8,7 @@
 import { revalidatePath } from "next/cache";
 import { and, eq, inArray } from "drizzle-orm";
 import { db, analysisRun, resultBundle, study, advancementDecision } from "@verdant/db";
-import { runMetAnalysis, runTomatoCut, buildCustomCut, type ModelOverrides } from "@verdant/pipeline";
+import { runMetAnalysis, runTomatoCut, buildCustomCut, previewCustomCut, type ModelOverrides, type CutPreview, type CutExclusions } from "@verdant/pipeline";
 import type { AnalysisRequest } from "@verdant/contracts";
 import { answer, type Answer } from "@verdant/ai";
 import { getLatestResult, getCutResult } from "@/lib/data";
@@ -78,6 +78,35 @@ export async function analyzeCut(cutId: string): Promise<{ status: "ok" | "error
     await runTomatoCut(cutId, { persist: true });
     revalidatePath("/");
     return { status: "ok" };
+  } catch (e) {
+    return { status: "error", error: (e as Error).message };
+  }
+}
+
+// PRE-FIT PREVIEW (ADR-0021/0016): data quality + the planner's recommended model for a composition,
+// with no BLUP fit (~0.5s) — so the breeder reviews data + model BEFORE pressing Run.
+export type PreviewResult = { status: "ok"; preview: CutPreview } | { status: "error"; error: string };
+export async function previewAnalysis(input: { trialIds: string[]; overrides?: ModelOverrides; exclusions?: CutExclusions }): Promise<PreviewResult> {
+  try {
+    if (!input.trialIds?.length) return { status: "error", error: "Pick at least one trial." };
+    const preview = previewCustomCut({ id: "preview", name: "preview", trialIds: input.trialIds }, { overrides: input.overrides, exclusions: input.exclusions });
+    return { status: "ok", preview };
+  } catch (e) {
+    return { status: "error", error: (e as Error).message };
+  }
+}
+
+// RUN: fit the (possibly overridden / outlier-excluded) model on the composition and persist it as a
+// named, re-runnable cut. The explicit gate after the breeder has reviewed data + model.
+export async function runAnalysis(input: { name: string; trialIds: string[]; overrides?: ModelOverrides; exclusions?: CutExclusions }): Promise<{ status: "ok"; cutId: string } | { status: "error"; error: string }> {
+  try {
+    const name = (input.name ?? "").trim();
+    if (!name) return { status: "error", error: "Name this analysis so you can find it later." };
+    if (!input.trialIds?.length) return { status: "error", error: "Pick at least one trial." };
+    const id = cutSlug(name);
+    await buildCustomCut({ id, name, trialIds: input.trialIds }, { overrides: input.overrides, exclusions: input.exclusions });
+    revalidatePath("/");
+    return { status: "ok", cutId: id };
   } catch (e) {
     return { status: "error", error: (e as Error).message };
   }

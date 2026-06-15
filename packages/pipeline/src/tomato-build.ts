@@ -13,11 +13,60 @@ import { validateResultBundle, type ResultBundle, type AnalysisRequest } from '@
 import { estimateGeneticCovariance } from './blupf90';
 import { runRKernel } from './kernel';
 import { isEntrypoint } from './entry';
-import { runPlanner, type ModelPlan } from './planner';
-import { attachPlotIds, runDataQuality, runModelQc, mergeTraitDiagnostics, boundaryFlags } from './data-quality-build';
+import { runPlanner, type ModelPlan, type ModelOverrides } from './planner';
+import { attachPlotIds, applyDataOverrides, runDataQuality, runModelQc, mergeTraitDiagnostics, boundaryFlags } from './data-quality-build';
 import { assembleCut, assembleCustom, listCuts, cutById, loadManifest, type Cut, type CutDef, type AssembledCut } from './tomato-corpus';
 
 const PROGRAM = 'Verdant tomato (synthetic)';
+
+/** Pre-fit setup for a cut: the breeder reviews these BEFORE pressing Run (ADR-0021/0016). */
+export type CutExclusions = NonNullable<AnalysisRequest['data_overrides']>['exclusions'];
+export interface CutRunOpts { overrides?: ModelOverrides; exclusions?: CutExclusions }
+export interface CutPreview {
+  composition: AssembledCut['composition'];
+  data_quality: ResultBundle['data_quality'];
+  chosen_model: ResultBundle['chosen_model'];
+  data_readiness: ResultBundle['data_readiness'];
+  removed: number; // plot rows dropped by the exclusion overlay
+}
+
+/** The shared pre-fit pass: attach ids → apply the exclusion overlay → data quality + the planner's
+ *  model plan + readiness. No BLUP fit — cheap, so the Data + Model steps can show it live. */
+function prefit(assembled: AssembledCut, opts: CutRunOpts) {
+  const { traits } = assembled;
+  const all = attachPlotIds(assembled.records);
+  const applied = applyDataOverrides(all, opts.exclusions ?? []);
+  const recs = applied.records;
+  let dataQuality: ResultBundle['data_quality'] = null;
+  try { dataQuality = runDataQuality(recs, traits); } catch (e) { console.log(`data_quality skipped: ${(e as Error).message}`); }
+  const { plan, readiness } = runPlanner(traits, recs, { overrides: opts.overrides });
+  return { recs, applied, dataQuality, plan, readiness };
+}
+
+/** Build the data_readiness block (planner readiness + the cut descriptor) — shared by preview + fit. */
+function readinessBlock(assembled: AssembledCut, readiness: { scale: unknown; connectivity: unknown; replication: unknown; grids: unknown }, plan: ModelPlan): ResultBundle['data_readiness'] {
+  const { cut, composition, trials } = assembled;
+  return {
+    scale: readiness.scale, connectivity: readiness.connectivity, replication: readiness.replication,
+    grids: readiness.grids, unlocks: plan.unlocks,
+    cut: { id: cut.id, purpose: cut.purpose, market: cut.market, market_label: cut.market_label, tpe: cut.tpe,
+      label: cut.label, custom: cut.custom ?? false, n_checks: composition.n_checks, trial_ids: trials.map((tt) => tt.trial_id),
+      trials: trials.map((tt) => ({ trial_id: tt.trial_id, stage: tt.stage, year: tt.year, market_tag: tt.market_tag, n_entries: tt.n_entries, n_loc: tt.n_loc })),
+      stages: composition.stages, years: composition.years },
+  } as unknown as ResultBundle['data_readiness'];
+}
+
+/** Pre-fit PREVIEW (no BLUP): data quality + the planner's recommended model, for review before Run. */
+export function previewCut(assembled: AssembledCut, opts: CutRunOpts = {}): CutPreview {
+  const { plan, readiness, dataQuality, applied } = prefit(assembled, opts);
+  return {
+    composition: assembled.composition,
+    data_quality: dataQuality ?? null,
+    chosen_model: chosenModel(plan, 'blupf90+', assembled.cut, assembled.composition, false),
+    data_readiness: readinessBlock(assembled, readiness, plan),
+    removed: applied.removed,
+  };
+}
 
 /** Transparent weighted index for a market's signed weights (negative weight = minimise the trait). */
 function transparentIndex(
@@ -97,23 +146,16 @@ function chosenModel(plan: ModelPlan, engine: string, cut: Cut, composition: Ass
 /** Fit the cut and assemble a FULL contract-valid bundle (no persist): pre-fit data quality, the
  *  planner's model decisions + readiness, the multi-trait fit (+ GxE when estimable), one index per
  *  market the cut touches (the Select-step switcher), and post-fit model-QC diagnostics. */
-export function buildCutBundle(assembled: AssembledCut): ResultBundle {
-  const { cut, traits, records, composition, trials, relevantMarkets } = assembled;
-  const qcRecords = attachPlotIds(records);
-
-  // Pre-fit data quality (ADR-0021) — crop-agnostic; the grid checks no-op with null row/col.
-  let dataQuality: ResultBundle['data_quality'] = null;
-  try { dataQuality = runDataQuality(qcRecords, traits); } catch (e) { console.log(`data_quality skipped: ${(e as Error).message}`); }
-
-  // Planner (ADR-0016) — the model decisions + readiness the Model step renders. Generic: with no field
-  // grid it returns spatial='none' (single-stage), and GxE only when the cut's connectivity supports it.
-  const { plan, readiness } = runPlanner(traits, records);
+export function buildCutBundle(assembled: AssembledCut, opts: CutRunOpts = {}): ResultBundle {
+  const { cut, traits, composition, relevantMarkets } = assembled;
+  // Shared pre-fit pass (data quality + planner) on the exclusion-filtered records.
+  const { recs, dataQuality, plan, readiness } = prefit(assembled, opts);
 
   // Multi-trait fit. GxE is NOT fitted: a pooled cut is severely unbalanced (early-stage founders sit
   // in a single environment), so a genotype×environment term is non-estimable / unstable. The planner
   // still REPORTS its GxE stance in the decision log (chosen_model.decisions) — recommendation vs what's
   // safely fittable here — but the fit stays phenotypic BLUPs.
-  const g = estimateGeneticCovariance({ variableIds: traits, rows: records });
+  const g = estimateGeneticCovariance({ variableIds: traits, rows: recs });
   const blupMap = new Map(g.blups.map((b) => [b.genotype, b.values]));
   const genos = g.blups.map((b) => b.genotype);
 
@@ -133,12 +175,12 @@ export function buildCutBundle(assembled: AssembledCut): ResultBundle {
   const blupsByTrait: Record<string, Record<string, number>> = {};
   traits.forEach((id, j) => { const mp: Record<string, number> = {}; for (const b of g.blups) if (b.values[j] != null) mp[b.genotype] = b.values[j] as number; blupsByTrait[id] = mp; });
   let modelQc: ReturnType<typeof runModelQc> = {};
-  try { modelQc = runModelQc(qcRecords, traits, blupsByTrait); } catch { /* best-effort */ }
+  try { modelQc = runModelQc(recs, traits, blupsByTrait); } catch { /* best-effort */ }
 
   const Ve = g.residualCovariance.map((r, i) => r[i]);
   const bundleTraits: ResultBundle['traits'] = traits.map((id, j) => {
     const vg = g.geneticVariances[j]; const ve = Ve[j];
-    const nObs = records.filter((r) => r.values[j] != null).length;
+    const nObs = recs.filter((r) => r.values[j] != null).length;
     return {
       variable_id: id, status: 'ok',
       effects: g.blups.map((b) => ({ germplasm_id: b.genotype, value: b.values[j], type: 'BLUP' as const })),
@@ -165,15 +207,7 @@ export function buildCutBundle(assembled: AssembledCut): ResultBundle {
     traits: bundleTraits,
     genetic_correlations: { variable_ids: traits, matrix: g.geneticCorrelation },
     gxe: null,
-    data_readiness: {
-      scale: readiness.scale, connectivity: readiness.connectivity, replication: readiness.replication,
-      grids: readiness.grids, unlocks: plan.unlocks,
-      // The cut descriptor — what data this analysis was run on (ADR-0023 provenance) + n_checks.
-      cut: { id: cut.id, purpose: cut.purpose, market: cut.market, market_label: cut.market_label, tpe: cut.tpe,
-        label: cut.label, custom: cut.custom ?? false, n_checks: composition.n_checks, trial_ids: trials.map((tt) => tt.trial_id),
-        trials: trials.map((tt) => ({ trial_id: tt.trial_id, stage: tt.stage, year: tt.year, market_tag: tt.market_tag, n_entries: tt.n_entries, n_loc: tt.n_loc })),
-        stages: composition.stages, years: composition.years },
-    } as unknown as ResultBundle['data_readiness'],
+    data_readiness: readinessBlock(assembled, readiness, plan),
     data_quality: dataQuality ?? null,
     indices,
     divergence,
@@ -206,21 +240,33 @@ export async function persistCutBundle(cut: Cut, bundle: ResultBundle, source = 
   return run.id;
 }
 
-/** Build (and optionally persist) one built-in template cut by id — the Server Action's re-run path. */
-export async function runTomatoCut(cutId: string, opts: { persist?: boolean } = {}): Promise<{ bundle: ResultBundle; analysisRunId: number | null }> {
+/** Preview (no fit) a built-in template cut by id — for the pre-fit Data + Model review. */
+export function previewTomatoCut(cutId: string, opts: CutRunOpts = {}): CutPreview {
+  const cut = cutById(cutId);
+  if (!cut) throw new Error(`unknown tomato cut: ${cutId}`);
+  return previewCut(assembleCut(cut), opts);
+}
+
+/** Build (and optionally persist) one built-in template cut by id — the Server Action's run path. */
+export async function runTomatoCut(cutId: string, opts: { persist?: boolean } & CutRunOpts = {}): Promise<{ bundle: ResultBundle; analysisRunId: number | null }> {
   const cut = cutById(cutId);
   if (!cut) throw new Error(`unknown tomato cut: ${cutId}`);
   const assembled = assembleCut(cut);
-  const bundle = buildCutBundle(assembled);
+  const bundle = buildCutBundle(assembled, opts);
   const analysisRunId = (opts.persist ?? true) ? await persistCutBundle(cut, bundle) : null;
   return { bundle, analysisRunId };
 }
 
-/** Build + persist a BREEDER-DEFINED cut (a saved preset): fit the hand-picked trials and store it as
- *  its own re-runnable study (source='tomato-cut'). Returns the cut id the page loads by. */
-export async function buildCustomCut(def: CutDef): Promise<{ cutId: string; analysisRunId: number }> {
+/** Preview (no fit) a breeder-defined composite, for the pre-fit Data + Model review. */
+export function previewCustomCut(def: CutDef, opts: CutRunOpts = {}): CutPreview {
+  return previewCut(assembleCustom(def), opts);
+}
+
+/** Build + persist a BREEDER-DEFINED cut (a saved preset): fit the hand-picked trials (with any model
+ *  overrides / data exclusions) and store it as its own re-runnable study (source='tomato-cut'). */
+export async function buildCustomCut(def: CutDef, opts: CutRunOpts = {}): Promise<{ cutId: string; analysisRunId: number }> {
   const assembled = assembleCustom(def);
-  const bundle = buildCutBundle(assembled);
+  const bundle = buildCutBundle(assembled, opts);
   const analysisRunId = await persistCutBundle(assembled.cut, bundle, 'tomato-cut');
   return { cutId: def.id, analysisRunId };
 }
