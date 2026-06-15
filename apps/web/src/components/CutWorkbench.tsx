@@ -23,7 +23,7 @@ import AdvanceStep, { type AdvanceRow } from "./AdvanceStep";
 import GenomicWorkspace from "./GenomicWorkspace";
 
 export interface WorkbenchInitial { cutId: string; bundle: ResultBundle; runId: number; advancements: AdvanceRow[]; trialIds: string[] }
-type ModelOv = { spatial?: "spats" | "none"; gxe?: "include" | "skip"; relationship?: "identity" | "G" };
+type ModelOv = { spatial?: "spats" | "none"; gxe?: "include" | "skip"; relationship?: "identity" | "G"; engine?: "rrblup" | "blupf90" };
 
 const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x));
 const cutLabel = (b: ResultBundle | null) => (b?.data_readiness as { cut?: { label?: string } } | undefined)?.cut?.label ?? null;
@@ -43,7 +43,7 @@ export default function CutWorkbench({ cuts, catalog, taxonomy, savedCuts, initi
   const [running, startRun] = useTransition();
   const [err, setErr] = useState<string | null>(null);
 
-  const hasOverrides = !!(ov.spatial === "spats" || ov.gxe === "include" || ov.relationship === "G");
+  const hasOverrides = !!(ov.spatial === "spats" || ov.gxe === "include" || ov.relationship === "G" || ov.engine === "blupf90");
   // Results are fresh only if the current composition matches what was fit (a model override invalidates).
   const resultFresh = !!initial && sameSet(trialIds, initial.trialIds) && !hasOverrides;
   const matchedTemplate = useMemo(() => cuts.find((c) => sameSet(trialIds, c.trial_ids)), [cuts, trialIds]);
@@ -157,26 +157,34 @@ function ModelStudio({ bundle, ov, setOv }: { bundle: ResultBundle; ov: ModelOv;
         <h3 className="text-sm font-semibold text-slate-800">Model studio</h3>
         <span className="text-[11px] text-slate-400">the planner recommends; you choose — more thorough options fit slower</span>
       </div>
-      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Toggle label="Spatial correction" desc="SpATS de-trends the field grid (two-stage)" on={ov.spatial === "spats"} rec={dec("spatial")?.recommended === "spats"} onChange={(v) => setOv({ ...ov, spatial: v ? "spats" : "none" })} />
         <Toggle label="Genotype × Environment" desc="separate GxE from error (needs multi-env reps)" on={ov.gxe === "include"} rec={dec("gxe")?.recommended === "include"} onChange={(v) => setOv({ ...ov, gxe: v ? "include" : "skip" })} />
-        <Toggle label="Genomic (GRM)" desc="rank on marker-based GEBVs; lights up Genomics" on={ov.relationship === "G"} rec={false} onChange={(v) => setOv({ ...ov, relationship: v ? "G" : "identity" })} />
+        <Toggle label="Genomic (GRM)" desc="rank on marker-based GEBVs; lights up Genomics" on={ov.relationship === "G"} rec={dec("relationship")?.recommended === "G"} onChange={(v) => setOv({ ...ov, relationship: v ? "G" : "identity", engine: v ? ov.engine : "rrblup" })} />
+        <Toggle
+          label="Engine: BLUPF90"
+          desc={ov.relationship === "G" ? "native preGSf90 GBLUP vs rrBLUP (fast default)" : "turn on Genomic (GRM) to choose the engine"}
+          on={ov.engine === "blupf90"}
+          rec={dec("engine")?.recommended === "blupf90"}
+          disabled={ov.relationship !== "G"}
+          onChange={(v) => setOv({ ...ov, engine: v ? "blupf90" : "rrblup" })}
+        />
       </div>
     </div>
   );
 }
-function Toggle({ label, desc, on, rec, onChange }: { label: string; desc: string; on: boolean; rec: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ label, desc, on, rec, onChange, disabled }: { label: string; desc: string; on: boolean; rec: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
-    <div className={`rounded-xl border p-3 ${on ? "border-emerald-300 bg-emerald-50/50" : "border-slate-200"}`}>
+    <div className={`rounded-xl border p-3 ${disabled ? "border-slate-100 bg-slate-50/60 opacity-60" : on ? "border-emerald-300 bg-emerald-50/50" : "border-slate-200"}`}>
       <div className="flex items-center justify-between gap-2">
         <span className="text-[13px] font-medium text-slate-800">{label}</span>
         <span className="inline-flex shrink-0 rounded-lg border border-slate-200 bg-white p-0.5 text-[11px]">
-          <button type="button" onClick={() => onChange(false)} className={`rounded px-2 py-0.5 ${!on ? "bg-slate-100 font-medium text-slate-700" : "text-slate-400"}`}>Off</button>
-          <button type="button" onClick={() => onChange(true)} className={`rounded px-2 py-0.5 ${on ? "bg-emerald-600 font-medium text-white" : "text-slate-400"}`}>On</button>
+          <button type="button" disabled={disabled} onClick={() => onChange(false)} className={`rounded px-2 py-0.5 disabled:cursor-not-allowed ${!on ? "bg-slate-100 font-medium text-slate-700" : "text-slate-400"}`}>Off</button>
+          <button type="button" disabled={disabled} onClick={() => onChange(true)} className={`rounded px-2 py-0.5 disabled:cursor-not-allowed ${on ? "bg-emerald-600 font-medium text-white" : "text-slate-400"}`}>On</button>
         </span>
       </div>
       <p className="mt-1 text-[11px] text-slate-500">{desc}</p>
-      {rec && <span className="mt-1.5 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">planner recommends</span>}
+      {rec && !disabled && <span className="mt-1.5 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">planner recommends</span>}
     </div>
   );
 }

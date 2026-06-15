@@ -12,7 +12,7 @@ import { db, program, study, analysisRun, resultBundle } from '@verdant/db';
 import { validateResultBundle, type ResultBundle, type AnalysisRequest } from '@verdant/contracts';
 import { estimateGeneticCovariance } from './blupf90';
 import { spatialStage1 } from './stage1';
-import { buildGenomicBlock } from './tomato-genomic';
+import { buildGenomicBlock, markerReadiness } from './tomato-genomic';
 import { runRKernel } from './kernel';
 import { isEntrypoint } from './entry';
 import { runPlanner, type ModelPlan, type ModelOverrides } from './planner';
@@ -41,7 +41,10 @@ function prefit(assembled: AssembledCut, opts: CutRunOpts) {
   const recs = applied.records;
   let dataQuality: ResultBundle['data_quality'] = null;
   try { dataQuality = runDataQuality(recs, traits); } catch (e) { console.log(`data_quality skipped: ${(e as Error).message}`); }
-  const { plan, readiness } = runPlanner(traits, recs, { overrides: opts.overrides });
+  // Tell the planner markers exist for this cohort so it offers relationship=G and the genomic engine
+  // choice (rrBLUP vs native BLUPF90). The plot structure can't see markers — the driver supplies it.
+  const genomicReadiness = markerReadiness(assembled.germplasm);
+  const { plan, readiness } = runPlanner(traits, recs, { overrides: opts.overrides, genomic: genomicReadiness });
   return { recs, applied, dataQuality, plan, readiness };
 }
 
@@ -122,7 +125,7 @@ function geneticIndex(
 
 /** chosen_model from the planner's resolved plan (the decision log + overridable factors the Model
  *  step renders) — generic strings, no maize assumptions. */
-interface Applied { twoStage: boolean; fittedGxe: boolean; relationship: 'identity' | 'A' | 'G' | 'H' }
+interface Applied { twoStage: boolean; fittedGxe: boolean; relationship: 'identity' | 'A' | 'G' | 'H'; genomicEngine?: 'rrblup' | 'blupf90' }
 function chosenModel(plan: ModelPlan, engine: string, cut: Cut, composition: AssembledCut['composition'], ap: Applied): ResultBundle['chosen_model'] {
   const scope = cut.purpose === 'prediction'
     ? `the broad prediction cut (${composition.n_trials} trials across stages ${composition.stages.join('–')} / years ${composition.years.join('/')}, ${composition.n_geno} genotypes)`
@@ -135,6 +138,9 @@ function chosenModel(plan: ModelPlan, engine: string, cut: Cut, composition: Ass
     if (d.factor === 'staging') return { ...d, choice: ap.twoStage ? 'two_stage' : 'single_stage', recommended: rec };
     if (d.factor === 'gxe') return { ...d, choice: ap.fittedGxe ? 'include' : 'skip', recommended: rec ?? 'include', feasible: true };
     if (d.factor === 'relationship') return { ...d, choice: ap.relationship, recommended: rec };
+    // The genomic engine actually used (only meaningful at relationship=G; rrBLUP is the default).
+    if (d.factor === 'engine' && ap.relationship === 'G' && ap.genomicEngine)
+      return { ...d, choice: ap.genomicEngine, recommended: rec ?? 'rrblup' };
     return d;
   };
   return {
@@ -190,22 +196,33 @@ export function buildCutBundle(assembled: AssembledCut, opts: CutRunOpts = {}): 
   const genos = g.blups.map((b) => b.genotype);
 
   // Genomic GRM/GBLUP — opt-in (relationship = G). Builds bundle.genomic (CV, GEBVs, PCA, GRM heatmap)
-  // from markers.csv, and re-points the selection index onto the genomic_G GEBVs. Phenotypic BLUPs are
-  // the genomic kernel's phenotype. Best-effort: failure leaves the phenotypic ranking intact.
+  // from markers.csv, and re-points the selection index onto the chosen genomic engine's GEBVs (rrBLUP
+  // by default, native BLUPF90/preGSf90 GBLUP when engine = blupf90). Phenotypic BLUPs are the genomic
+  // kernel's phenotype. Best-effort: failure leaves the phenotypic ranking intact.
   let genomic: Record<string, unknown> | null = null;
   let relationship: 'identity' | 'G' = 'identity';
+  let genomicEngine: 'rrblup' | 'blupf90' = 'rrblup';
   let rankMap = blupMap; let rankGenos = genos;
   if (opts.overrides?.relationship === 'G') {
     try {
       const phenoByTrait: Record<string, Array<number | null>> = {};
       traits.forEach((id, j) => { phenoByTrait[id] = genos.map((gn) => blupMap.get(gn)![j]); });
-      genomic = buildGenomicBlock({ cohort: genos, traits, phenoByTrait });
+      genomic = buildGenomicBlock({
+        cohort: genos, traits, phenoByTrait,
+        engine: opts.overrides?.engine ?? null,
+        geneticCovariance: g.geneticCovariance, residualCovariance: g.residualCovariance,
+      });
       const gbm = genomic?.gebv_by_model as Record<string, Record<string, { values: number[] }>> | undefined;
+      const nat = genomic?.gebv_blupf90 as Record<string, { values: number[] }> | undefined;
       const cohort = genomic?.cohort as string[] | undefined;
       if (genomic && gbm?.genomic_G && cohort) {
         relationship = 'G';
+        // BLUPF90 GEBVs when requested AND they were produced; otherwise rrBLUP (the fast default).
+        const useNat = opts.overrides?.engine === 'blupf90' && !!nat;
+        genomicEngine = useNat ? 'blupf90' : 'rrblup';
         const gMap = new Map<string, Array<number | null>>();
-        cohort.forEach((id, i) => gMap.set(id, traits.map((tr) => gbm.genomic_G[tr]?.values?.[i] ?? null)));
+        cohort.forEach((id, i) => gMap.set(id, traits.map((tr) =>
+          (useNat ? nat![tr]?.values?.[i] : gbm.genomic_G[tr]?.values?.[i]) ?? null)));
         rankMap = gMap; rankGenos = cohort;
       }
     } catch (e) { console.log(`genomic block skipped: ${(e as Error).message}`); }
@@ -265,7 +282,7 @@ export function buildCutBundle(assembled: AssembledCut, opts: CutRunOpts = {}): 
 
   const bundle: ResultBundle = {
     contract_version: 'v0', status: 'ok', intent: broad ? 'prediction' : 'selection',
-    chosen_model: chosenModel(plan, g.engine, cut, composition, { twoStage, fittedGxe, relationship }),
+    chosen_model: chosenModel(plan, g.engine, cut, composition, { twoStage, fittedGxe, relationship, genomicEngine }),
     traits: bundleTraits,
     genetic_correlations: { variable_ids: traits, matrix: g.geneticCorrelation },
     gxe: fittedGxe && g.gxeCovariance ? { variable_ids: traits, covariance: g.gxeCovariance, correlation: g.gxeCorrelation, variances: g.gxeVariances } : null,
