@@ -80,10 +80,16 @@ function chosenModel(plan: ModelPlan, engine: string, cut: Cut, composition: Ass
     spatial_method: plan.spatial_method,
     relationship: plan.relationship as 'identity' | 'A' | 'G' | 'H',
     engine,
-    rationale: plan.decisions.find((d) => d.factor === 'gxe')?.reason ?? plan.decisions.find((d) => d.factor === 'staging')?.reason ?? '',
+    rationale: plan.decisions.find((d) => d.factor === 'staging')?.reason ?? '',
     model_class: plan.model_class,
     staging_weighted: plan.staging_weighted,
-    decisions: plan.decisions,
+    // Reflect what was actually FIT: GxE is recommended by structure but not fitted (a pooled cut's
+    // early-stage founders sit in a single environment → a genotype×environment term isn't stably
+    // estimable; fitting it is non-convergent). Keep the planner's recommendation visible.
+    decisions: plan.decisions.map((d) => d.factor === 'gxe'
+      ? { ...d, choice: 'skip', recommended: d.recommended ?? (d as { choice?: string }).choice ?? 'include', feasible: false,
+          reason: 'Recommended by structure, but a pooled cut spans stages where early founders appear in a single environment — a genotype×environment term is not stably estimable here, so the fit uses phenotypic BLUPs.' }
+      : d),
     overridable: plan.overridable,
   };
 }
