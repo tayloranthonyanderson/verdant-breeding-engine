@@ -23,6 +23,7 @@ import AdvanceStep, { type AdvanceRow } from "./AdvanceStep";
 import GenomicWorkspace from "./GenomicWorkspace";
 
 export interface WorkbenchInitial { cutId: string; bundle: ResultBundle; runId: number; advancements: AdvanceRow[]; trialIds: string[] }
+type ModelOv = { spatial?: "spats" | "none"; gxe?: "include" | "skip"; relationship?: "identity" | "G" };
 
 const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x));
 const cutLabel = (b: ResultBundle | null) => (b?.data_readiness as { cut?: { label?: string } } | undefined)?.cut?.label ?? null;
@@ -33,23 +34,27 @@ export default function CutWorkbench({ cuts, catalog, taxonomy, savedCuts, initi
   const router = useRouter();
   const [trialIds, setTrialIds] = useState<string[]>(initial?.trialIds ?? cuts[0]?.trial_ids ?? []);
   const [name, setName] = useState("");
+  // Breeder model overrides (the Model Studio). Defaults = the fast baseline; toggling on a more
+  // thorough option re-plans the preview and is applied at Run.
+  const [ov, setOv] = useState<ModelOv>({});
   const [preview, setPreview] = useState<Awaited<ReturnType<typeof previewAnalysis>> | null>(null);
   const [active, setActive] = useState(initial ? 1 : 0);
   const [, startPreview] = useTransition();
   const [running, startRun] = useTransition();
   const [err, setErr] = useState<string | null>(null);
 
-  // Results are fresh only if the current composition matches what was fit.
-  const resultFresh = !!initial && sameSet(trialIds, initial.trialIds);
+  const hasOverrides = !!(ov.spatial === "spats" || ov.gxe === "include" || ov.relationship === "G");
+  // Results are fresh only if the current composition matches what was fit (a model override invalidates).
+  const resultFresh = !!initial && sameSet(trialIds, initial.trialIds) && !hasOverrides;
   const matchedTemplate = useMemo(() => cuts.find((c) => sameSet(trialIds, c.trial_ids)), [cuts, trialIds]);
 
-  // Live pre-fit preview (data quality + planner) whenever the composition changes.
-  const sig = trialIds.slice().sort().join(",");
+  // Live pre-fit preview (data quality + planner) whenever the composition or the model overrides change.
+  const sig = trialIds.slice().sort().join(",") + "|" + JSON.stringify(ov);
   useEffect(() => {
     if (!trialIds.length) { setPreview(null); return; }
     let cancelled = false;
     startPreview(async () => {
-      const res = await previewAnalysis({ trialIds });
+      const res = await previewAnalysis({ trialIds, overrides: ov });
       if (!cancelled) setPreview(res);
     });
     return () => { cancelled = true; };
@@ -66,11 +71,11 @@ export default function CutWorkbench({ cuts, catalog, taxonomy, savedCuts, initi
 
   const run = () => {
     setErr(null);
-    if (matchedTemplate) { router.push(`/?cut=${matchedTemplate.id}`); return; } // prebuilt — instant
-    const nm = name.trim();
+    if (matchedTemplate && !hasOverrides) { router.push(`/?cut=${matchedTemplate.id}`); return; } // prebuilt — instant
+    const nm = name.trim() || (matchedTemplate ? `${matchedTemplate.label} · custom model` : "");
     if (!nm) { setErr("Name this analysis to run & save it."); return; }
     startRun(async () => {
-      const res = await runAnalysis({ name: nm, trialIds });
+      const res = await runAnalysis({ name: nm, trialIds, overrides: ov });
       if (res.status === "error") { setErr(res.error); return; }
       router.push(`/?cut=${res.cutId}`);
     });
@@ -110,7 +115,8 @@ export default function CutWorkbench({ cuts, catalog, taxonomy, savedCuts, initi
         <div className="space-y-5">
           <InsightBanner bundle={previewBundle} />
           <ModelReadiness bundle={previewBundle} />
-          <RunPanel matchedTemplate={!!matchedTemplate} name={name} setName={setName} run={run} running={running} err={err} fresh={resultFresh} />
+          <ModelStudio bundle={previewBundle} ov={ov} setOv={setOv} />
+          <RunPanel matchedTemplate={!!matchedTemplate && !hasOverrides} name={name} setName={setName} run={run} running={running} err={err} fresh={resultFresh} />
         </div>
       ) : <Loading /> },
     { id: "understand", label: "Understand", sublabel: "ask, heritability & correlations", icon: <Microscope size={14} />,
@@ -139,6 +145,40 @@ function Loading() {
 }
 function NextHint({ onNext, label, disabled }: { onNext: () => void; label: string; disabled?: boolean }) {
   return <div className="flex justify-end"><button type="button" onClick={onNext} disabled={disabled} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:opacity-40">{label} <ArrowRight size={14} /></button></div>;
+}
+// The Model Studio — the breeder reviews the planner's recommendation and chooses the model. Spatial /
+// GxE / genomic are off by default (fast); turning one on re-plans the preview and is applied at Run.
+function ModelStudio({ bundle, ov, setOv }: { bundle: ResultBundle; ov: ModelOv; setOv: (o: ModelOv) => void }) {
+  const dec = (f: string) => (bundle.chosen_model.decisions ?? []).find((d) => d.factor === f) as { recommended?: string | null } | undefined;
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-center gap-2">
+        <span className="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-slate-500"><SlidersHorizontal size={15} /></span>
+        <h3 className="text-sm font-semibold text-slate-800">Model studio</h3>
+        <span className="text-[11px] text-slate-400">the planner recommends; you choose — more thorough options fit slower</span>
+      </div>
+      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+        <Toggle label="Spatial correction" desc="SpATS de-trends the field grid (two-stage)" on={ov.spatial === "spats"} rec={dec("spatial")?.recommended === "spats"} onChange={(v) => setOv({ ...ov, spatial: v ? "spats" : "none" })} />
+        <Toggle label="Genotype × Environment" desc="separate GxE from error (needs multi-env reps)" on={ov.gxe === "include"} rec={dec("gxe")?.recommended === "include"} onChange={(v) => setOv({ ...ov, gxe: v ? "include" : "skip" })} />
+        <Toggle label="Genomic (GRM)" desc="rank on marker-based GEBVs; lights up Genomics" on={ov.relationship === "G"} rec={false} onChange={(v) => setOv({ ...ov, relationship: v ? "G" : "identity" })} />
+      </div>
+    </div>
+  );
+}
+function Toggle({ label, desc, on, rec, onChange }: { label: string; desc: string; on: boolean; rec: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div className={`rounded-xl border p-3 ${on ? "border-emerald-300 bg-emerald-50/50" : "border-slate-200"}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[13px] font-medium text-slate-800">{label}</span>
+        <span className="inline-flex shrink-0 rounded-lg border border-slate-200 bg-white p-0.5 text-[11px]">
+          <button type="button" onClick={() => onChange(false)} className={`rounded px-2 py-0.5 ${!on ? "bg-slate-100 font-medium text-slate-700" : "text-slate-400"}`}>Off</button>
+          <button type="button" onClick={() => onChange(true)} className={`rounded px-2 py-0.5 ${on ? "bg-emerald-600 font-medium text-white" : "text-slate-400"}`}>On</button>
+        </span>
+      </div>
+      <p className="mt-1 text-[11px] text-slate-500">{desc}</p>
+      {rec && <span className="mt-1.5 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">planner recommends</span>}
+    </div>
+  );
 }
 function RunPanel({ matchedTemplate, name, setName, run, running, err, fresh }: { matchedTemplate: boolean; name: string; setName: (s: string) => void; run: () => void; running: boolean; err: string | null; fresh: boolean }) {
   return (
