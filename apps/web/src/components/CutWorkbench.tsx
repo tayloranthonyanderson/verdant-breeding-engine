@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { ResultBundle } from "@verdant/contracts";
-import { Layers, ShieldCheck, SlidersHorizontal, Microscope, ListChecks, ClipboardCheck, Dna, Play, RefreshCw, Lock, ArrowRight } from "lucide-react";
+import { Layers, ShieldCheck, SlidersHorizontal, Microscope, ListChecks, ClipboardCheck, Dna, Play, RefreshCw, Lock, ArrowRight, Activity } from "lucide-react";
 import { previewAnalysis, runAnalysis } from "@/app/actions";
 import DataCutPicker, { type CutCard, type CatalogTrial, type Taxonomy, type SavedCutCard } from "./DataCutPicker";
 import StepShell, { type Step } from "./StepShell";
@@ -119,6 +119,12 @@ export default function CutWorkbench({ cuts, catalog, taxonomy, savedCuts, initi
           <RunPanel matchedTemplate={!!matchedTemplate && !hasOverrides} name={name} setName={setName} run={run} running={running} err={err} fresh={resultFresh} />
         </div>
       ) : <Loading /> },
+    { id: "fit", label: "Fit", sublabel: "did the model work? residuals & Q-Q", icon: <Activity size={14} />,
+      content: result ? (
+        <div className="space-y-5">
+          <DataQuality bundle={result} phase="fit" reviewOnly />
+        </div>
+      ) : <RunGate what="the fit diagnostics" /> },
     { id: "understand", label: "Understand", sublabel: "ask, heritability & correlations", icon: <Microscope size={14} />,
       content: result ? (
         <div className="space-y-5">
