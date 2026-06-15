@@ -95,6 +95,9 @@ for (tpe in names(BV)) rownames(BV[[tpe]]) <- line_ids
 ## GxE / residual / block sds (yield most plastic). Trait panel measured per trial passed in `traits`.
 ge_sd  <- c(yield = 6, brix = 0.25, firmness = 3, fruit_wt = 3, maturity = 1.5, shelf_life = 1.2)
 res_sd <- c(yield = 7, brix = 0.35, firmness = 4, fruit_wt = 5, maturity = 2.2, shelf_life = 1.6)
+## spatial field-trend amplitude per trait — a smooth row×col surface SpATS can recover (the reason a
+## field layout exists at all). Comparable to block/residual, not dominating.
+spat_sd <- c(yield = 5, brix = 0.30, firmness = 3, fruit_wt = 4, maturity = 2, shelf_life = 1.5)
 
 sim_trial <- function(entries, tpe, year, locs, reps, measured, loc_prefix) {
   bvt <- BV[[tpe]]
@@ -104,16 +107,27 @@ sim_trial <- function(entries, tpe, year, locs, reps, measured, loc_prefix) {
                    diag((c(yield = 12, brix = 0.6, firmness = 5, fruit_wt = 6, maturity = 4, shelf_life = 3))^2))
   rows <- list(); k <- 0
   for (e in seq_len(locs)) {
+    ## FIELD LAYOUT: place every plot in this environment (entries × reps) on a row×col grid, in random
+    ## order, and add a smooth low-frequency field surface (so spatial de-trending is meaningful).
+    np <- length(entries) * reps
+    ncol <- ceiling(sqrt(np)); nrowg <- ceiling(np / ncol)
+    w <- stats::rnorm(3)                       # this field's surface shape
+    plot_order <- sample.int(np)               # randomized layout (genotypes not clustered by index)
+    block_shift <- lapply(seq_len(reps), function(r) stats::rnorm(length(TRAITS), 0, c(2.5, 0.12, 1.5, 1.5, 0.8, 0.6)))
+    p <- 0
     for (r in seq_len(reps)) {
-      block_shift <- stats::rnorm(length(TRAITS), 0, c(2.5, 0.12, 1.5, 1.5, 0.8, 0.6))
       for (gi in seq_along(entries)) {
-        k <- k + 1
+        k <- k + 1; p <- p + 1
+        pos <- plot_order[p]
+        rr <- ((pos - 1) %/% ncol) + 1L; cc <- ((pos - 1) %% ncol) + 1L
+        surf <- sin(pi * rr / (nrowg + 1)) * w[1] + sin(pi * cc / (ncol + 1)) * w[2] +
+                sin(pi * rr / (nrowg + 1)) * sin(2 * pi * cc / (ncol + 1)) * w[3]
         ge  <- stats::rnorm(length(TRAITS), 0, ge_sd)
         res <- stats::rnorm(length(TRAITS), 0, res_sd)
-        vals <- bvt[entries[gi], ] + env_eff[e, ] + ge + block_shift + res
+        vals <- bvt[entries[gi], ] + env_eff[e, ] + ge + block_shift[[r]] + surf * spat_sd + res
         names(vals) <- TRAITS
         row <- data.frame(genotype = entries[gi], env = env_names[e],
-                          block = sprintf("%s-B%d", env_names[e], r), rep = r,
+                          block = sprintf("%s-B%d", env_names[e], r), rep = r, row = rr, col = cc,
                           stringsAsFactors = FALSE)
         for (tr in TRAITS) row[[tr]] <- if (tr %in% measured) round(vals[[tr]], 2) else NA_real_
         rows[[k]] <- row

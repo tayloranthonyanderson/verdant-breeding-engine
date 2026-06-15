@@ -11,6 +11,8 @@ import { eq, desc, and } from 'drizzle-orm';
 import { db, program, study, analysisRun, resultBundle } from '@verdant/db';
 import { validateResultBundle, type ResultBundle, type AnalysisRequest } from '@verdant/contracts';
 import { estimateGeneticCovariance } from './blupf90';
+import { spatialStage1 } from './stage1';
+import { buildGenomicBlock } from './tomato-genomic';
 import { runRKernel } from './kernel';
 import { isEntrypoint } from './entry';
 import { runPlanner, type ModelPlan, type ModelOverrides } from './planner';
@@ -59,10 +61,12 @@ function readinessBlock(assembled: AssembledCut, readiness: { scale: unknown; co
 /** Pre-fit PREVIEW (no BLUP): data quality + the planner's recommended model, for review before Run. */
 export function previewCut(assembled: AssembledCut, opts: CutRunOpts = {}): CutPreview {
   const { plan, readiness, dataQuality, applied } = prefit(assembled, opts);
+  const relationship = (opts.overrides?.relationship as 'identity' | 'A' | 'G' | 'H' | undefined) ?? 'identity';
   return {
     composition: assembled.composition,
     data_quality: dataQuality ?? null,
-    chosen_model: chosenModel(plan, 'blupf90+', assembled.cut, assembled.composition, false),
+    chosen_model: chosenModel(plan, 'blupf90+', assembled.cut, assembled.composition,
+      { twoStage: opts.overrides?.spatial === 'spats', fittedGxe: opts.overrides?.gxe === 'include', relationship }),
     data_readiness: readinessBlock(assembled, readiness, plan),
     removed: applied.removed,
   };
@@ -118,27 +122,34 @@ function geneticIndex(
 
 /** chosen_model from the planner's resolved plan (the decision log + overridable factors the Model
  *  step renders) — generic strings, no maize assumptions. */
-function chosenModel(plan: ModelPlan, engine: string, cut: Cut, composition: AssembledCut['composition'], fittedGxe: boolean): ResultBundle['chosen_model'] {
+interface Applied { twoStage: boolean; fittedGxe: boolean; relationship: 'identity' | 'A' | 'G' | 'H' }
+function chosenModel(plan: ModelPlan, engine: string, cut: Cut, composition: AssembledCut['composition'], ap: Applied): ResultBundle['chosen_model'] {
   const scope = cut.purpose === 'prediction'
     ? `the broad prediction cut (${composition.n_trials} trials across stages ${composition.stages.join('–')} / years ${composition.years.join('/')}, ${composition.n_geno} genotypes)`
     : `the narrow advancement cut (${composition.n_geno} entries at the latest stage)`;
+  // The decision log reports what was actually APPLIED (choice), keeping the planner's recommendation
+  // visible (recommended). Spatial/GxE/genomic are breeder opt-ins (the Model Studio), default off.
+  const appliedChoice = (d: ModelPlan['decisions'][number]): ModelPlan['decisions'][number] => {
+    const rec = d.recommended ?? (d as { choice?: string }).choice ?? null;
+    if (d.factor === 'spatial') return { ...d, choice: ap.twoStage ? 'spats' : 'none', recommended: rec, source: ap.twoStage ? 'overridden' : (d.source ?? 'recommended') };
+    if (d.factor === 'staging') return { ...d, choice: ap.twoStage ? 'two_stage' : 'single_stage', recommended: rec };
+    if (d.factor === 'gxe') return { ...d, choice: ap.fittedGxe ? 'include' : 'skip', recommended: rec ?? 'include', feasible: true };
+    if (d.factor === 'relationship') return { ...d, choice: ap.relationship, recommended: rec };
+    return d;
+  };
   return {
-    description: `Single-stage multi-trait AI-REML on ${scope}${fittedGxe ? ' with a genotype×environment term' : ''}; genotype random (BLUPs).`,
-    formula: `trait ~ environment + genotype(random)${fittedGxe ? ' + genotype:environment(random)' : ''}`,
+    description: `${ap.twoStage ? 'Two-stage: SpATS spatial de-trending per environment, then ' : 'Single-stage '}multi-trait AI-REML on ${scope}${ap.fittedGxe ? ' with a genotype×environment term' : ''}; genotype random (BLUPs)${ap.relationship === 'G' ? '; ranked on genomic (G) GEBVs' : ''}.`,
+    formula: ap.twoStage
+      ? `stage 1: trait ~ PSANOVA(col,row) + genotype(fixed) [per env];  stage 2: adjusted_mean ~ environment + genotype(random)${ap.fittedGxe ? ' + genotype:environment(random)' : ''}`
+      : `trait ~ environment + genotype(random)${ap.fittedGxe ? ' + genotype:environment(random)' : ''}`,
     genotype_effect: 'random',
-    spatial_method: plan.spatial_method,
-    relationship: plan.relationship as 'identity' | 'A' | 'G' | 'H',
+    spatial_method: ap.twoStage ? 'spats' : 'none',
+    relationship: ap.relationship,
     engine,
     rationale: plan.decisions.find((d) => d.factor === 'staging')?.reason ?? '',
-    model_class: plan.model_class,
-    staging_weighted: plan.staging_weighted,
-    // Reflect what was actually FIT: GxE is recommended by structure but not fitted (a pooled cut's
-    // early-stage founders sit in a single environment → a genotype×environment term isn't stably
-    // estimable; fitting it is non-convergent). Keep the planner's recommendation visible.
-    decisions: plan.decisions.map((d) => d.factor === 'gxe'
-      ? { ...d, choice: 'skip', recommended: d.recommended ?? (d as { choice?: string }).choice ?? 'include', feasible: false,
-          reason: 'Recommended by structure, but a pooled cut spans stages where early founders appear in a single environment — a genotype×environment term is not stably estimable here, so the fit uses phenotypic BLUPs.' }
-      : d),
+    model_class: ap.twoStage ? 'two_stage' : 'single_stage',
+    staging_weighted: ap.twoStage,
+    decisions: plan.decisions.map(appliedChoice),
     overridable: plan.overridable,
   };
 }
@@ -151,46 +162,97 @@ export function buildCutBundle(assembled: AssembledCut, opts: CutRunOpts = {}): 
   // Shared pre-fit pass (data quality + planner) on the exclusion-filtered records.
   const { recs, dataQuality, plan, readiness } = prefit(assembled, opts);
 
-  // Multi-trait fit. GxE is NOT fitted: a pooled cut is severely unbalanced (early-stage founders sit
-  // in a single environment), so a genotype×environment term is non-estimable / unstable. The planner
-  // still REPORTS its GxE stance in the decision log (chosen_model.decisions) — recommendation vs what's
-  // safely fittable here — but the fit stays phenotypic BLUPs.
-  const g = estimateGeneticCovariance({ variableIds: traits, rows: recs });
+  // FIT. The default is a FAST single-stage phenotypic BLUP. The more-correct, more-expensive options —
+  // SpATS spatial de-trending (two-stage), GxE, genomic GRM — are breeder OPT-INS via the Model Studio
+  // (the planner recommends them in the decision log; the breeder turns them on, accepting a longer run).
+  const twoStage = opts.overrides?.spatial === 'spats';
+  const wantGxe = opts.overrides?.gxe === 'include';
+  let stage1FieldTrends: Record<string, unknown> | undefined;
+  let stage1ModelQc: Record<string, unknown> | undefined;
+  let fitRows: Array<{ genotype: string; environment: string; values: Array<number | null>; weights?: Array<number | null> }>;
+  if (twoStage) {
+    const s1 = spatialStage1(traits, recs);
+    stage1FieldTrends = s1.field_trends;
+    stage1ModelQc = s1.model_qc as Record<string, unknown> | undefined;
+    fitRows = s1.adjusted.map((a) => ({ genotype: a.genotype, environment: a.environment, values: a.values, weights: a.weights }));
+  } else {
+    fitRows = recs.map((r) => ({ genotype: r.genotype, environment: r.environment, values: r.values }));
+  }
+
+  let g: ReturnType<typeof estimateGeneticCovariance> | null = null;
+  let fittedGxe = false;
+  if (wantGxe) {
+    try { g = estimateGeneticCovariance({ variableIds: traits, rows: fitRows, interaction: true }); fittedGxe = true; }
+    catch (e) { console.log(`GxE fit not estimable for this cut (${(e as Error).message}); phenotypic BLUPs`); }
+  }
+  if (!g) g = estimateGeneticCovariance({ variableIds: traits, rows: fitRows });
   const blupMap = new Map(g.blups.map((b) => [b.genotype, b.values]));
   const genos = g.blups.map((b) => b.genotype);
 
+  // Genomic GRM/GBLUP — opt-in (relationship = G). Builds bundle.genomic (CV, GEBVs, PCA, GRM heatmap)
+  // from markers.csv, and re-points the selection index onto the genomic_G GEBVs. Phenotypic BLUPs are
+  // the genomic kernel's phenotype. Best-effort: failure leaves the phenotypic ranking intact.
+  let genomic: Record<string, unknown> | null = null;
+  let relationship: 'identity' | 'G' = 'identity';
+  let rankMap = blupMap; let rankGenos = genos;
+  if (opts.overrides?.relationship === 'G') {
+    try {
+      const phenoByTrait: Record<string, Array<number | null>> = {};
+      traits.forEach((id, j) => { phenoByTrait[id] = genos.map((gn) => blupMap.get(gn)![j]); });
+      genomic = buildGenomicBlock({ cohort: genos, traits, phenoByTrait });
+      const gbm = genomic?.gebv_by_model as Record<string, Record<string, { values: number[] }>> | undefined;
+      const cohort = genomic?.cohort as string[] | undefined;
+      if (genomic && gbm?.genomic_G && cohort) {
+        relationship = 'G';
+        const gMap = new Map<string, Array<number | null>>();
+        cohort.forEach((id, i) => gMap.set(id, traits.map((tr) => gbm.genomic_G[tr]?.values?.[i] ?? null)));
+        rankMap = gMap; rankGenos = cohort;
+      }
+    } catch (e) { console.log(`genomic block skipped: ${(e as Error).message}`); }
+  }
+
   // One transparent + genetically-aware index PER market the cut touches (one fit, many lenses); the
-  // Select-step target-market switcher flips between them (ADR-0023).
+  // Select-step target-market switcher flips between them (ADR-0023). Ranked on the chosen relationship's
+  // breeding values (phenotypic BLUPs, or genomic_G GEBVs when relationship = G).
   const indices: NonNullable<ResultBundle['indices']> = [];
   let divergence: ResultBundle['divergence'] = null;
   for (const mk of relevantMarkets) {
-    const t = transparentIndex(traits, blupMap, mk.weights); t.segment_id = mk.id;
-    const gi = geneticIndex(traits, g.geneticCovariance, genos, genos.map((gn) => blupMap.get(gn)!), mk.weights, t.ranking);
+    const t = transparentIndex(traits, rankMap, mk.weights); t.segment_id = mk.id;
+    const gi = geneticIndex(traits, g.geneticCovariance, rankGenos, rankGenos.map((gn) => rankMap.get(gn)!), mk.weights, t.ranking);
     gi.index.segment_id = mk.id;
     indices.push(t, gi.index);
     if (divergence == null || mk.id === cut.market) divergence = gi.divergence;
   }
 
-  // Post-fit model QC — residuals reconstructed from the BLUPs (no Stage-1 on tomato).
-  const blupsByTrait: Record<string, Record<string, number>> = {};
-  traits.forEach((id, j) => { const mp: Record<string, number> = {}; for (const b of g.blups) if (b.values[j] != null) mp[b.genotype] = b.values[j] as number; blupsByTrait[id] = mp; });
+  // Post-fit model QC — the REAL Stage-1 spatial residuals (two-stage) or reconstructed from BLUPs.
   let modelQc: ReturnType<typeof runModelQc> = {};
-  try { modelQc = runModelQc(recs, traits, blupsByTrait); } catch { /* best-effort */ }
+  if (stage1ModelQc && Object.keys(stage1ModelQc).length) {
+    modelQc = stage1ModelQc as ReturnType<typeof runModelQc>;
+  } else {
+    const blupsByTrait: Record<string, Record<string, number>> = {};
+    traits.forEach((id, j) => { const mp: Record<string, number> = {}; for (const b of g!.blups) if (b.values[j] != null) mp[b.genotype] = b.values[j] as number; blupsByTrait[id] = mp; });
+    try { modelQc = runModelQc(recs, traits, blupsByTrait); } catch { /* best-effort */ }
+  }
+  if (dataQuality && stage1FieldTrends && Object.keys(stage1FieldTrends).length) {
+    (dataQuality as { field_trends?: unknown }).field_trends = stage1FieldTrends;
+  }
 
   const Ve = g.residualCovariance.map((r, i) => r[i]);
+  const Vge = fittedGxe ? g.gxeVariances : undefined;
   const bundleTraits: ResultBundle['traits'] = traits.map((id, j) => {
-    const vg = g.geneticVariances[j]; const ve = Ve[j];
+    const vg = g!.geneticVariances[j]; const vge = Vge?.[j] ?? 0; const ve = Ve[j];
     const nObs = recs.filter((r) => r.values[j] != null).length;
     return {
       variable_id: id, status: 'ok',
-      effects: g.blups.map((b) => ({ germplasm_id: b.genotype, value: b.values[j], type: 'BLUP' as const })),
-      heritability: { method: 'standard', value: vg + ve > 0 ? Number((vg / (vg + ve)).toFixed(4)) : null },
+      effects: g!.blups.map((b) => ({ germplasm_id: b.genotype, value: b.values[j], type: 'BLUP' as const })),
+      heritability: { method: 'standard', value: vg + vge + ve > 0 ? Number((vg / (vg + vge + ve)).toFixed(4)) : null },
       genetic_sd: Number(Math.sqrt(Math.max(vg, 0)).toFixed(6)),
       varcomp: [
         { component: 'genotype', variance: Number(vg.toFixed(6)) },
+        ...(Vge ? [{ component: 'genotype:environment', variance: Number(vge.toFixed(6)) }] : []),
         { component: 'residual', variance: Number(ve.toFixed(6)) },
       ],
-      diagnostics: mergeTraitDiagnostics({ converged: g.converged, n_genotypes: g.blups.length, n_obs: nObs }, modelQc[id], boundaryFlags(vg, 0, ve)),
+      diagnostics: mergeTraitDiagnostics({ converged: g!.converged, n_genotypes: g!.blups.length, n_obs: nObs }, modelQc[id], boundaryFlags(vg, vge, ve)),
       warnings: [],
     };
   });
@@ -199,14 +261,15 @@ export function buildCutBundle(assembled: AssembledCut, opts: CutRunOpts = {}): 
   const warnings: ResultBundle['warnings'] = [];
   if (broad) warnings.push({ code: 'cut_pools_stages', message: `This prediction cut pools ${composition.n_trials} trials across stages ${composition.stages.join('+')} and years ${composition.years.join('+')}, connected by ${composition.n_checks} common checks. Including the early-stage records the selection used de-biases the variance components.`, severity: 'info' });
   else warnings.push({ code: 'cut_is_narrow', message: `This advancement cut is the latest-stage decision set (${composition.n_geno} entries); variance components from so few lines are less precise than the broad prediction cut.`, severity: 'info' });
-  if (!plan.gxe.include) warnings.push({ code: 'gxe_not_separated', message: plan.gxe.reason, severity: 'info' });
+  if (wantGxe && !fittedGxe) warnings.push({ code: 'gxe_not_separated', message: 'GxE was requested but not estimable for this cut (early-stage founders appear in a single environment); fit uses phenotypic BLUPs.', severity: 'info' });
 
   const bundle: ResultBundle = {
     contract_version: 'v0', status: 'ok', intent: broad ? 'prediction' : 'selection',
-    chosen_model: chosenModel(plan, g.engine, cut, composition, false),
+    chosen_model: chosenModel(plan, g.engine, cut, composition, { twoStage, fittedGxe, relationship }),
     traits: bundleTraits,
     genetic_correlations: { variable_ids: traits, matrix: g.geneticCorrelation },
-    gxe: null,
+    gxe: fittedGxe && g.gxeCovariance ? { variable_ids: traits, covariance: g.gxeCovariance, correlation: g.gxeCorrelation, variances: g.gxeVariances } : null,
+    ...(genomic ? { genomic: genomic as unknown as ResultBundle['genomic'] } : {}),
     data_readiness: readinessBlock(assembled, readiness, plan),
     data_quality: dataQuality ?? null,
     indices,

@@ -104,12 +104,13 @@ const isCheck = (g: string) => g.startsWith('CHK-');
 
 function readTrial(t: TrialMeta, traits: string[]): AssembledCut['records'] {
   const rows = parse(readFileSync(join(tomatoCorpusDir(), t.file)), { columns: true, skip_empty_lines: true }) as Record<string, string>[];
+  const num = (v: string | undefined) => (v == null || v === '' || v === 'NA' ? null : Number(v));
   return rows.map((r) => ({
     genotype: r.genotype,
     environment: `${t.trial_id}/${r.env}`, // namespace so distinct trials never merge into one env
-    row: null, col: null, // tomato sim has no field grid → planner returns spatial='none' (no two-stage)
+    row: num(r.row), col: num(r.col), // real field grid → planner can recommend SpATS / two-stage
     rep: r.rep ?? null,
-    values: traits.map((tr) => { const v = r[tr]; return v == null || v === '' || v === 'NA' ? null : Number(v); }),
+    values: traits.map((tr) => num(r[tr])),
   }));
 }
 
