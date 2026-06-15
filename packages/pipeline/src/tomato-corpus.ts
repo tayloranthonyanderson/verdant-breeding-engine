@@ -87,10 +87,16 @@ export function cutById(id: string, m: Manifest = loadManifest()): Cut | null {
   return listCuts(m).find((c) => c.id === id) ?? null;
 }
 
+/** A rankable market available to a cut (its trials are in the cut) — drives the Select-step switcher. */
+export interface CutMarket { id: string; label: string; weights: Record<string, number> }
 export interface AssembledCut {
   cut: Cut; traits: string[]; weights: Record<string, number>; trials: TrialMeta[];
-  records: Array<{ genotype: string; environment: string; values: Array<number | null> }>;
+  /** Full plot records (row/col null — tomato has no field grid; rep carried for the planner). */
+  records: Array<{ genotype: string; environment: string; row: number | null; col: number | null; rep: string | number | null; values: Array<number | null> }>;
   germplasm: string[];
+  /** Every market whose TPE is represented in the cut — the cut is ranked under EACH (one fit, many
+   *  lenses); the Select step switches between them. */
+  relevantMarkets: CutMarket[];
   composition: { n_trials: number; n_env: number; n_geno: number; n_obs: number; n_checks: number; stages: string[]; years: number[] };
 }
 
@@ -101,8 +107,18 @@ function readTrial(t: TrialMeta, traits: string[]): AssembledCut['records'] {
   return rows.map((r) => ({
     genotype: r.genotype,
     environment: `${t.trial_id}/${r.env}`, // namespace so distinct trials never merge into one env
+    row: null, col: null, // tomato sim has no field grid → planner returns spatial='none' (no two-stage)
+    rep: r.rep ?? null,
     values: traits.map((tr) => { const v = r[tr]; return v == null || v === '' || v === 'NA' ? null : Number(v); }),
   }));
+}
+
+/** Markets (leaf nodes with weights) whose TPE appears among the cut's trials. */
+function relevantMarketsFor(trials: TrialMeta[], m: Manifest): CutMarket[] {
+  const tpes = new Set(trials.map((t) => t.tpe));
+  return Object.entries(m.hierarchy)
+    .filter(([, n]) => n.weights && n.tpe && tpes.has(n.tpe))
+    .map(([id, n]) => ({ id, label: n.label, weights: n.weights as Record<string, number> }));
 }
 
 function compose(cut: Cut, trials: TrialMeta[], rankMarket: string, m: Manifest): AssembledCut {
@@ -111,6 +127,7 @@ function compose(cut: Cut, trials: TrialMeta[], rankMarket: string, m: Manifest)
   const germplasm = [...new Set(records.map((r) => r.genotype))];
   return {
     cut, traits, weights: m.hierarchy[rankMarket]?.weights ?? {}, trials, records, germplasm,
+    relevantMarkets: relevantMarketsFor(trials, m),
     composition: {
       n_trials: trials.length, n_env: new Set(records.map((r) => r.environment)).size, n_geno: germplasm.length,
       n_obs: records.length, n_checks: germplasm.filter(isCheck).length,
@@ -131,21 +148,24 @@ export function assembleCut(cut: Cut, m: Manifest = loadManifest()): AssembledCu
   return compose(cut, trialsForTags(cut.tags, m), cut.market, m);
 }
 
-/** A breeder-defined cut: a name, the market to rank on, and the exact trials (the UI resolves the
- *  composite of selected nodes to this trial list). */
-export interface CutDef { id: string; name: string; market: string; trialIds: string[] }
+/** A breeder-defined cut: a name and the exact trials (the UI resolves the composite of selected nodes
+ *  to this list). The cut is ranked under every market its trials touch; `market` (optional) just sets
+ *  the default lens shown first. */
+export interface CutDef { id: string; name: string; trialIds: string[]; market?: string }
 export function assembleCustom(def: CutDef, m: Manifest = loadManifest()): AssembledCut {
-  const mk = m.hierarchy[def.market];
-  if (!mk?.weights) throw new Error(`unknown market: ${def.market}`);
   const trials = def.trialIds.map((id) => m.trials.find((t) => t.trial_id === id)).filter((t): t is TrialMeta => !!t);
   if (trials.length === 0) throw new Error('a cut must include at least one trial');
+  const rel = relevantMarketsFor(trials, m);
+  const primary = (def.market && rel.some((r) => r.id === def.market)) ? def.market : rel[0]?.id;
+  if (!primary) throw new Error('the chosen trials are not associated with any rankable market');
+  const mk = m.hierarchy[primary];
   const multiStage = new Set(trials.map((t) => t.stage)).size > 1;
   const cut: Cut = {
-    id: def.id, purpose: multiStage ? 'prediction' : 'advancement', market: def.market, market_label: mk.label,
+    id: def.id, purpose: multiStage ? 'prediction' : 'advancement', market: primary, market_label: mk.label,
     tpe: mk.tpe ?? '', label: def.name, blurb: 'Breeder-defined cut — the trials you composed.',
     tags: [...new Set(trials.map((t) => t.market_tag))], custom: true,
   };
-  return compose(cut, trials, def.market, m);
+  return compose(cut, trials, primary, m);
 }
 
 /** The full trial catalog (for "see all the data"), in funnel order. */

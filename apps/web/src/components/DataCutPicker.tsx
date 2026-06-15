@@ -26,10 +26,10 @@ const sameSet = (a: Set<string>, b: string[]) => a.size === b.length && b.every(
 const shortMarket = (s: string) => s.replace(/^Processing · |^Fresh-market · /, "");
 
 export default function DataCutPicker({
-  cuts, catalog, taxonomy, savedCuts, selected, composition, currentTrialIds, currentMarket,
+  cuts, catalog, taxonomy, savedCuts, selected, composition, currentTrialIds,
 }: {
   cuts: CutCard[]; catalog: CatalogTrial[]; taxonomy: Taxonomy; savedCuts: SavedCutCard[];
-  selected: string; composition: Composition | null; currentTrialIds: string[]; currentMarket: string;
+  selected: string; composition: Composition | null; currentTrialIds: string[];
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -37,7 +37,6 @@ export default function DataCutPicker({
   const [err, setErr] = useState<string | null>(null);
 
   const [included, setIncluded] = useState<Set<string>>(() => new Set(currentTrialIds));
-  const [rankMarket, setRankMarket] = useState<string>(currentMarket || taxonomy.markets[0]?.id || "");
   const [name, setName] = useState<string>("");
   const [refineOpen, setRefineOpen] = useState(false);
 
@@ -78,23 +77,23 @@ export default function DataCutPicker({
     markets: [...new Set(draftTrials.map((t) => t.market_tag))],
   }), [draftTrials]);
 
-  // markets that actually have trials in this composite — the sensible ones to rank by.
-  const rankable = taxonomy.markets.filter((m) => nodeTrials(m.id).some((t) => included.has(t.trial_id)) || draft.n_trials === 0);
-  const effRank = rankable.some((m) => m.id === rankMarket) ? rankMarket : rankable[0]?.id ?? rankMarket;
+  // markets whose trials are in this composite — shown as info (the actual ranking lens is chosen at
+  // the Select step, where the same fit is re-ranked per market).
+  const cutMarkets = taxonomy.markets.filter((m) => nodeTrials(m.id).some((t) => included.has(t.trial_id)));
 
-  const template = useMemo(() => cuts.find((c) => sameSet(included, c.trial_ids) && c.market === effRank), [cuts, included, effRank]);
+  const template = useMemo(() => cuts.find((c) => sameSet(included, c.trial_ids)), [cuts, included]);
 
-  const seedTemplate = (id: string) => { const t = cuts.find((c) => c.id === id); if (t) { setIncluded(new Set(t.trial_ids)); setRankMarket(t.market); } };
+  const seedTemplate = (id: string) => { const t = cuts.find((c) => c.id === id); if (t) setIncluded(new Set(t.trial_ids)); };
   const view = () => { if (template) router.push(`/?cut=${template.id}`); };
   const save = () => {
     setErr(null);
     start(async () => {
-      const res = await saveAndRunCut({ name, market: effRank, trialIds: [...included] });
+      const res = await saveAndRunCut({ name, trialIds: [...included] });
       if (res.status === "error") { setErr(res.error); return; }
       router.push(`/?cut=${res.cutId}`);
     });
   };
-  const rerun = (id: string, def?: SavedCutCard) => { setBusy(id); start(async () => { if (def) await saveAndRunCut({ name: def.name, market: def.market, trialIds: def.trialIds }); else await analyzeCut(id); setBusy(null); router.refresh(); }); };
+  const rerun = (id: string, def?: SavedCutCard) => { setBusy(id); start(async () => { if (def) await saveAndRunCut({ name: def.name, trialIds: def.trialIds }); else await analyzeCut(id); setBusy(null); router.refresh(); }); };
   const remove = (id: string) => { setBusy(id); start(async () => { await deleteCut(id); setBusy(null); if (selected === id) router.push("/"); else router.refresh(); }); };
 
   const activeSaved = savedCuts.find((c) => c.id === selected);
@@ -151,22 +150,16 @@ export default function DataCutPicker({
             <p className="px-2 pt-1.5 text-[11px] text-slate-400">Indent = how specific the target is. Inner nodes (All, the TPEs) carry the early/mid shared trials; leaves are the market-specific late trials.</p>
           </div>
 
-          {/* rank-by + composition */}
+          {/* markets in the cut (info) + composition */}
           <div className="space-y-3">
             <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
-              <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400"><Trophy size={12} /> Rank by market</div>
+              <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400"><Trophy size={12} /> Markets in this cut</div>
               <div className="flex flex-wrap gap-1.5">
-                {taxonomy.markets.map((m) => {
-                  const inCut = nodeTrials(m.id).some((t) => included.has(t.trial_id));
-                  return (
-                    <button key={m.id} type="button" onClick={() => setRankMarket(m.id)}
-                      className={`rounded-full border px-3 py-1 text-xs font-medium transition ${effRank === m.id ? "border-emerald-400 bg-emerald-600 text-white" : inCut ? "border-slate-200 bg-white text-slate-600 hover:border-emerald-300" : "border-slate-200 bg-slate-50 text-slate-400"}`}>
-                      {shortMarket(m.label)}{!inCut && <span className="ml-1 text-[9px]">(not in cut)</span>}
-                    </button>
-                  );
-                })}
+                {cutMarkets.length ? cutMarkets.map((m) => (
+                  <span key={m.id} className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">{shortMarket(m.label)}</span>
+                )) : <span className="text-[11px] text-slate-400">none — pick some trials</span>}
               </div>
-              <p className="mt-1.5 text-[11px] text-slate-400">The index that ranks candidates. Pick a target that&rsquo;s in your cut.</p>
+              <p className="mt-1.5 text-[11px] text-slate-400">You&rsquo;ll choose which of these ranks the candidates in the <b>Select</b> step (same fit, switch the lens).</p>
             </div>
             <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 text-[12px] text-slate-600">
               <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">This cut</div>

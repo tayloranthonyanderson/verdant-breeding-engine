@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Leaf, FlaskConical, Sprout, ClipboardCheck, Compass, SlidersHorizontal, Microscope, ListChecks, Dna, ShieldCheck, Layers, Trophy } from "lucide-react";
+import { Leaf, FlaskConical, Sprout, ClipboardCheck, Compass, SlidersHorizontal, Microscope, ListChecks, Dna, ShieldCheck, Layers } from "lucide-react";
 import type { ResultBundle, AnalysisRequest } from "@verdant/contracts";
 import { getG2fResult, getCutResult, listSavedCuts } from "@/lib/data";
 import { listCuts, trialsForTags, trialCatalog, cutTaxonomy, type CutTaxonomy } from "@verdant/pipeline";
@@ -15,7 +15,6 @@ import AskPanel from "@/components/AskPanel";
 import SelectionSection from "@/components/SelectionSection";
 import GenomicWorkspace from "@/components/GenomicWorkspace";
 import DataCutPicker, { type CutCard, type CatalogTrial, type Composition } from "@/components/DataCutPicker";
-import CutRanking from "@/components/CutRanking";
 import StepShell, { type Step } from "@/components/StepShell";
 
 // Always read the freshest persisted result from Postgres.
@@ -58,15 +57,36 @@ async function CutExperience({ cutId }: { cutId: string }) {
   } : null;
   const activeCutId = result?.study?.name ?? cutId;
   const currentTrialIds = dr.cut?.trial_ids ?? [];
-  const currentMarket = dr.cut?.market ?? taxonomy?.markets[0]?.id ?? "";
+  const hasGenomic = !!(result?.bundle as { genomic?: unknown } | undefined)?.genomic;
 
+  // The full analysis workflow, now ON THE CHOSEN CUT (tomato sim data). Step 1 composes the cut; the
+  // rest are the same rich stations the G2F MET path has — Overview, Data/QC, Model (planner decisions),
+  // Understand, Select (the target-market switcher = "rank by market"), Advance, and Genomics if present.
   const steps: Step[] = result && taxonomy ? [
     {
-      id: "cut", label: "Data cut", sublabel: "define what to analyze", icon: <Layers size={14} />,
-      content: <DataCutPicker cuts={cuts} catalog={catalog} taxonomy={taxonomy} savedCuts={savedCuts} selected={activeCutId} composition={composition} currentTrialIds={currentTrialIds} currentMarket={currentMarket} />,
+      id: "cut", label: "Data cut", sublabel: "compose what to analyze", icon: <Layers size={14} />,
+      content: <DataCutPicker cuts={cuts} catalog={catalog} taxonomy={taxonomy} savedCuts={savedCuts} selected={activeCutId} composition={composition} currentTrialIds={currentTrialIds} />,
     },
     {
-      id: "understand", label: "Understand", sublabel: "heritability & genetic correlations", icon: <Microscope size={14} />,
+      id: "overview", label: "Overview", sublabel: "the cut at a glance", icon: <Compass size={14} />,
+      content: <OverviewSummary bundle={result.bundle} studyName={result.study?.name ?? null} />,
+    },
+    {
+      id: "data", label: "Data", sublabel: "is your data sound?", icon: <ShieldCheck size={14} />,
+      content: <DataQuality bundle={result.bundle} activeExclusions={[]} phase="data" />,
+    },
+    {
+      id: "model", label: "Model", sublabel: "the model planner's call & checks", icon: <SlidersHorizontal size={14} />,
+      content: (
+        <div className="space-y-5">
+          <InsightBanner bundle={result.bundle} />
+          <ModelReadiness bundle={result.bundle} />
+          <DataQuality bundle={result.bundle} activeExclusions={[]} phase="fit" />
+        </div>
+      ),
+    },
+    {
+      id: "understand", label: "Understand", sublabel: "ask, heritability & correlations", icon: <Microscope size={14} />,
       content: (
         <div className="space-y-5">
           <AskPanel cutId={activeCutId} />
@@ -75,13 +95,27 @@ async function CutExperience({ cutId }: { cutId: string }) {
             <HeritabilityCards bundle={result.bundle} />
           </section>
           <GeneticCorrelations bundle={result.bundle} />
+          <CombiningAbilityUnderstand bundle={result.bundle} />
         </div>
       ),
     },
     {
-      id: "select", label: "Select", sublabel: "rank for the market", icon: <Trophy size={14} />,
-      content: <CutRanking bundle={result.bundle} />,
+      id: "select", label: "Select", sublabel: "rank by market & choose", icon: <ListChecks size={14} />,
+      content: (
+        <SelectionSection
+          bundle={result.bundle}
+          analysisRunId={result.run.id}
+          advancements={result.advancements.map((a) => ({ candidate: a.candidate, unit: a.unit, pool: a.pool, disposition: a.disposition }))}
+        />
+      ),
     },
+    {
+      id: "advance", label: "Advance", sublabel: "record decisions", icon: <ClipboardCheck size={14} />,
+      content: <AdvanceStep advancements={result.advancements} />,
+    },
+    ...(hasGenomic
+      ? [{ id: "genomics", label: "Genomics", sublabel: "relationship, structure, GEBVs", icon: <Dna size={14} />, content: <GenomicWorkspace bundle={result.bundle} /> } as Step]
+      : []),
   ] : [];
 
   return (

@@ -13,6 +13,8 @@ import { validateResultBundle, type ResultBundle, type AnalysisRequest } from '@
 import { estimateGeneticCovariance } from './blupf90';
 import { runRKernel } from './kernel';
 import { isEntrypoint } from './entry';
+import { runPlanner, type ModelPlan } from './planner';
+import { attachPlotIds, runDataQuality, runModelQc, mergeTraitDiagnostics, boundaryFlags } from './data-quality-build';
 import { assembleCut, assembleCustom, listCuts, cutById, loadManifest, type Cut, type CutDef, type AssembledCut } from './tomato-corpus';
 
 const PROGRAM = 'Verdant tomato (synthetic)';
@@ -65,15 +67,67 @@ function geneticIndex(
   );
 }
 
-/** Fit the cut and assemble a contract-valid bundle (no persist). */
+/** chosen_model from the planner's resolved plan (the decision log + overridable factors the Model
+ *  step renders) — generic strings, no maize assumptions. */
+function chosenModel(plan: ModelPlan, engine: string, cut: Cut, composition: AssembledCut['composition'], fittedGxe: boolean): ResultBundle['chosen_model'] {
+  const scope = cut.purpose === 'prediction'
+    ? `the broad prediction cut (${composition.n_trials} trials across stages ${composition.stages.join('–')} / years ${composition.years.join('/')}, ${composition.n_geno} genotypes)`
+    : `the narrow advancement cut (${composition.n_geno} entries at the latest stage)`;
+  return {
+    description: `Single-stage multi-trait AI-REML on ${scope}${fittedGxe ? ' with a genotype×environment term' : ''}; genotype random (BLUPs).`,
+    formula: `trait ~ environment + genotype(random)${fittedGxe ? ' + genotype:environment(random)' : ''}`,
+    genotype_effect: 'random',
+    spatial_method: plan.spatial_method,
+    relationship: plan.relationship as 'identity' | 'A' | 'G' | 'H',
+    engine,
+    rationale: plan.decisions.find((d) => d.factor === 'gxe')?.reason ?? plan.decisions.find((d) => d.factor === 'staging')?.reason ?? '',
+    model_class: plan.model_class,
+    staging_weighted: plan.staging_weighted,
+    decisions: plan.decisions,
+    overridable: plan.overridable,
+  };
+}
+
+/** Fit the cut and assemble a FULL contract-valid bundle (no persist): pre-fit data quality, the
+ *  planner's model decisions + readiness, the multi-trait fit (+ GxE when estimable), one index per
+ *  market the cut touches (the Select-step switcher), and post-fit model-QC diagnostics. */
 export function buildCutBundle(assembled: AssembledCut): ResultBundle {
-  const { cut, traits, weights, records, composition, trials } = assembled;
+  const { cut, traits, records, composition, trials, relevantMarkets } = assembled;
+  const qcRecords = attachPlotIds(records);
+
+  // Pre-fit data quality (ADR-0021) — crop-agnostic; the grid checks no-op with null row/col.
+  let dataQuality: ResultBundle['data_quality'] = null;
+  try { dataQuality = runDataQuality(qcRecords, traits); } catch (e) { console.log(`data_quality skipped: ${(e as Error).message}`); }
+
+  // Planner (ADR-0016) — the model decisions + readiness the Model step renders. Generic: with no field
+  // grid it returns spatial='none' (single-stage), and GxE only when the cut's connectivity supports it.
+  const { plan, readiness } = runPlanner(traits, records);
+
+  // Multi-trait fit. GxE is NOT fitted: a pooled cut is severely unbalanced (early-stage founders sit
+  // in a single environment), so a genotype×environment term is non-estimable / unstable. The planner
+  // still REPORTS its GxE stance in the decision log (chosen_model.decisions) — recommendation vs what's
+  // safely fittable here — but the fit stays phenotypic BLUPs.
   const g = estimateGeneticCovariance({ variableIds: traits, rows: records });
   const blupMap = new Map(g.blups.map((b) => [b.genotype, b.values]));
   const genos = g.blups.map((b) => b.genotype);
 
-  const t = transparentIndex(traits, blupMap, weights);
-  const gi = geneticIndex(traits, g.geneticCovariance, genos, genos.map((gn) => blupMap.get(gn)!), weights, t.ranking);
+  // One transparent + genetically-aware index PER market the cut touches (one fit, many lenses); the
+  // Select-step target-market switcher flips between them (ADR-0023).
+  const indices: NonNullable<ResultBundle['indices']> = [];
+  let divergence: ResultBundle['divergence'] = null;
+  for (const mk of relevantMarkets) {
+    const t = transparentIndex(traits, blupMap, mk.weights); t.segment_id = mk.id;
+    const gi = geneticIndex(traits, g.geneticCovariance, genos, genos.map((gn) => blupMap.get(gn)!), mk.weights, t.ranking);
+    gi.index.segment_id = mk.id;
+    indices.push(t, gi.index);
+    if (divergence == null || mk.id === cut.market) divergence = gi.divergence;
+  }
+
+  // Post-fit model QC — residuals reconstructed from the BLUPs (no Stage-1 on tomato).
+  const blupsByTrait: Record<string, Record<string, number>> = {};
+  traits.forEach((id, j) => { const mp: Record<string, number> = {}; for (const b of g.blups) if (b.values[j] != null) mp[b.genotype] = b.values[j] as number; blupsByTrait[id] = mp; });
+  let modelQc: ReturnType<typeof runModelQc> = {};
+  try { modelQc = runModelQc(qcRecords, traits, blupsByTrait); } catch { /* best-effort */ }
 
   const Ve = g.residualCovariance.map((r, i) => r[i]);
   const bundleTraits: ResultBundle['traits'] = traits.map((id, j) => {
@@ -88,7 +142,7 @@ export function buildCutBundle(assembled: AssembledCut): ResultBundle {
         { component: 'genotype', variance: Number(vg.toFixed(6)) },
         { component: 'residual', variance: Number(ve.toFixed(6)) },
       ],
-      diagnostics: { converged: g.converged, n_genotypes: g.blups.length, n_obs: nObs },
+      diagnostics: mergeTraitDiagnostics({ converged: g.converged, n_genotypes: g.blups.length, n_obs: nObs }, modelQc[id], boundaryFlags(vg, 0, ve)),
       warnings: [],
     };
   });
@@ -97,35 +151,26 @@ export function buildCutBundle(assembled: AssembledCut): ResultBundle {
   const warnings: ResultBundle['warnings'] = [];
   if (broad) warnings.push({ code: 'cut_pools_stages', message: `This prediction cut pools ${composition.n_trials} trials across stages ${composition.stages.join('+')} and years ${composition.years.join('+')}, connected by ${composition.n_checks} common checks. Including the early-stage records the selection used de-biases the variance components.`, severity: 'info' });
   else warnings.push({ code: 'cut_is_narrow', message: `This advancement cut is the latest-stage decision set (${composition.n_geno} entries); variance components from so few lines are less precise than the broad prediction cut.`, severity: 'info' });
+  if (!plan.gxe.include) warnings.push({ code: 'gxe_not_separated', message: plan.gxe.reason, severity: 'info' });
 
   const bundle: ResultBundle = {
     contract_version: 'v0', status: 'ok', intent: broad ? 'prediction' : 'selection',
-    chosen_model: {
-      description: broad
-        ? `Multi-trait AI-REML (BLUPF90) over the broad prediction cut: ${composition.n_trials} trials across stages ${composition.stages.join('–')} and years ${composition.years.join('/')}, ${composition.n_geno} genotypes connected by common checks; genotype random (BLUPs).`
-        : `Multi-trait AI-REML (BLUPF90) over the narrow advancement cut: the latest-stage trials for ${cut.market_label} (${composition.n_geno} entries); genotype random (BLUPs).`,
-      formula: 'trait ~ environment + genotype(random)',
-      genotype_effect: 'random', spatial_method: 'none',
-      relationship: 'identity', engine: g.engine,
-      rationale: broad
-        ? 'Prediction cut: relevance is the TPE, not the stage — pool every trial relevant to this market across stages and years; markers (a GRM) would further glue it (genomic prediction is the next layer).'
-        : 'Advancement cut: the focused advance/drop set at the most advanced stage for this market.',
-      model_class: 'single_stage', staging_weighted: false, decisions: [], overridable: [],
-    },
+    chosen_model: chosenModel(plan, g.engine, cut, composition, false),
     traits: bundleTraits,
     genetic_correlations: { variable_ids: traits, matrix: g.geneticCorrelation },
+    gxe: null,
     data_readiness: {
-      scale: { n_obs: composition.n_obs, n_geno: composition.n_geno, n_env: composition.n_env, n_traits: traits.length },
-      connectivity: { n_checks: composition.n_checks, note: `${composition.n_checks} common checks link the ${composition.n_trials} trial(s).` },
-      unlocks: broad ? [{ capability: 'Genomic prediction (GBLUP/ssGBLUP)', blocked_by: 'The wide cut is phenotype-only here; the marker scaffold isn\'t yet built into a GRM.', hint: 'Build a GRM from data/tomato/markers.csv to borrow strength across the unbalanced, cross-stage trials.' }] : [],
-      // The cut descriptor — what data this analysis was run on (ADR-0023 provenance).
+      scale: readiness.scale, connectivity: readiness.connectivity, replication: readiness.replication,
+      grids: readiness.grids, unlocks: plan.unlocks,
+      // The cut descriptor — what data this analysis was run on (ADR-0023 provenance) + n_checks.
       cut: { id: cut.id, purpose: cut.purpose, market: cut.market, market_label: cut.market_label, tpe: cut.tpe,
-        label: cut.label, custom: cut.custom ?? false, trial_ids: trials.map((tt) => tt.trial_id),
+        label: cut.label, custom: cut.custom ?? false, n_checks: composition.n_checks, trial_ids: trials.map((tt) => tt.trial_id),
         trials: trials.map((tt) => ({ trial_id: tt.trial_id, stage: tt.stage, year: tt.year, market_tag: tt.market_tag, n_entries: tt.n_entries, n_loc: tt.n_loc })),
         stages: composition.stages, years: composition.years },
     } as unknown as ResultBundle['data_readiness'],
-    indices: [t, gi.index],
-    divergence: gi.divergence,
+    data_quality: dataQuality ?? null,
+    indices,
+    divergence,
     warnings,
     provenance: { contract_version: 'v0', engine_versions: { blupf90: g.engine }, source: 'tomato-sim-corpus' } as ResultBundle['provenance'],
   };

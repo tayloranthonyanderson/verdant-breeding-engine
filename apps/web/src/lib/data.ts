@@ -89,5 +89,9 @@ export async function getCutResult(cutId: string): Promise<LoadedResult | null> 
     .orderBy(desc(resultBundle.id))
     .limit(1);
   if (!row) return null;
-  return { study: s, run: row.run, bundle: row.bundle as ResultBundle, advancements: [] };
+  const advancements = await db
+    .select().from(advancementDecision)
+    .where(eq(advancementDecision.analysisRunId, row.run.id))
+    .orderBy(desc(advancementDecision.id));
+  return { study: s, run: row.run, bundle: row.bundle as ResultBundle, advancements };
 }

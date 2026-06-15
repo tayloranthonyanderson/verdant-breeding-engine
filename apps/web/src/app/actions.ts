@@ -85,14 +85,14 @@ export async function analyzeCut(cutId: string): Promise<{ status: "ok" | "error
 
 // Save + run a BREEDER-DEFINED cut: the breeder picked the market and the exact trials; we fit them and
 // persist a re-runnable preset (a study, source='tomato-cut'). Re-saving the same name re-runs it.
-export async function saveAndRunCut(input: { name: string; market: string; trialIds: string[] }): Promise<{ status: "ok"; cutId: string } | { status: "error"; error: string }> {
+export async function saveAndRunCut(input: { name: string; trialIds: string[] }): Promise<{ status: "ok"; cutId: string } | { status: "error"; error: string }> {
   try {
     const name = (input.name ?? "").trim();
     if (!name) return { status: "error", error: "Name your data cut so you can find it later." };
     if (!input.trialIds?.length) return { status: "error", error: "Pick at least one trial for the cut." };
-    if (!input.market) return { status: "error", error: "Choose a market to rank the cut on." };
     const id = cutSlug(name);
-    await buildCustomCut({ id, name, market: input.market, trialIds: input.trialIds });
+    // Markets are derived from the trials (the cut is ranked under each at Select time).
+    await buildCustomCut({ id, name, trialIds: input.trialIds });
     revalidatePath("/");
     return { status: "ok", cutId: id };
   } catch (e) {
