@@ -144,7 +144,7 @@ function chosenModel(plan: ModelPlan, engine: string, cut: Cut, composition: Ass
     return d;
   };
   return {
-    description: `${ap.twoStage ? 'Two-stage: SpATS spatial de-trending per environment, then ' : 'Single-stage '}multi-trait AI-REML on ${scope}${ap.fittedGxe ? ' with a genotype×environment term' : ''}; genotype random (BLUPs)${ap.relationship === 'G' ? '; ranked on genomic (G) GEBVs' : ''}.`,
+    description: `${ap.twoStage ? 'Two-stage: SpATS spatial de-trending per environment, then ' : 'Single-stage '}multi-trait AI-REML on ${scope}${ap.fittedGxe ? ' with a genotype×environment term' : ''}; genotype random (BLUPs)${ap.relationship === 'G' ? `; ranked on two-step genomic GBLUP (G) breeding values (${ap.genomicEngine === 'blupf90' ? 'BLUPF90/preGSf90' : 'rrBLUP'} solver)` : ''}.`,
     formula: ap.twoStage
       ? `stage 1: trait ~ PSANOVA(col,row) + genotype(fixed) [per env];  stage 2: adjusted_mean ~ environment + genotype(random)${ap.fittedGxe ? ' + genotype:environment(random)' : ''}`
       : `trait ~ environment + genotype(random)${ap.fittedGxe ? ' + genotype:environment(random)' : ''}`,

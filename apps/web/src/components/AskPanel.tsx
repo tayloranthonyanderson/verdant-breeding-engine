@@ -3,20 +3,19 @@
 // "Ask your results" — grounded natural-language Q&A over the result bundle (ADR-0002/0004). The
 // answer is generated server-side; every number it states comes from the bundle (the AI explains,
 // never computes). Shows whether the answer came from the live model or the offline fallback.
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { Sparkles, CornerDownLeft, AlertCircle, ShieldCheck, ShieldAlert } from "lucide-react";
+import type { ResultBundle } from "@verdant/contracts";
 import { askResults, type AskResult } from "@/app/actions";
+import { suggestQuestions } from "@/lib/ask";
 
-const SUGGESTIONS = [
-  "Which lines top the Yield-first market, and why?",
-  "What's the heritability of each trait?",
-  "Where do the transparent and genetically-aware indices disagree?",
-];
-
-export default function AskPanel({ cutId }: { cutId?: string }) {
+export default function AskPanel({ cutId, bundle }: { cutId?: string; bundle?: ResultBundle | null }) {
   const [q, setQ] = useState("");
   const [res, setRes] = useState<AskResult | null>(null);
   const [pending, start] = useTransition();
+  // Suggestions are derived from THIS bundle's real markets/traits/insights — never hardcoded to one
+  // dataset, so they always name something the results can actually answer.
+  const suggestions = useMemo(() => suggestQuestions(bundle), [bundle]);
 
   function ask(question: string) {
     const text = question.trim();
@@ -55,7 +54,7 @@ export default function AskPanel({ cutId }: { cutId?: string }) {
       </div>
 
       <div className="mt-2 flex flex-wrap gap-1.5">
-        {SUGGESTIONS.map((s) => (
+        {suggestions.map((s) => (
           <button
             key={s}
             type="button"

@@ -128,7 +128,7 @@ export default function CutWorkbench({ cuts, catalog, taxonomy, savedCuts, initi
     { id: "understand", label: "Understand", sublabel: "ask, heritability & correlations", icon: <Microscope size={14} />,
       content: result ? (
         <div className="space-y-5">
-          <AskPanel cutId={initial!.cutId} />
+          <AskPanel cutId={initial!.cutId} bundle={result} />
           <section><h3 className="mb-2 text-sm font-semibold text-slate-700">Heritability on this cut</h3><HeritabilityCards bundle={result} /></section>
           <GeneticCorrelations bundle={result} />
           <CombiningAbilityUnderstand bundle={result} />
@@ -152,10 +152,17 @@ function Loading() {
 function NextHint({ onNext, label, disabled }: { onNext: () => void; label: string; disabled?: boolean }) {
   return <div className="flex justify-end"><button type="button" onClick={onNext} disabled={disabled} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:opacity-40">{label} <ArrowRight size={14} /></button></div>;
 }
-// The Model Studio — the breeder reviews the planner's recommendation and chooses the model. Spatial /
-// GxE / genomic are off by default (fast); turning one on re-plans the preview and is applied at Run.
+// The Model Studio — the breeder reviews the planner's recommendation and chooses the model. Two kinds
+// of choice: STRUCTURAL toggles (spatial / GxE — on/off) and the GENETIC MODEL (the relationship method
+// + its solver). All default to the fast baseline; turning one on re-plans the preview and is applied at
+// Run. The genetic-model control deliberately keeps the METHOD (which relatives, two-step vs single-step)
+// separate from the SOLVER (rrBLUP vs BLUPF90 — same math, different engine), because conflating them is
+// what made the old toggle confusing.
+type Decision = { recommended?: string | null; reason?: string | null };
+type Option = { value: string; feasible?: boolean | null; reason?: string | null };
 function ModelStudio({ bundle, ov, setOv }: { bundle: ResultBundle; ov: ModelOv; setOv: (o: ModelOv) => void }) {
-  const dec = (f: string) => (bundle.chosen_model.decisions ?? []).find((d) => d.factor === f) as { recommended?: string | null } | undefined;
+  const dec = (f: string) => (bundle.chosen_model.decisions ?? []).find((d) => d.factor === f) as Decision | undefined;
+  const opts = (f: string): Option[] => ((bundle.chosen_model.overridable ?? []).find((o) => o.factor === f)?.options ?? []) as Option[];
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-center gap-2">
@@ -163,19 +170,89 @@ function ModelStudio({ bundle, ov, setOv }: { bundle: ResultBundle; ov: ModelOv;
         <h3 className="text-sm font-semibold text-slate-800">Model studio</h3>
         <span className="text-[11px] text-slate-400">the planner recommends; you choose — more thorough options fit slower</span>
       </div>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <Toggle label="Spatial correction" desc="SpATS de-trends the field grid (two-stage)" on={ov.spatial === "spats"} rec={dec("spatial")?.recommended === "spats"} onChange={(v) => setOv({ ...ov, spatial: v ? "spats" : "none" })} />
         <Toggle label="Genotype × Environment" desc="separate GxE from error (needs multi-env reps)" on={ov.gxe === "include"} rec={dec("gxe")?.recommended === "include"} onChange={(v) => setOv({ ...ov, gxe: v ? "include" : "skip" })} />
-        <Toggle label="Genomic (GRM)" desc="rank on marker-based GEBVs; lights up Genomics" on={ov.relationship === "G"} rec={dec("relationship")?.recommended === "G"} onChange={(v) => setOv({ ...ov, relationship: v ? "G" : "identity", engine: v ? ov.engine : "rrblup" })} />
-        <Toggle
-          label="Engine: BLUPF90"
-          desc={ov.relationship === "G" ? "native preGSf90 GBLUP vs rrBLUP (fast default)" : "turn on Genomic (GRM) to choose the engine"}
-          on={ov.engine === "blupf90"}
-          rec={dec("engine")?.recommended === "blupf90"}
-          disabled={ov.relationship !== "G"}
-          onChange={(v) => setOv({ ...ov, engine: v ? "blupf90" : "rrblup" })}
-        />
       </div>
+      <GeneticModelControl ov={ov} setOv={setOv} relOptions={opts("relationship")} relDec={dec("relationship")} engOptions={opts("engine")} engDec={dec("engine")} />
+    </div>
+  );
+}
+
+// The genetic-model axis: a relationship/method chooser + (only under G) a solver chooser. Reads the
+// planner's feasibility + unlock reasons, so options the data can't support (e.g. pedigree-based A/H on a
+// marker-only corpus) show locked with the planner's hint — the breeder still sees the method exists and
+// why it's off. This is the "two-step GBLUP vs single-step ssGBLUP vs the rrBLUP/BLUPF90 solver"
+// differentiation made legible (it was collapsed into one confusing toggle before).
+const REL_ORDER = ["identity", "A", "G", "H"] as const;
+const REL_META: Record<string, { label: string; tag: string; desc: string }> = {
+  identity: { label: "Identity", tag: "no GRM", desc: "Rank on the field BLUPs; genotypes treated as unrelated." },
+  A: { label: "Pedigree (A)", tag: "two-step", desc: "GEBVs from a pedigree relationship matrix, fit on the field BLUPs." },
+  G: { label: "Genomic GBLUP (G)", tag: "two-step", desc: "GEBVs from a marker relationship matrix, fit on the field BLUPs. Lights up the Genomics tab." },
+  H: { label: "Single-step ssGBLUP (H)", tag: "single-step", desc: "One joint model over markers + pedigree + phenotypes; also ranks un-genotyped lines." },
+};
+const ENG_META: Record<string, { label: string; desc: string }> = {
+  rrblup: { label: "rrBLUP", desc: "fast, in-process — the default" },
+  blupf90: { label: "BLUPF90", desc: "native preGSf90 — the scale engine (slower)" },
+};
+function GeneticModelControl({ ov, setOv, relOptions, relDec, engOptions, engDec }: {
+  ov: ModelOv; setOv: (o: ModelOv) => void; relOptions: Option[]; relDec?: Decision; engOptions: Option[]; engDec?: Decision;
+}) {
+  const rel = ov.relationship ?? "identity";
+  const feasibleOf = (v: string) => relOptions.find((o) => o.value === v)?.feasible ?? (v === "identity");
+  const reasonOf = (v: string) => relOptions.find((o) => o.value === v)?.reason ?? null;
+  const pickRel = (v: string) => {
+    if (!feasibleOf(v)) return;
+    if (v === "G") setOv({ ...ov, relationship: "G", engine: ov.engine ?? "rrblup" });
+    else if (v === "identity") setOv({ ...ov, relationship: "identity", engine: "rrblup" });
+    // A/H are not yet selectable in this workbench (no pedigree in the corpus) — locked above.
+  };
+  const engVal = ov.engine ?? "rrblup";
+  return (
+    <div className="mt-3 rounded-xl border border-slate-200 p-3">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[13px] font-medium text-slate-800">Genetic model</span>
+        <span className="text-[11px] text-slate-400">the method is the science; the solver is just the compute engine</span>
+      </div>
+      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+        {REL_ORDER.filter((v) => relOptions.some((o) => o.value === v) || v === "identity" || v === "G").map((v) => {
+          const m = REL_META[v]; const feasible = feasibleOf(v); const selected = rel === v; const recommended = relDec?.recommended === v;
+          return (
+            <button key={v} type="button" disabled={!feasible} onClick={() => pickRel(v)}
+              className={`rounded-lg border p-2.5 text-left transition ${!feasible ? "cursor-not-allowed border-slate-100 bg-slate-50/60" : selected ? "border-emerald-400 bg-emerald-50/60" : "border-slate-200 hover:border-emerald-300"}`}>
+              <div className="flex items-center gap-1.5">
+                {!feasible && <Lock size={11} className="text-slate-300" />}
+                <span className={`text-[12px] font-medium ${feasible ? "text-slate-800" : "text-slate-400"}`}>{m.label}</span>
+                <span className="rounded bg-slate-100 px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-slate-500">{m.tag}</span>
+                {recommended && feasible && <span className="rounded bg-amber-100 px-1 py-0.5 text-[9px] font-medium text-amber-700">recommended</span>}
+              </div>
+              <p className={`mt-1 text-[11px] leading-snug ${feasible ? "text-slate-500" : "text-slate-400"}`}>{m.desc}</p>
+              {!feasible && reasonOf(v) && <p className="mt-1 text-[10px] italic text-slate-400">{reasonOf(v)}</p>}
+            </button>
+          );
+        })}
+      </div>
+      {rel === "G" && (
+        <div className="mt-3 rounded-lg bg-slate-50 p-2.5">
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-[12px] font-medium text-slate-700">Genomic solver</span>
+            <span className="text-[10px] text-slate-400">same two-step GBLUP — cross-validated to match</span>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {(engOptions.length ? engOptions.map((o) => o.value) : ["rrblup", "blupf90"]).map((v) => {
+              const m = ENG_META[v] ?? { label: v, desc: "" }; const selected = engVal === v; const recommended = engDec?.recommended === v;
+              return (
+                <button key={v} type="button" onClick={() => setOv({ ...ov, engine: v as "rrblup" | "blupf90" })}
+                  className={`rounded-lg border px-2.5 py-1.5 text-left transition ${selected ? "border-emerald-400 bg-emerald-50/70" : "border-slate-200 bg-white hover:border-emerald-300"}`}>
+                  <span className="text-[12px] font-medium text-slate-800">{m.label}</span>
+                  {recommended && <span className="ml-1.5 rounded bg-amber-100 px-1 py-0.5 text-[9px] font-medium text-amber-700">recommended</span>}
+                  <span className="block text-[10px] text-slate-500">{m.desc}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
