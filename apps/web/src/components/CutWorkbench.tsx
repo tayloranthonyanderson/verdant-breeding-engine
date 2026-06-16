@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { ResultBundle } from "@verdant/contracts";
-import { Layers, ShieldCheck, SlidersHorizontal, Microscope, ListChecks, ClipboardCheck, Dna, Play, RefreshCw, Lock, ArrowRight, Activity } from "lucide-react";
+import { Layers, ShieldCheck, SlidersHorizontal, Microscope, ListChecks, ClipboardCheck, Dna, Play, RefreshCw, Lock, ArrowRight, Activity, Check } from "lucide-react";
 import { previewAnalysis, runAnalysis } from "@/app/actions";
 import DataCutPicker, { type CutCard, type CatalogTrial, type Taxonomy, type SavedCutCard } from "./DataCutPicker";
 import StepShell, { type Step } from "./StepShell";
@@ -160,16 +160,43 @@ function NextHint({ onNext, label, disabled }: { onNext: () => void; label: stri
 // what made the old toggle confusing.
 type Decision = { recommended?: string | null; reason?: string | null };
 type Option = { value: string; feasible?: boolean | null; reason?: string | null };
+const FAST_DEFAULT: ModelOv = { spatial: "none", gxe: "skip", relationship: "identity", engine: "rrblup" };
 function ModelStudio({ bundle, ov, setOv }: { bundle: ResultBundle; ov: ModelOv; setOv: (o: ModelOv) => void }) {
   const dec = (f: string) => (bundle.chosen_model.decisions ?? []).find((d) => d.factor === f) as Decision | undefined;
   const opts = (f: string): Option[] => ((bundle.chosen_model.overridable ?? []).find((o) => o.factor === f)?.options ?? []) as Option[];
+  // The planner's full recommendation as one override set (A/H are never recommended without a pedigree,
+  // so relationship collapses to G-or-identity; engine only matters under G).
+  const relRec = dec("relationship")?.recommended;
+  const recommended: ModelOv = {
+    spatial: dec("spatial")?.recommended === "spats" ? "spats" : "none",
+    gxe: dec("gxe")?.recommended === "include" ? "include" : "skip",
+    relationship: relRec === "G" ? "G" : "identity",
+    engine: relRec === "G" && dec("engine")?.recommended === "blupf90" ? "blupf90" : "rrblup",
+  };
+  const eq = (a: ModelOv, b: ModelOv) => (a.spatial ?? "none") === (b.spatial ?? "none") && (a.gxe ?? "skip") === (b.gxe ?? "skip") && (a.relationship ?? "identity") === (b.relationship ?? "identity") && (a.engine ?? "rrblup") === (b.engine ?? "rrblup");
+  const following = eq(ov, recommended);
+  const isDefault = eq(ov, FAST_DEFAULT);
+  const recDiffers = !eq(recommended, FAST_DEFAULT); // is there anything thorough to apply?
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-center gap-2">
-        <span className="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-slate-500"><SlidersHorizontal size={15} /></span>
-        <h3 className="text-sm font-semibold text-slate-800">Model studio</h3>
-        <span className="text-[11px] text-slate-400">the planner recommends; you choose — more thorough options fit slower</span>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-slate-500"><SlidersHorizontal size={15} /></span>
+          <h3 className="text-sm font-semibold text-slate-800">Model studio</h3>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button type="button" onClick={() => setOv(recommended)} disabled={following || !recDiffers}
+            title="Set every option to the planner's recommendation (the thorough model — fits slower)"
+            className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40">
+            <Check size={12} /> {following && recDiffers ? "Following planner" : "Use planner's recommendation"}
+          </button>
+          {!isDefault && (
+            <button type="button" onClick={() => setOv({ ...FAST_DEFAULT })}
+              className="rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-medium text-slate-500 transition hover:bg-slate-50">Fast default</button>
+          )}
+        </div>
       </div>
+      <p className="mt-1 text-[11px] text-slate-400">the planner recommends; you choose — more thorough options fit slower</p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <Toggle label="Spatial correction" desc="SpATS de-trends the field grid (two-stage)" on={ov.spatial === "spats"} rec={dec("spatial")?.recommended === "spats"} onChange={(v) => setOv({ ...ov, spatial: v ? "spats" : "none" })} />
         <Toggle label="Genotype × Environment" desc="separate GxE from error (needs multi-env reps)" on={ov.gxe === "include"} rec={dec("gxe")?.recommended === "include"} onChange={(v) => setOv({ ...ov, gxe: v ? "include" : "skip" })} />
