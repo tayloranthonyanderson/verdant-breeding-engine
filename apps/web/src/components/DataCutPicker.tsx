@@ -117,9 +117,11 @@ export default function DataCutPicker({
           <h3 className="text-sm font-semibold text-slate-800">Compose your data cut</h3>
           <div className="flex items-center gap-3 text-[11px] text-slate-500">
             <label className="flex items-center gap-1.5">Start from
-              <select value="" onChange={(e) => e.target.value && seedTemplate(e.target.value)}
+              {/* Reflects the matched template (the memo) so the box shows your pick; reverts to the
+                  placeholder once you edit the selection into something custom — meaningful feedback. */}
+              <select value={template?.id ?? ""} onChange={(e) => e.target.value && seedTemplate(e.target.value)}
                 className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[12px] text-slate-700 outline-none focus:border-emerald-400">
-                <option value="">a template…</option>
+                <option value="">{included.size === 0 ? "a template…" : "custom (edited)…"}</option>
                 {cuts.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
               </select>
             </label>
