@@ -363,6 +363,13 @@ export async function buildCustomCut(def: CutDef, opts: CutRunOpts = {}): Promis
   return { cutId: def.id, analysisRunId };
 }
 
+/** Fit a breeder-defined cut WITHOUT persisting — the ephemeral "run without saving" path. Returns the
+ *  full bundle for in-memory viewing; the breeder Saves later (a server re-fit + persist), so nothing is
+ *  written to the database here. Synchronous fit; no DB access. */
+export function fitCustomCut(def: CutDef, opts: CutRunOpts = {}): { bundle: ResultBundle } {
+  return { bundle: buildCutBundle(assembleCustom(def), opts) };
+}
+
 async function cli() {
   loadManifest();
   const cuts = listCuts();

@@ -8,8 +8,8 @@
 import { revalidatePath } from "next/cache";
 import { and, eq, inArray } from "drizzle-orm";
 import { db, analysisRun, resultBundle, study, advancementDecision } from "@verdant/db";
-import { runMetAnalysis, runTomatoCut, buildCustomCut, previewCustomCut, type ModelOverrides, type CutPreview, type CutExclusions } from "@verdant/pipeline";
-import type { AnalysisRequest } from "@verdant/contracts";
+import { runMetAnalysis, runTomatoCut, buildCustomCut, fitCustomCut, previewCustomCut, type ModelOverrides, type CutPreview, type CutExclusions } from "@verdant/pipeline";
+import type { AnalysisRequest, ResultBundle } from "@verdant/contracts";
 import { answer, type Answer } from "@verdant/ai";
 import { getLatestResult, getCutResult } from "@/lib/data";
 
@@ -58,14 +58,29 @@ export async function withdrawAdvancement(input: { analysisRunId: number; candid
 // --- Grounded Q&A (ADR-0002/0004) — ask the freshest analysis a question; the AI explains the
 // bundle and may state only numbers present in it (evals/groundedness). The LLM call runs server-only.
 export type AskResult = { status: "ok"; answer: Answer } | { status: "error"; error: string };
-export async function askResults(question: string, cutId?: string): Promise<AskResult> {
+export async function askResults(question: string, cutId?: string, bundle?: ResultBundle): Promise<AskResult> {
   try {
     const q = (question ?? "").trim();
     if (!q) return { status: "error", error: "Ask a question about the results." };
-    // Answer against the cut currently being viewed (its own data scope), else the latest analysis.
-    const result = cutId ? await getCutResult(cutId) : await getLatestResult();
-    if (!result) return { status: "error", error: "No analysis available yet." };
-    return { status: "ok", answer: await answer(q, result.bundle) };
+    // An unsaved (ephemeral) run hands its in-memory bundle directly; otherwise answer against the cut
+    // being viewed (its own data scope), else the latest persisted analysis.
+    const b = bundle ?? (cutId ? (await getCutResult(cutId))?.bundle : (await getLatestResult())?.bundle);
+    if (!b) return { status: "error", error: "No analysis available yet." };
+    return { status: "ok", answer: await answer(q, b) };
+  } catch (e) {
+    return { status: "error", error: (e as Error).message };
+  }
+}
+
+// EPHEMERAL RUN (ADR-0023): fit a breeder-defined composition and return the bundle WITHOUT persisting —
+// "run without saving". The breeder reviews the live results; Save (runAnalysis) is a separate, explicit
+// step that re-fits + persists server-side (we never store a client-supplied bundle). Synchronous fit.
+export type FitResult = { status: "ok"; bundle: ResultBundle } | { status: "error"; error: string };
+export async function fitCut(input: { trialIds: string[]; overrides?: ModelOverrides; exclusions?: CutExclusions }): Promise<FitResult> {
+  try {
+    if (!input.trialIds?.length) return { status: "error", error: "Pick at least one trial." };
+    const { bundle } = fitCustomCut({ id: "ephemeral", name: "Unsaved run", trialIds: input.trialIds }, { overrides: input.overrides, exclusions: input.exclusions });
+    return { status: "ok", bundle };
   } catch (e) {
     return { status: "error", error: (e as Error).message };
   }

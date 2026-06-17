@@ -6,8 +6,8 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { ResultBundle } from "@verdant/contracts";
-import { Layers, ShieldCheck, SlidersHorizontal, Microscope, ListChecks, ClipboardCheck, Dna, Play, RefreshCw, Lock, ArrowRight, Activity, Check } from "lucide-react";
-import { previewAnalysis, runAnalysis } from "@/app/actions";
+import { Layers, ShieldCheck, SlidersHorizontal, Microscope, ListChecks, ClipboardCheck, Dna, Play, RefreshCw, Lock, ArrowRight, Activity, Check, Save, Eye } from "lucide-react";
+import { previewAnalysis, runAnalysis, fitCut } from "@/app/actions";
 import DataCutPicker, { type CutCard, type CatalogTrial, type Taxonomy, type SavedCutCard } from "./DataCutPicker";
 import StepShell, { type Step } from "./StepShell";
 import OverviewSummary from "./OverviewSummary";
@@ -38,9 +38,13 @@ export default function CutWorkbench({ cuts, catalog, taxonomy, savedCuts, initi
   // thorough option re-plans the preview and is applied at Run.
   const [ov, setOv] = useState<ModelOv>({});
   const [preview, setPreview] = useState<Awaited<ReturnType<typeof previewAnalysis>> | null>(null);
+  // The result of an EPHEMERAL run (fit, not persisted) — held in memory, shown in the result tabs, and
+  // discarded if the cut/model changes. Save (below) is the explicit persist step.
+  const [transient, setTransient] = useState<ResultBundle | null>(null);
   const [active, setActive] = useState(initial ? 1 : 0);
   const [, startPreview] = useTransition();
-  const [running, startRun] = useTransition();
+  const [fitting, startFit] = useTransition();
+  const [saving, startRun] = useTransition();
   const [err, setErr] = useState<string | null>(null);
 
   const hasOverrides = !!(ov.spatial === "spats" || ov.gxe === "include" || ov.relationship === "G" || ov.engine === "blupf90");
@@ -53,6 +57,7 @@ export default function CutWorkbench({ cuts, catalog, taxonomy, savedCuts, initi
   useEffect(() => {
     if (!trialIds.length) { setPreview(null); return; }
     let cancelled = false;
+    setTransient(null); // editing the cut/model invalidates any unsaved run
     startPreview(async () => {
       const res = await previewAnalysis({ trialIds, overrides: ov });
       if (!cancelled) setPreview(res);
@@ -69,11 +74,23 @@ export default function CutWorkbench({ cuts, catalog, taxonomy, savedCuts, initi
     warnings: [], provenance: { contract_version: "v0" },
   } as unknown as ResultBundle) : null, [p]);
 
-  const run = () => {
+  // RUN = fit and show, WITHOUT saving (ephemeral). A plain unedited template is already persisted, so
+  // running it just opens its prebuilt result; anything custom fits in-memory.
+  const fit = () => {
     setErr(null);
     if (matchedTemplate && !hasOverrides) { router.push(`/?cut=${matchedTemplate.id}`); return; } // prebuilt — instant
+    startFit(async () => {
+      const res = await fitCut({ trialIds, overrides: ov });
+      if (res.status === "error") { setErr(res.error); return; }
+      setTransient(res.bundle);
+      setActive(3); // jump to the first result tab (Fit)
+    });
+  };
+  // SAVE = persist the current composition + model as a named, re-runnable cut (server re-fit + persist).
+  const save = () => {
+    setErr(null);
     const nm = name.trim() || (matchedTemplate ? `${matchedTemplate.label} · custom model` : "");
-    if (!nm) { setErr("Name this analysis to run & save it."); return; }
+    if (!nm) { setErr("Name this analysis to save it."); return; }
     startRun(async () => {
       const res = await runAnalysis({ name: nm, trialIds, overrides: ov });
       if (res.status === "error") { setErr(res.error); return; }
@@ -81,7 +98,10 @@ export default function CutWorkbench({ cuts, catalog, taxonomy, savedCuts, initi
     });
   };
 
-  const result = resultFresh ? initial!.bundle : null;
+  // The result shown in the tabs: an unsaved run takes precedence; otherwise the persisted bundle (only
+  // when it matches the current composition + default model).
+  const result = transient ?? (resultFresh ? initial!.bundle : null);
+  const ephemeral = !!transient;
   const hasGenomic = !!(result as { genomic?: unknown } | null)?.genomic;
   const studyName = cutLabel(result) ?? matchedTemplate?.label ?? cutLabel(previewBundle) ?? "new cut";
 
@@ -116,19 +136,21 @@ export default function CutWorkbench({ cuts, catalog, taxonomy, savedCuts, initi
           <InsightBanner bundle={previewBundle} />
           <ModelReadiness bundle={previewBundle} />
           <ModelStudio bundle={previewBundle} ov={ov} setOv={setOv} />
-          <RunPanel matchedTemplate={!!matchedTemplate && !hasOverrides} name={name} setName={setName} run={run} running={running} err={err} fresh={resultFresh} />
+          <RunPanel matchedTemplate={!!matchedTemplate && !hasOverrides} name={name} setName={setName} fit={fit} save={save} discard={() => setTransient(null)} fitting={fitting} saving={saving} err={err} fresh={resultFresh} ephemeral={ephemeral} />
         </div>
       ) : <Loading /> },
     { id: "fit", label: "Fit", sublabel: "did the model work? residuals & Q-Q", icon: <Activity size={14} />,
       content: result ? (
         <div className="space-y-5">
+          {ephemeral && <UnsavedBanner onSave={() => setActive(2)} />}
           <DataQuality bundle={result} phase="fit" reviewOnly />
         </div>
       ) : <RunGate what="the fit diagnostics" /> },
     { id: "understand", label: "Understand", sublabel: "ask, heritability & correlations", icon: <Microscope size={14} />,
       content: result ? (
         <div className="space-y-5">
-          <AskPanel cutId={initial!.cutId} bundle={result} />
+          {ephemeral && <UnsavedBanner onSave={() => setActive(2)} />}
+          <AskPanel cutId={ephemeral ? undefined : initial?.cutId} bundle={result} />
           <section><h3 className="mb-2 text-sm font-semibold text-slate-700">Heritability on this cut</h3><HeritabilityCards bundle={result} /></section>
           <GeneticCorrelations bundle={result} />
           <CombiningAbilityUnderstand bundle={result} />
@@ -136,10 +158,11 @@ export default function CutWorkbench({ cuts, catalog, taxonomy, savedCuts, initi
       ) : <RunGate what="heritability & correlations" /> },
     { id: "select", label: "Select", sublabel: "rank by market & choose", icon: <ListChecks size={14} />,
       content: result ? (
-        <SelectionSection bundle={result} analysisRunId={initial!.runId} advancements={initial!.advancements.map((a) => ({ candidate: a.candidate, unit: a.unit, pool: a.pool, disposition: a.disposition }))} />
+        <SelectionSection bundle={result} analysisRunId={ephemeral ? -1 : initial!.runId} ephemeral={ephemeral}
+          advancements={ephemeral ? [] : initial!.advancements.map((a) => ({ candidate: a.candidate, unit: a.unit, pool: a.pool, disposition: a.disposition }))} />
       ) : <RunGate what="the rankings" /> },
     { id: "advance", label: "Advance", sublabel: "record decisions", icon: <ClipboardCheck size={14} />,
-      content: result ? <AdvanceStep advancements={initial!.advancements} /> : <RunGate what="advancement decisions" /> },
+      content: result ? (ephemeral ? <UnsavedBanner onSave={() => setActive(2)} what="record advancement decisions" /> : <AdvanceStep advancements={initial!.advancements} />) : <RunGate what="advancement decisions" /> },
     ...(hasGenomic ? [{ id: "genomics", label: "Genomics", sublabel: "relationship, structure, GEBVs", icon: <Dna size={14} />, content: <GenomicWorkspace bundle={result!} /> } as Step] : []),
   ];
 
@@ -298,22 +321,51 @@ function Toggle({ label, desc, on, rec, onChange, disabled }: { label: string; d
     </div>
   );
 }
-function RunPanel({ matchedTemplate, name, setName, run, running, err, fresh }: { matchedTemplate: boolean; name: string; setName: (s: string) => void; run: () => void; running: boolean; err: string | null; fresh: boolean }) {
+// The Run/Save panel. Run FITS without persisting (ephemeral); Save persists it as a named cut. A plain
+// unedited template is already saved → Run just opens its prebuilt result and there's nothing to Save.
+function RunPanel({ matchedTemplate, name, setName, fit, save, discard, fitting, saving, err, fresh, ephemeral }: {
+  matchedTemplate: boolean; name: string; setName: (s: string) => void; fit: () => void; save: () => void; discard: () => void;
+  fitting: boolean; saving: boolean; err: string | null; fresh: boolean; ephemeral: boolean;
+}) {
+  if (ephemeral) {
+    // An unsaved run is showing in the result tabs — offer to keep it (Save) or throw it away (Discard).
+    return (
+      <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4">
+        <h3 className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-800"><Eye size={15} className="text-amber-600" /> Unsaved run — results are below</h3>
+        <p className="mt-0.5 text-[12px] text-slate-500">Nothing was saved. Review the results in the steps that follow, then <b>Save</b> to keep it as a re-runnable cut (needed to record advancement decisions), or discard it.</p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name this analysis to save it, e.g. “CA processing 24-25”" className="min-w-[260px] flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400" />
+          <button type="button" onClick={save} disabled={saving} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50">
+            {saving ? <><RefreshCw size={15} className="animate-spin" /> Saving…</> : <><Save size={15} /> Save this run</>}
+          </button>
+          <button type="button" onClick={discard} disabled={saving} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-500 hover:bg-white disabled:opacity-50">Discard</button>
+        </div>
+        {err && <p className="mt-2 text-[12px] text-rose-600">{err}</p>}
+      </div>
+    );
+  }
   return (
     <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4">
       <h3 className="text-sm font-semibold text-slate-800">{fresh ? "Analysis is up to date" : "Run the analysis"}</h3>
       <p className="mt-0.5 text-[12px] text-slate-500">
         {fresh ? "This cut has already been fit — its results are in the steps that follow. Edit the cut or model to run again."
-          : matchedTemplate ? "A standard cut — running fits the model and shows the results below."
-          : "Name this custom analysis; running fits the model and saves it as a re-runnable cut."}
+          : matchedTemplate ? "A standard cut — running opens its prebuilt results below."
+          : "Running fits the model and shows the results below — nothing is saved until you choose to."}
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        {!matchedTemplate && !fresh && <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name this analysis, e.g. “CA processing training set 24-25”" className="min-w-[260px] flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400" />}
-        <button type="button" onClick={run} disabled={running} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50">
-          {running ? <><RefreshCw size={15} className="animate-spin" /> Running the fit…</> : <><Play size={15} /> {fresh ? "Re-run analysis" : "Run analysis"}</>}
+        <button type="button" onClick={fit} disabled={fitting} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50">
+          {fitting ? <><RefreshCw size={15} className="animate-spin" /> Running the fit…</> : <><Play size={15} /> {fresh ? "Re-run analysis" : matchedTemplate ? "Run analysis" : "Run (without saving)"}</>}
         </button>
       </div>
       {err && <p className="mt-2 text-[12px] text-rose-600">{err}</p>}
+    </div>
+  );
+}
+function UnsavedBanner({ onSave, what }: { onSave: () => void; what?: string }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
+      <Eye size={14} /> <span>Unsaved run{what ? ` — Save it to ${what}` : " — these results aren't saved yet"}.</span>
+      <button type="button" onClick={onSave} className="ml-auto inline-flex items-center gap-1 rounded-lg bg-amber-600 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-amber-700"><Save size={12} /> Go to Save</button>
     </div>
   );
 }

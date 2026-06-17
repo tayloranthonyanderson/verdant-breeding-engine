@@ -6,7 +6,7 @@
 // recycle — the same lenses pointed at parent GCA, within heterotic pool. Advancement state lives here
 // (shared across both levels) so a parent and a hybrid advance through the same recorded decision.
 import { useMemo, useState, useTransition } from "react";
-import { FlaskConical, Sprout, SlidersHorizontal, TrendingUp } from "lucide-react";
+import { FlaskConical, Sprout, SlidersHorizontal, TrendingUp, Lock } from "lucide-react";
 import type { ResultBundle } from "@verdant/contracts";
 import { getCombiningAbility, type AdvanceFn, type AdvancementRow } from "@/lib/ca";
 import { recordAdvancement, withdrawAdvancement } from "@/app/actions";
@@ -18,13 +18,15 @@ type Level = "hybrids" | "parents";
 type HybridView = "index" | "performance";
 
 export default function SelectionSection({
-  bundle, analysisRunId, advancements,
-}: { bundle: ResultBundle; analysisRunId: number; advancements: AdvancementRow[] }) {
+  bundle, analysisRunId, advancements, ephemeral,
+}: { bundle: ResultBundle; analysisRunId: number; advancements: AdvancementRow[]; ephemeral?: boolean }) {
   const ca = useMemo(() => getCombiningAbility(bundle), [bundle]);
   const [level, setLevel] = useState<Level>(ca ? "parents" : "hybrids");
   const [hybridView, setHybridView] = useState<HybridView>("index");
   const [, start] = useTransition();
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  // On an unsaved run there's no persisted analysis to attach decisions to — recording is gated on Save.
+  const [note, setNote] = useState<string | null>(null);
 
   const advancedKeys = useMemo(
     () => new Map(advancements.map((a) => [`${a.unit}:${a.candidate}`, a.disposition])),
@@ -32,6 +34,7 @@ export default function SelectionSection({
   );
 
   const advance: AdvanceFn = (candidate, unit, pool, disposition) => {
+    if (ephemeral) { setNote("This is an unsaved run — Save it (in the Model step) to record advancement decisions."); return; }
     const key = `${unit}:${candidate}`;
     setBusyKey(key);
     start(async () => {
@@ -41,12 +44,18 @@ export default function SelectionSection({
     });
   };
   const advanceMany = (rows: Array<{ candidate: string; unit: "inbred" | "hybrid"; pool: string | null; disposition: string }>) => {
+    if (ephemeral) { setNote("This is an unsaved run — Save it (in the Model step) to record advancement decisions."); return; }
     setBusyKey("__batch__");
     start(async () => { await recordAdvancement({ analysisRunId, candidates: rows }); setBusyKey(null); });
   };
 
   return (
     <section className="space-y-4">
+      {note && (
+        <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
+          <Lock size={14} /> {note}
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-3">
         <h3 className="text-sm font-semibold text-slate-700">Selection</h3>
         {ca && (
