@@ -202,6 +202,21 @@ recorded advancement. Validated on G2F MET line×tester. See `.scratch/ux-archit
   kinship so a thinly-crossed inbred still gets a usable GCA. Same machinery as genomic prediction, pointed
   at the parents.
 
+## Cross-planning vocabulary (ADR-0024)
+The **forward** half of the cycle — combining ability stops being *displayed* and becomes a *generated
+decision*: which matings to make. Two modes, not one tool:
+- **Product cross** — pool-A inbred × pool-B inbred → the **F1 you sell** (terminal: no within-cross
+  selection, not a parent). *Built* (2026-06-18): the **Cross** step ranks every across-pool A×B by a
+  market-weighted index of **combined GCA** (`GCA_a + GCA_b`, the Hybrid-prediction workhorse above),
+  gates each cross on **allele transmission** (a dominant R-gene fixes in the F1 if *either* parent
+  carries it), and composes a **portfolio** under a per-parent use cap. **GCA-only by design** (these
+  crosses are unmade → SCA unknowable); **no OCS/coancestry penalty** — the heterotic-pool split *is* the
+  diversity, and a terminal F1 has no inbreeding to manage. A client-side derivation over
+  `combining_ability` (`lib/cross-plan.ts`).
+- **Recycling cross** — within-pool line × line → the **next inbred generation**. Recurrent selection, so
+  **optimal-contribution selection** (gain vs. group coancestry; genomic, no pedigree) *is* the right
+  tool here. *Deferred.* Maps to the **Parents·GCA** Selection level (vs. **Hybrids** = product cross).
+
 ## Program organization vocabulary (the two axes — see [DOMAIN-MODEL.md](docs/DOMAIN-MODEL.md))
 - **Stage** — a candidate's position on the program's *ordered* advancement ladder (e.g.
   stage 1 → pre-commercial → commercial). Program-defined; material moves between stages via an

@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { ResultBundle } from "@verdant/contracts";
-import { Layers, ShieldCheck, SlidersHorizontal, Microscope, ListChecks, ClipboardCheck, Dna, Play, RefreshCw, Lock, ArrowRight, Activity, Check, Save, Eye } from "lucide-react";
+import { Layers, ShieldCheck, SlidersHorizontal, Microscope, ListChecks, ClipboardCheck, Dna, Play, RefreshCw, Lock, ArrowRight, Activity, Check, Save, Eye, Combine } from "lucide-react";
 import { previewAnalysis, runAnalysis, fitCut } from "@/app/actions";
 import DataCutPicker, { type CutCard, type CatalogTrial, type Taxonomy, type SavedCutCard } from "./DataCutPicker";
 import StepShell, { type Step } from "./StepShell";
@@ -20,6 +20,7 @@ import CombiningAbilityUnderstand from "./CombiningAbilityUnderstand";
 import AskPanel from "./AskPanel";
 import SelectionSection from "./SelectionSection";
 import AdvanceStep, { type AdvanceRow } from "./AdvanceStep";
+import CrossPlanner from "./CrossPlanner";
 import GenomicWorkspace from "./GenomicWorkspace";
 
 export interface WorkbenchInitial { cutId: string; bundle: ResultBundle; runId: number; advancements: AdvanceRow[]; trialIds: string[] }
@@ -103,6 +104,7 @@ export default function CutWorkbench({ cuts, catalog, taxonomy, savedCuts, initi
   const result = transient ?? (resultFresh ? initial!.bundle : null);
   const ephemeral = !!transient;
   const hasGenomic = !!(result as { genomic?: unknown } | null)?.genomic;
+  const hasCA = !!(result as { combining_ability?: unknown } | null)?.combining_ability;
   const studyName = cutLabel(result) ?? matchedTemplate?.label ?? cutLabel(previewBundle) ?? "new cut";
 
   const RunGate = ({ what }: { what: string }) => (
@@ -163,6 +165,7 @@ export default function CutWorkbench({ cuts, catalog, taxonomy, savedCuts, initi
       ) : <RunGate what="the rankings" /> },
     { id: "advance", label: "Advance", sublabel: "record decisions", icon: <ClipboardCheck size={14} />,
       content: result ? (ephemeral ? <UnsavedBanner onSave={() => setActive(2)} what="record advancement decisions" /> : <AdvanceStep advancements={initial!.advancements} />) : <RunGate what="advancement decisions" /> },
+    ...(hasCA ? [{ id: "cross", label: "Cross", sublabel: "plan next season's product crosses", icon: <Combine size={14} />, content: <CrossPlanner bundle={result!} /> } as Step] : []),
     ...(hasGenomic ? [{ id: "genomics", label: "Genomics", sublabel: "relationship, structure, GEBVs", icon: <Dna size={14} />, content: <GenomicWorkspace bundle={result!} /> } as Step] : []),
   ];
 
