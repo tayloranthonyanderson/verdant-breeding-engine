@@ -5,12 +5,8 @@
 // the marker gate's loci are read from markers.csv against a small tomato gene panel. Returns the
 // combining_ability block the Understand + Select (Parents·GCA / Hybrids) views render. Best-effort:
 // callers wrap in try/catch, and it returns null when the cut carries no crosses.
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { parse } from 'csv-parse/sync';
-import { tomatoCorpusDir } from './paths';
 import { runRKernel } from './kernel';
-import { loadInbreds, type AssembledCut } from './tomato-corpus';
+import { loadInbreds, markerPanel, type AssembledCut } from './tomato-corpus';
 import { buildTomatoRecycling } from './tomato-recycling';
 import type { CombiningAbility } from './combining-ability-build';
 
@@ -26,25 +22,17 @@ const TOMATO_LOCI: TomatoLocus[] = [
 ];
 const NATIVE_GATE = 'Pto_resistant'; // the native-trait gate id (bacterial speck) — see combining-ability.R native_id
 
-let _markerGate: { byId: Map<string, Record<string, number>> } | null = null;
-function markerCalls(): Map<string, Record<string, number>> {
-  if (_markerGate) return _markerGate.byId;
-  const rows = parse(readFileSync(join(tomatoCorpusDir(), 'markers.csv')), { columns: true, skip_empty_lines: true }) as Record<string, string>[];
-  const byId = new Map<string, Record<string, number>>();
-  for (const r of rows) {
-    const calls: Record<string, number> = {};
-    for (const L of TOMATO_LOCI) calls[L.marker] = Number(r[L.marker]);
-    byId.set(r.genotype, calls);
-  }
-  return (_markerGate = { byId }).byId;
-}
-/** A line's homozygous-ish allele at each gate locus (dosage ≥ 1 → favorable), for the marker gate. */
+/** A line's homozygous-ish allele at each gate locus (dosage ≥ 1 → favorable), for the marker gate.
+ *  Reads the shared marker panel by column index. */
 function allelesFor(name: string): Record<string, string> {
-  const calls = markerCalls().get(name);
+  const panel = markerPanel();
+  const dos = panel.byId.get(name);
   const out: Record<string, string> = {};
   for (const L of TOMATO_LOCI) {
     const other = L.alleles[0] === L.favorable ? L.alleles[1] : L.alleles[0];
-    out[L.locus] = calls && (calls[L.marker] ?? 0) >= 1 ? L.favorable : other;
+    const idx = panel.index.get(L.marker);
+    const d = dos && idx != null ? (dos[idx] ?? 0) : 0;
+    out[L.locus] = d >= 1 ? L.favorable : other;
   }
   return out;
 }
@@ -97,8 +85,8 @@ export function buildTomatoCombiningAbility(assembled: AssembledCut): CombiningA
   const ca = runRKernel<{ combining_ability: CombiningAbility }>('combining-ability.R', payload, { transport: 'cfg-file', maxBuffer: 1 << 28 }).combining_ability;
   // Attach each line's marker calls (the gate source) + the tomato locus catalog for the GcaGates UI.
   ca.gca = ca.gca.map((g) => ({ ...g, loci: allelesFor(g.line) }));
-  (ca as { loci_catalog?: unknown }).loci_catalog = TOMATO_LOCI.map(({ locus, trait, alleles, favorable, freq }) => ({ locus, trait, alleles, favorable, freq }));
+  ca.loci_catalog = TOMATO_LOCI.map(({ locus, trait, alleles, favorable, freq }) => ({ locus, trait, alleles, favorable, freq }));
   // Within-pool recycling (mode 2) — usefulness vs OCS per pool. Best-effort; rides along on the same block.
-  try { (ca as { recycling?: unknown }).recycling = buildTomatoRecycling(); } catch { /* recycling stays absent */ }
+  try { ca.recycling = buildTomatoRecycling(); } catch { /* recycling stays absent */ }
   return ca;
 }

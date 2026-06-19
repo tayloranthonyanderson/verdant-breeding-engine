@@ -4,25 +4,13 @@
 // the pool roster + per-se merit come from inbreds.csv, the genotypes from markers.csv; marker effects for
 // the progeny-variance term are trained on the FULL pool germplasm (both pools) so σ is identifiable.
 // Runs the generic cross-recycling.R kernel once per pool. Best-effort: callers wrap in try/catch.
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { parse } from 'csv-parse/sync';
-import { tomatoCorpusDir } from './paths';
+import type { Recycling, RecyclePool } from '@verdant/contracts';
 import { runRKernel } from './kernel';
-import { loadInbreds } from './tomato-corpus';
+import { loadInbreds, markerPanel } from './tomato-corpus';
 
-let _mm: { byId: Map<string, number[]>; cols: string[] } | null = null;
-function markerMatrix(): { byId: Map<string, number[]>; cols: string[] } {
-  if (_mm) return _mm;
-  const rows = parse(readFileSync(join(tomatoCorpusDir(), 'markers.csv')), { columns: true, skip_empty_lines: true }) as Record<string, string>[];
-  const cols = Object.keys(rows[0] ?? {}).filter((c) => c !== 'genotype');
-  const byId = new Map<string, number[]>();
-  for (const r of rows) byId.set(r.genotype, cols.map((c) => Number(r[c])));
-  return (_mm = { byId, cols });
-}
-
-// The kernel's recycling block (loosely typed here; the web tier's lib/ca.ts gives it a rich shape).
-export type RecyclingByPool = Record<string, unknown>;
+// The per-pool recycling block — the shape lives once in the engine contract; the only cast is the
+// kernel's `unknown` output narrowed to RecyclePool, at the single point it's consumed (below).
+export type RecyclingByPool = Recycling;
 
 /** Within-pool recycling plans (usefulness vs OCS) for each heterotic pool, from inbreds.csv + markers.csv.
  *  Independent of the cut's trials — it operates on the program's inbred pools. Returns null when there
@@ -30,7 +18,7 @@ export type RecyclingByPool = Record<string, unknown>;
 export function buildTomatoRecycling(opts: { nCrosses?: number; selProp?: number } = {}): RecyclingByPool | null {
   const inbreds = [...loadInbreds().values()];
   if (!inbreds.length) return null;
-  const mm = markerMatrix();
+  const mm = markerPanel();
   const usable = inbreds.filter((f) => f.per_se != null && f.pool && f.pool !== 'Unassigned' && mm.byId.has(f.name));
   if (usable.length < 16) return null;
   // marker effects are trained on the FULL set of usable pool lines (both pools) → σ identifiable.
@@ -50,7 +38,7 @@ export function buildTomatoRecycling(opts: { nCrosses?: number; selProp?: number
       train_bv, train_dosage,
       n_crosses: opts.nCrosses ?? 15, max_per_parent: 15, sel_prop: opts.selProp ?? 0.10,
     }, { transport: 'cfg-file', maxBuffer: 1 << 28 });
-    out[pool] = res.recycling;
+    out[pool] = res.recycling as RecyclePool;
   }
   return Object.keys(out).length ? out : null;
 }

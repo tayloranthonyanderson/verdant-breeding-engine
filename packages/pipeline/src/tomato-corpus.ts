@@ -136,6 +136,21 @@ export function loadInbreds(): Map<string, InbredFact> {
   return (_inbreds = m);
 }
 
+/** The tomato corpus marker panel: data/tomato/markers.csv read ONCE into a genotype→dosage matrix
+ *  (`byId`), the marker-column order (`cols`), and a column→position `index`. The single reader the
+ *  genomic, combining-ability and recycling facets share (each used to re-parse the file itself). */
+export interface MarkerPanel { byId: Map<string, number[]>; cols: string[]; nMarkers: number; index: Map<string, number> }
+let _markerPanel: MarkerPanel | null = null;
+export function markerPanel(): MarkerPanel {
+  if (_markerPanel) return _markerPanel;
+  const rows = parse(readFileSync(join(tomatoCorpusDir(), 'markers.csv')), { columns: true, skip_empty_lines: true }) as Record<string, string>[];
+  const cols = Object.keys(rows[0] ?? {}).filter((c) => c !== 'genotype');
+  const index = new Map(cols.map((c, i) => [c, i]));
+  const byId = new Map<string, number[]>();
+  for (const r of rows) byId.set(r.genotype, cols.map((c) => Number(r[c])));
+  return (_markerPanel = { byId, cols, nMarkers: cols.length, index });
+}
+
 /** Markets (leaf nodes with weights) whose TPE appears among the cut's trials. */
 function relevantMarketsFor(trials: TrialMeta[], m: Manifest): CutMarket[] {
   const tpes = new Set(trials.map((t) => t.tpe));

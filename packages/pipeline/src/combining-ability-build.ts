@@ -7,10 +7,10 @@
 // so Model Studio re-runs stay unified.
 import { desc, eq } from 'drizzle-orm';
 import { db, pool as pgPool, program, study, analysisRun, resultBundle, inbredLine } from '@verdant/db';
-import { validateResultBundle, type ResultBundle, type AnalysisRequest } from '@verdant/contracts';
+import { validateResultBundle, type ResultBundle, type AnalysisRequest, type CombiningAbility } from '@verdant/contracts';
 import { parseG2fMet, parseG2fHybrids } from './g2f';
 import { runRKernel } from './kernel';
-import { LOCI_CATALOG, type Locus } from './loci';
+import { LOCI_CATALOG } from './loci';
 import { metFixture } from './paths';
 import { isEntrypoint } from './entry';
 
@@ -31,19 +31,9 @@ const DEFAULT_OBJECTIVE = {
   gates: [{ variable_id: 'nctlb_resistant', operator: '>=' as const, threshold: 1 }],
 };
 
-export interface CombiningAbility {
-  topology: { kind: string; n_lines: number; n_testers: number; eff_testers: number; n_crosses: number; tester_effect: string; sca_included: boolean; pools: Array<{ pool: string; n: number }>; decisions: Array<{ factor: string; choice: string; reason: string; diagnostic?: unknown }> };
-  diagnostics: { degree: { min: number; median: number; max: number; distribution: Record<string, number> }; connectivity: { components: number; connected: boolean }; replication: { replicated_crosses: number; total_crosses: number } };
-  traits: Array<{ variable_id: string; varcomp: Array<{ component: string; variance: number }>; genetic_sd: number | null; baker_ratio: number | null }>;
-  gca_genetic_correlations: { variable_ids: string[]; matrix: number[][] };
-  index_traits: string[];
-  loci_catalog?: Locus[];
-  gca: Array<{ line: string; pool: string; cross_degree: { n_testers: number; n_plots: number }; per_se: number | null; nclb_resistant: number | null; loci?: Record<string, string> | null; values: Record<string, number | null> }>;
-  pool_rankings: Array<{ pool: string; n: number; ranking: Array<{ line: string; pool: string; score: number; rank: number; gated_out: boolean; gate_failures: string[] }> }>;
-  hybrids: Array<{ hybrid: string; line: string; tester: string; pool: string; n_plots: number; rank: number; score: number; observed: Record<string, number | null>; line_gca: Record<string, number | null> }>;
-  sca: Array<{ line: string; tester: string; value: number }>;
-  divergence: { compared: string[]; rank_correlation: number | null; notable_movers: Array<{ line: string; pool: string; rank_delta: number; per_se: number; gca_score: number }> };
-}
+// The combining_ability facet shape now lives once in the engine contract; re-exported here so existing
+// importers (met-build, tomato-combining-ability, the pipeline barrel) keep their import path.
+export type { CombiningAbility };
 
 /** Run the GCA/SCA fit and return the combining_ability section. Reuses the MET fixture (parentage +
  *  plot phenotypes) + the synthetic inbred-line facts (pool / per-se / native trait) from the DB. */

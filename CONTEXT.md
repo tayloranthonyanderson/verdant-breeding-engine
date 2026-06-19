@@ -169,6 +169,9 @@ page** whose **Selection** workspace has a **level** switch (Hybrids / Parents·
 (Stated / Genetically-optimal / Compare) over the shared index components — the genetic desired-gains
 lens runs on GCA too. Within-pool GCA + hybrid ranking, per-se↔GCA divergence, SCA, native-trait gating,
 recorded advancement. Validated on G2F MET line×tester. See `.scratch/ux-architecture/plan.md`.
+The rich `combining_ability` + `recycling` **facet shapes** are typed ONCE in `@verdant/contracts`
+(`facets.ts`) and imported by both the pipeline (which builds them) and the web tier (which renders
+them) — the bundle types them loosely, so `combiningAbilityOf` / `recyclingOf` are the single read seams.
 - **Combining ability** — the decomposition of a *cross's* performance into the contributions of its
   *parents*. Turns a hybrid-performance trial into **parent selection**: which inbreds are good
   *combiners*, not merely which hybrids won (the opaque hybrid BLUP can't say). Fired by the planner as a

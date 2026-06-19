@@ -4,28 +4,17 @@
 // everything the Genomics tab renders, and the genomic_G GEBVs the selection index can rank on when the
 // breeder chooses relationship = G. The G2F path reads markers from Postgres; tomato's are a flat CSV
 // with full overlap to the trial genotypes (incl. the 6 checks) and no pedigree.
-import { readFileSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { parse } from 'csv-parse/sync';
-import { tomatoCorpusDir } from './paths';
 import { runRKernel } from './kernel';
 import { genomicGblup } from './genomic-blupf90';
-
-let _markers: { byId: Map<string, number[]>; nMarkers: number } | null = null;
-function loadMarkers() {
-  if (_markers) return _markers;
-  const rows = parse(readFileSync(join(tomatoCorpusDir(), 'markers.csv')), { columns: true, skip_empty_lines: true }) as Record<string, string>[];
-  const cols = Object.keys(rows[0] ?? {}).filter((c) => c !== 'genotype');
-  const byId = new Map<string, number[]>();
-  for (const r of rows) byId.set(r.genotype, cols.map((c) => Number(r[c])));
-  return (_markers = { byId, nMarkers: cols.length });
-}
+import { markerPanel } from './tomato-corpus';
 
 /** Marker readiness for a cut's cohort (the planner needs this to offer relationship=G and the genomic
  *  engine choice). No pedigree in the tomato corpus, so A/H stay locked; markers + overlap drive G. */
 export function markerReadiness(cohort: string[]): { markers_present: boolean; pedigree_present: boolean; n_genotyped: number } {
-  const mk = loadMarkers();
+  const mk = markerPanel();
   const n = cohort.filter((id) => mk.byId.has(id)).length;
   return { markers_present: n >= 10 && mk.nMarkers > 0, pedigree_present: false, n_genotyped: n };
 }
@@ -44,7 +33,7 @@ export interface GenomicBuildInput {
 /** Build the bundle.genomic block from markers.csv for the cut's cohort. Returns null when too few
  *  genotyped lines for a meaningful GRM. Best-effort: caller wraps in try/catch. */
 export function buildGenomicBlock(input: GenomicBuildInput): Record<string, unknown> | null {
-  const mk = loadMarkers();
+  const mk = markerPanel();
   const cohort = input.cohort.filter((id) => mk.byId.has(id));
   if (cohort.length < 10 || mk.nMarkers < 1) return null;
   const m = mk.nMarkers;

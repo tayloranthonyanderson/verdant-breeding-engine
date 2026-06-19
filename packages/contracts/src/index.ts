@@ -8,6 +8,10 @@
 export type { AnalysisRequest } from './generated/analysis-request';
 export type { ResultBundle } from './generated/result-bundle';
 
+// The rich result-bundle facet shapes (combining_ability + recycling) + their narrowing helpers —
+// the one typed home both the pipeline and the web tier import (the generated bundle types these loosely).
+export * from './facets';
+
 export {
   validateAnalysisRequest,
   validateResultBundle,
