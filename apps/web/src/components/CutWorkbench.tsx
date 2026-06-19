@@ -104,7 +104,12 @@ export default function CutWorkbench({ cuts, catalog, taxonomy, savedCuts, initi
   const result = transient ?? (resultFresh ? initial!.bundle : null);
   const ephemeral = !!transient;
   const hasGenomic = !!(result as { genomic?: unknown } | null)?.genomic;
-  const hasCA = !!(result as { combining_ability?: unknown } | null)?.combining_ability;
+  // The catalog's testcross/hybrid trials — offered as one-click "add it" in the Cross step's empty-state
+  // so cross-planning is discoverable from ANY cut, not only one that already carries crosses.
+  const testcrossTrials = useMemo(() => catalog
+    .filter((t) => /testcross|hybrid/i.test(t.stage_label) || /hybrid/i.test(t.market_tag))
+    .map((t) => ({ trial_id: t.trial_id, label: t.stage_label })), [catalog]);
+  const addTestcross = (id: string) => { setTrialIds((ids) => (ids.includes(id) ? ids : [...ids, id])); setActive(2); };
   const studyName = cutLabel(result) ?? matchedTemplate?.label ?? cutLabel(previewBundle) ?? "new cut";
 
   const RunGate = ({ what }: { what: string }) => (
@@ -165,7 +170,8 @@ export default function CutWorkbench({ cuts, catalog, taxonomy, savedCuts, initi
       ) : <RunGate what="the rankings" /> },
     { id: "advance", label: "Advance", sublabel: "record decisions", icon: <ClipboardCheck size={14} />,
       content: result ? (ephemeral ? <UnsavedBanner onSave={() => setActive(2)} what="record advancement decisions" /> : <AdvanceStep advancements={initial!.advancements} />) : <RunGate what="advancement decisions" /> },
-    ...(hasCA ? [{ id: "cross", label: "Cross", sublabel: "plan next season's product crosses", icon: <Combine size={14} />, content: <CrossPlanner bundle={result!} /> } as Step] : []),
+    { id: "cross", label: "Cross", sublabel: "plan next season's product crosses", icon: <Combine size={14} />,
+      content: result ? <CrossPlanner bundle={result} testcrossTrials={testcrossTrials} included={trialIds} onAddTestcross={addTestcross} /> : <RunGate what="the cross plan" /> },
     ...(hasGenomic ? [{ id: "genomics", label: "Genomics", sublabel: "relationship, structure, GEBVs", icon: <Dna size={14} />, content: <GenomicWorkspace bundle={result!} /> } as Step] : []),
   ];
 

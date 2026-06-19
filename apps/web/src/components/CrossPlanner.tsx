@@ -15,7 +15,12 @@ import { buildCrossPlan, humanizeTrait, type CrossCandidate, type CrossTraitTerm
 
 const COLORS = ["#0ea5e9", "#8b5cf6"]; // poolA, poolB
 
-export default function CrossPlanner({ bundle }: { bundle: ResultBundle }) {
+export default function CrossPlanner({ bundle, testcrossTrials = [], included = [], onAddTestcross }: {
+  bundle: ResultBundle;
+  testcrossTrials?: { trial_id: string; label: string }[];
+  included?: string[];
+  onAddTestcross?: (id: string) => void;
+}) {
   const ca = useMemo(() => getCombiningAbility(bundle), [bundle]);
   const [gates, setGates] = useState<MarkerGates>({});
   const [maxPerParent, setMaxPerParent] = useState(3);
@@ -29,7 +34,7 @@ export default function CrossPlanner({ bundle }: { bundle: ResultBundle }) {
   );
 
   if (!ca || !plan) {
-    return <Empty msg="This run carries no combining-ability analysis. Compose a cut that includes the testcross trial and run it to plan crosses." />;
+    return <NoCrosses testcrossTrials={testcrossTrials} included={included} onAdd={onAddTestcross} />;
   }
   if (plan.note) return <Empty msg={plan.note} />;
 
@@ -275,6 +280,39 @@ function Empty({ msg }: { msg: string }) {
     <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 px-6 py-10 text-center">
       <div className="mx-auto grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-400"><Combine size={17} /></div>
       <p className="mt-3 text-sm text-slate-500">{msg}</p>
+    </div>
+  );
+}
+
+// Shown when the cut carries no testcross trial (so no combining ability to plan from). Explains why and
+// offers a one-click add of an available testcross trial — making cross-planning discoverable from any cut.
+function NoCrosses({ testcrossTrials, included, onAdd }: {
+  testcrossTrials: { trial_id: string; label: string }[]; included: string[]; onAdd?: (id: string) => void;
+}) {
+  const addable = testcrossTrials.filter((t) => !included.includes(t.trial_id));
+  const presentButThin = testcrossTrials.some((t) => included.includes(t.trial_id));
+  return (
+    <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 px-6 py-10 text-center">
+      <div className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-emerald-50 text-emerald-600"><Combine size={18} /></div>
+      <p className="mt-3 text-sm font-medium text-slate-700">No crosses to plan on this cut</p>
+      <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-slate-500">
+        Product cross-planning ranks across-pool A×B crosses by <b>combining ability</b>, so it needs an
+        F1 <b>testcross</b> trial in the cut to estimate GCA. This cut has none
+        {presentButThin ? " with enough lines for a GCA fit" : ""}.
+      </p>
+      {addable.length > 0 && onAdd && (
+        <>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            {addable.map((t) => (
+              <button key={t.trial_id} type="button" onClick={() => onAdd(t.trial_id)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-emerald-700">
+                <Plus size={13} /> Add {t.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] text-slate-400">Adds it to your cut and opens the Model step — press Run to plan crosses.</p>
+        </>
+      )}
     </div>
   );
 }
