@@ -9,12 +9,15 @@
 // they're tested — and the pool split, not a coancestry penalty, supplies the diversity (see ADR-0024).
 import { useMemo, useState } from "react";
 import type { ResultBundle } from "@verdant/contracts";
-import { Combine, ShieldCheck, Dna, X, ChevronDown, ChevronRight, Info, Plus, Minus } from "lucide-react";
-import { getCombiningAbility, type MarkerGates } from "@/lib/ca";
+import { Combine, ShieldCheck, Dna, X, ChevronDown, ChevronRight, Info, Plus, Minus, Recycle, Sprout } from "lucide-react";
+import { getCombiningAbility, getRecycling, type MarkerGates, type Recycling, type RecyclePool, type RecycleCross } from "@/lib/ca";
 import { buildCrossPlan, humanizeTrait, type CrossCandidate, type CrossTraitTerm } from "@/lib/cross-plan";
 
 const COLORS = ["#0ea5e9", "#8b5cf6"]; // poolA, poolB
+type CaT = NonNullable<ReturnType<typeof getCombiningAbility>>;
 
+// The Cross step: two crossing modes (ADR-0024). Product = across-pool A×B (which F1 to sell); Recycle =
+// within-pool line×line (what to recombine to keep the pool productive), shown as usefulness-vs-OCS.
 export default function CrossPlanner({ bundle, testcrossTrials = [], included = [], onAddTestcross }: {
   bundle: ResultBundle;
   testcrossTrials?: { trial_id: string; label: string }[];
@@ -22,20 +25,42 @@ export default function CrossPlanner({ bundle, testcrossTrials = [], included = 
   onAddTestcross?: (id: string) => void;
 }) {
   const ca = useMemo(() => getCombiningAbility(bundle), [bundle]);
+  const recycling = useMemo(() => getRecycling(ca), [ca]);
+  const [mode, setMode] = useState<"product" | "recycle">("product");
+  if (!ca) return <NoCrosses testcrossTrials={testcrossTrials} included={included} onAdd={onAddTestcross} />;
+  return (
+    <section className="space-y-4">
+      <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs">
+        <ModeTab active={mode === "product"} onClick={() => setMode("product")} icon={<Combine size={13} />}>Product · across-pool</ModeTab>
+        <ModeTab active={mode === "recycle"} onClick={() => setMode("recycle")} icon={<Recycle size={13} />}>Recycle · within-pool</ModeTab>
+      </div>
+      {mode === "product" ? (
+        <ProductCross ca={ca} />
+      ) : recycling ? (
+        <RecyclePlanner recycling={recycling} />
+      ) : (
+        <Empty msg="No within-pool recycling on this run — the heterotic pools were too small to fit." />
+      )}
+    </section>
+  );
+}
+
+function ModeTab({ active, onClick, icon, children }: { active: boolean; onClick: () => void; icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <button type="button" onClick={onClick}
+      className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition ${active ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+      {icon}{children}
+    </button>
+  );
+}
+
+function ProductCross({ ca }: { ca: CaT }) {
   const [gates, setGates] = useState<MarkerGates>({});
   const [maxPerParent, setMaxPerParent] = useState(3);
   const [nCrosses, setNCrosses] = useState(12);
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
   const [showAll, setShowAll] = useState(false);
-
-  const plan = useMemo(
-    () => (ca ? buildCrossPlan(ca, { gates, maxPerParent, nCrosses, excluded }) : null),
-    [ca, gates, maxPerParent, nCrosses, excluded],
-  );
-
-  if (!ca || !plan) {
-    return <NoCrosses testcrossTrials={testcrossTrials} included={included} onAdd={onAddTestcross} />;
-  }
+  const plan = useMemo(() => buildCrossPlan(ca, { gates, maxPerParent, nCrosses, excluded }), [ca, gates, maxPerParent, nCrosses, excluded]);
   if (plan.note) return <Empty msg={plan.note} />;
 
   const [poolA, poolB] = plan.pools!;
@@ -313,6 +338,123 @@ function NoCrosses({ testcrossTrials, included, onAdd }: {
           <p className="mt-2 text-[11px] text-slate-400">Adds it to your cut and opens the Model step — press Run to plan crosses.</p>
         </>
       )}
+    </div>
+  );
+}
+
+// ===== Recycle (within-pool) — usefulness vs OCS, the teaching contrast (ADR-0024 mode 2) =====
+function RecyclePlanner({ recycling }: { recycling: Recycling }) {
+  const pools = Object.keys(recycling);
+  const [pool, setPool] = useState(pools[0]);
+  const rp: RecyclePool | undefined = recycling[pool] ?? recycling[pools[0]];
+  if (!rp) return <Empty msg="No recycling pools on this run." />;
+  const c = rp.comparison;
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <div className="grid h-7 w-7 place-items-center rounded-lg bg-violet-50 text-violet-600"><Recycle size={15} /></div>
+          <div>
+            <h3 className="text-sm font-semibold text-slate-700">Recycle within {pool}</h3>
+            <p className="text-[11px] text-slate-400">Which line×line crosses to recombine into the next inbred generation — chasing gain vs. holding the pool&apos;s diversity.</p>
+          </div>
+        </div>
+        {pools.length > 1 && (
+          <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs">
+            {pools.map((p, i) => (
+              <button key={p} type="button" onClick={() => setPool(p)}
+                className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition ${pool === p ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+                <span className="h-2 w-2 rounded-full" style={{ background: COLORS[i % 2] }} />{p}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-start gap-1.5 rounded-xl border border-violet-100 bg-violet-50/40 px-3 py-2 text-[11px] leading-snug text-violet-900">
+        <Info size={13} className="mt-0.5 shrink-0" />
+        <span><b>Usefulness</b> ranks each cross by <code>μ + i·σ</code> (progeny mean + the variance it throws) and greedily takes the best — which piles onto a few elite, related lines. <b>OCS</b> maximises the same gain but caps <b>group coancestry</b>, spreading across more parents to protect the pool&apos;s long-term variance. Selection intensity i = {rp.selection_intensity} (top {Math.round(rp.sel_prop * 100)}%).</span>
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-[1fr_1fr_1.2fr]">
+        <PlanCard tone="amber" title="Usefulness" subtitle="greedy · chase gain" pt={c.usefulness_point} nCrosses={rp.usefulness_plan.n_crosses} />
+        <PlanCard tone="emerald" title="OCS" subtitle="cap coancestry" pt={c.ocs_point} nCrosses={rp.ocs_plan.n_crosses} />
+        <Frontier frontier={rp.frontier} useful={c.usefulness_point} ocs={c.ocs_point} />
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] leading-relaxed text-slate-600 shadow-sm">
+        OCS gives up <b className="text-amber-700">{c.gain_cost.toFixed(2)}</b> gain to save <b className="text-emerald-700">{c.coancestry_saved.toFixed(3)}</b> group coancestry and keep <b className="text-emerald-700">{c.eff_parents_gained.toFixed(1)}</b> more effective parents — only <b>{c.shared_crosses}/{rp.n_crosses}</b> crosses are shared between the two plans.
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        <CrossList title="Usefulness plan" tone="amber" crosses={rp.usefulness_plan.crosses} />
+        <CrossList title="OCS plan" tone="emerald" crosses={rp.ocs_plan.crosses} />
+      </div>
+    </div>
+  );
+}
+
+function PlanCard({ tone, title, subtitle, pt, nCrosses }: { tone: "amber" | "emerald"; title: string; subtitle: string; pt: { gain: number; coancestry: number; eff_parents: number }; nCrosses: number }) {
+  const ring = tone === "amber" ? "border-amber-200" : "border-emerald-200";
+  return (
+    <div className={`rounded-2xl border ${ring} bg-white p-3 shadow-sm`}>
+      <div className="flex items-baseline justify-between"><h4 className="text-sm font-semibold text-slate-700">{title}</h4><span className="text-[10px] text-slate-400">{subtitle}</span></div>
+      <dl className="mt-2 space-y-1 text-[12px]">
+        <Stat label="gain (Σ index)" value={`${pt.gain >= 0 ? "+" : ""}${pt.gain.toFixed(2)}`} />
+        <Stat label="group coancestry" value={pt.coancestry.toFixed(3)} />
+        <Stat label="effective parents" value={pt.eff_parents.toFixed(1)} />
+        <Stat label="crosses" value={String(nCrosses)} />
+      </dl>
+    </div>
+  );
+}
+function Stat({ label, value }: { label: string; value: string }) {
+  return <div className="flex items-center justify-between"><dt className="text-slate-500">{label}</dt><dd className="font-medium tabular-nums text-slate-800">{value}</dd></div>;
+}
+
+function Frontier({ frontier, useful, ocs }: { frontier: { gain: number; coancestry: number }[]; useful: { gain: number; coancestry: number }; ocs: { gain: number; coancestry: number } }) {
+  const W = 280, H = 150, pad = 30;
+  const xs = frontier.map((f) => f.coancestry).concat(useful.coancestry, ocs.coancestry);
+  const ys = frontier.map((f) => f.gain).concat(useful.gain, ocs.gain);
+  const xmin = Math.min(...xs), xmax = Math.max(...xs), ymin = Math.min(...ys), ymax = Math.max(...ys);
+  const sx = (x: number) => pad + (xmax > xmin ? (x - xmin) / (xmax - xmin) : 0.5) * (W - pad - 10);
+  const sy = (y: number) => H - pad - (ymax > ymin ? (y - ymin) / (ymax - ymin) : 0.5) * (H - pad - 12);
+  const pts = [...frontier].sort((a, b) => a.coancestry - b.coancestry).map((f) => `${sx(f.coancestry).toFixed(1)},${sy(f.gain).toFixed(1)}`).join(" ");
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+      <div className="px-1 text-[11px] font-medium text-slate-600">Gain vs. coancestry frontier</div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="gain vs coancestry frontier">
+        <line x1={pad} y1={H - pad} x2={W - 6} y2={H - pad} stroke="#e2e8f0" />
+        <line x1={pad} y1={8} x2={pad} y2={H - pad} stroke="#e2e8f0" />
+        <text x={(W + pad) / 2} y={H - 6} textAnchor="middle" fontSize="8" className="fill-slate-400">group coancestry →</text>
+        <text x={10} y={(H - pad) / 2} textAnchor="middle" fontSize="8" className="fill-slate-400" transform={`rotate(-90 10 ${(H - pad) / 2})`}>gain →</text>
+        <polyline points={pts} fill="none" stroke="#94a3b8" strokeWidth="1.5" />
+        <circle cx={sx(useful.coancestry)} cy={sy(useful.gain)} r="4" fill="#f59e0b" />
+        <text x={sx(useful.coancestry) - 6} y={sy(useful.gain) + 3} textAnchor="end" fontSize="8" className="fill-amber-600">usefulness</text>
+        <circle cx={sx(ocs.coancestry)} cy={sy(ocs.gain)} r="4" fill="#10b981" />
+        <text x={sx(ocs.coancestry) + 6} y={sy(ocs.gain) + 3} textAnchor="start" fontSize="8" className="fill-emerald-600">OCS</text>
+      </svg>
+    </div>
+  );
+}
+
+function CrossList({ title, tone, crosses }: { title: string; tone: "amber" | "emerald"; crosses: RecycleCross[] }) {
+  const head = tone === "amber" ? "text-amber-700" : "text-emerald-700";
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className={`border-b border-slate-100 px-3 py-2 text-xs font-semibold ${head}`}>{title} <span className="font-normal text-slate-400">· {crosses.length} crosses</span></div>
+      <ul className="max-h-[20rem] divide-y divide-slate-50 overflow-auto text-[12px]">
+        {crosses.map((c, i) => (
+          <li key={`${c.p1}-${c.p2}-${i}`} className="flex items-center justify-between gap-2 px-3 py-1.5">
+            <span className="inline-flex items-center gap-1 font-medium text-slate-700"><Sprout size={11} className="text-slate-300" />{c.p1} <span className="text-slate-300">×</span> {c.p2}</span>
+            <span className="flex items-center gap-2 tabular-nums text-[11px] text-slate-500">
+              <span title="midparent breeding value">μ {c.midparent >= 0 ? "+" : ""}{c.midparent.toFixed(2)}</span>
+              <span title="progeny SD — the variance this cross throws" className="text-slate-400">σ {c.sigma.toFixed(2)}</span>
+              <span title="parental coancestry (lower = more outbred)" className={c.coancestry > 0.1 ? "text-rose-500" : "text-slate-400"}>r {c.coancestry.toFixed(2)}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

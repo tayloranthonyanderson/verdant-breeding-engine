@@ -11,6 +11,7 @@ import { parse } from 'csv-parse/sync';
 import { tomatoCorpusDir } from './paths';
 import { runRKernel } from './kernel';
 import { loadInbreds, type AssembledCut } from './tomato-corpus';
+import { buildTomatoRecycling } from './tomato-recycling';
 import type { CombiningAbility } from './combining-ability-build';
 
 // A small tomato major-gene panel for the marker gate (GcaGates): each locus maps to one marker column
@@ -97,5 +98,7 @@ export function buildTomatoCombiningAbility(assembled: AssembledCut): CombiningA
   // Attach each line's marker calls (the gate source) + the tomato locus catalog for the GcaGates UI.
   ca.gca = ca.gca.map((g) => ({ ...g, loci: allelesFor(g.line) }));
   (ca as { loci_catalog?: unknown }).loci_catalog = TOMATO_LOCI.map(({ locus, trait, alleles, favorable, freq }) => ({ locus, trait, alleles, favorable, freq }));
+  // Within-pool recycling (mode 2) — usefulness vs OCS per pool. Best-effort; rides along on the same block.
+  try { (ca as { recycling?: unknown }).recycling = buildTomatoRecycling(); } catch { /* recycling stays absent */ }
   return ca;
 }

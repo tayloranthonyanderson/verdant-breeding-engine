@@ -67,29 +67,29 @@ p <- runif(N_LOCI, 0.1, 0.9)
 M <- matrix(rbinom(n_line * N_LOCI, 2, rep(p, each = n_line)), nrow = n_line)
 colnames(M) <- sprintf("m%03d", seq_len(N_LOCI))
 rownames(M) <- line_ids
-Mc <- scale(M, center = TRUE, scale = FALSE)  # centered dosages
+## per-locus additive effects (correlated across traits per G_corr), KEPT (not generated-and-discarded)
+## so appended germplasm — the recycling pools below — can be scored on the SAME genetic architecture.
+## Two effect sets (common + TPE-specific) build correlated-but-distinct processing/fresh breeding values.
+center_vec <- colMeans(M)                                       # the funnel's per-locus mean dosage
+draw_A <- function() .rmvn(N_LOCI, rep(0, length(TRAITS)), G_corr)   # n_loci x n_traits, cov ~ G_corr
+A_set  <- list(common = draw_A(), proc = draw_A(), fresh = draw_A())  # 3 draws — same RNG order as before
+.colbv <- function(Msub, A) sweep(Msub, 2, center_vec, "-") %*% A
+.cscl  <- lapply(A_set, function(A) g_sd / apply(.colbv(M, A), 2, sd))  # per-trait scale, from the funnel lines
+## the three scaled effect-set BVs for any marker matrix (identical to the old locus_effects() on the funnel)
+effset_bv <- function(Msub) setNames(lapply(names(A_set), function(k) sweep(.colbv(Msub, A_set[[k]]), 2, .cscl[[k]], "*")), names(A_set))
+bvo <- effset_bv(M); bv_common <- bvo$common; bv_proc_sp <- bvo$proc; bv_fresh_sp <- bvo$fresh
 
-## per-locus additive effects, correlated across traits per G_corr. Two effect sets (common + TPE-
-## specific) so we can build correlated-but-distinct processing/fresh breeding values.
-locus_effects <- function() {
-  A <- .rmvn(N_LOCI, rep(0, length(TRAITS)), G_corr)   # n_loci x n_traits, cov ~ G_corr
-  bv <- Mc %*% A                                        # n_line x n_traits (raw scale)
-  ## rescale each trait column to the target genetic sd (scaling a column preserves correlations)
-  for (j in seq_along(TRAITS)) bv[, j] <- bv[, j] * (g_sd[j] / sd(bv[, j]))
-  bv
-}
-bv_common   <- locus_effects()
-bv_proc_sp  <- locus_effects()
-bv_fresh_sp <- locus_effects()
-
-## TPE breeding values: sqrt(r)*common + sqrt(1-r)*specific  → cross-TPE corr ≈ CROSS_TPE_R
-mk_tpe_bv <- function(specific) {
-  bv <- sqrt(CROSS_TPE_R) * bv_common + sqrt(1 - CROSS_TPE_R) * specific
-  for (j in seq_along(TRAITS)) bv[, j] <- bv[, j] * (g_sd[j] / sd(bv[, j]))  # keep target sds
-  sweep(bv, 2, g_mean, "+")                                                  # add trait means
-}
-BV <- list(processing = mk_tpe_bv(bv_proc_sp), `fresh-east` = mk_tpe_bv(bv_fresh_sp))
+## TPE breeding values: sqrt(r)*common + sqrt(1-r)*specific → cross-TPE corr ≈ CROSS_TPE_R. Scale factors
+## come from the funnel lines so appended germplasm lands on the same scale.
+.tcomb <- function(common, specific) sqrt(CROSS_TPE_R) * common + sqrt(1 - CROSS_TPE_R) * specific
+.tscl  <- list(processing = g_sd / apply(.tcomb(bv_common, bv_proc_sp), 2, sd),
+               `fresh-east` = g_sd / apply(.tcomb(bv_common, bv_fresh_sp), 2, sd))
+tpe_bv <- function(common, specific, tpe) sweep(sweep(.tcomb(common, specific), 2, .tscl[[tpe]], "*"), 2, g_mean, "+")
+BV <- list(processing = tpe_bv(bv_common, bv_proc_sp, "processing"),
+           `fresh-east` = tpe_bv(bv_common, bv_fresh_sp, "fresh-east"))
 for (tpe in names(BV)) rownames(BV[[tpe]]) <- line_ids
+## processing BV for APPENDED germplasm (consistent scale with the funnel) — used by the recycling pools.
+proc_bv_for <- function(Msub) { b <- effset_bv(Msub); m <- tpe_bv(b$common, b$proc, "processing"); rownames(m) <- rownames(Msub); m }
 
 ## ---- trial simulator ----------------------------------------------------------------------------
 ## GxE / residual / block sds (yield most plastic). Trait panel measured per trial passed in `traits`.
@@ -241,20 +241,58 @@ s1b <- sim_trial(c(found_c2, CHECKS), "processing", 2025, locs = 1, reps = 1,
 add_trial("S1-2025-OBS", "S1", "Observation", 2025, "processing", "All", 1, 1, "single-plot",
           c("yield", "maturity", "fruit_wt"), s1b)
 
-## ===== Hybrid testcross (line × tester) — combining ability (ADR-0019/0020) =====
-## Tomato processing & fresh markets are F1-HYBRID. Elite inbreds are evaluated as HYBRID PARENTS: each
-## candidate line is crossed to a few common testers and the F1 trial decomposes into GCA (the parent's
-## general combining ability — the selection target, ~additive) and SCA (specific-cross deviation). The
-## F1 phenotype is mid-parent + the parents' GCA + a small SCA + heterosis + the usual MET noise, so the
-## kernel recovers a high Baker's ratio and a per-se↔GCA divergence (a line good per se can combine
-## poorly). Drawn LAST so every earlier trial's RNG (and CSV) is unchanged.
-elite      <- select_top(m2p, c(yield = 1.0, brix = 0.8, firmness = 0.8, maturity = -0.4), 24)  # candidate lines
-ht_pool    <- setNames(rep(c("Pool A", "Pool B"), length.out = length(elite)), elite)           # 2 heterotic pools
-tester_ids <- setdiff(found_c1, elite)[1:3]                                                       # 3 common testers (inbreds)
-RES_LOCUS  <- "m007"   # the marker standing in for the native disease-resistance gene (the native-trait gate)
+## ===== Heterotic pools for WITHIN-POOL recycling (ADR-0024 mode 2) + the hybrid testcross =====
+## Each pool is FOUNDED by a dozen+ inbreds and grown by within-pool crossing, so it carries real FAMILY
+## STRUCTURE (full/half sibs share haplotypes). That gives the GRM genuine relatedness and makes the
+## gain↔diversity tension REAL — a strong founder spawns a strong, RELATED family, so chasing gain
+## concentrates kinship (exactly what optimal-contribution selection exists to manage). The two pools are
+## genetically DIVERGENT (pool-specific allele freqs at a subset of loci) → distinct heterotic groups:
+## across-pool A×B is the product cross (mode 1), within-pool line×line is recycling (mode 2). Drawn LAST,
+## so every earlier (funnel) trial's RNG and CSV is unchanged.
+set.seed(910)
+N_FOUND_POOL <- 16     # founder inbreds per pool (≥ a dozen, as requested)
+N_LINE_POOL  <- 60     # current-generation inbred lines per pool (much bigger than the old 12)
+N_DIVERGENT  <- 60     # loci differentiating the pools (heterotic divergence)
+RES_LOCUS    <- "m007" # marker standing in for the native disease-resistance gene (the native-trait gate)
 
-sim_hybrid <- function(lines, testers, year, locs, reps, measured, loc_prefix) {
-  bvt    <- BV[["processing"]]
+div_loci  <- sample.int(N_LOCI, N_DIVERGENT)
+pool_freq <- function(shift) { pp <- p; pp[div_loci] <- pmin(0.95, pmax(0.05, pp[div_loci] + shift)); pp }
+descend   <- function(pa, pb) { g1 <- rbinom(N_LOCI, 1, pa / 2); g2 <- rbinom(N_LOCI, 1, pb / 2)
+  2L * ifelse(runif(N_LOCI) < 0.5, g1, g2) }   # DH-like inbred: homozygous for a sampled parental gamete
+build_pool <- function(tag, shift) {
+  Fdr <- matrix(rbinom(N_FOUND_POOL * N_LOCI, 2, rep(pool_freq(shift), each = N_FOUND_POOL)), nrow = N_FOUND_POOL)
+  ncx <- ceiling(N_LINE_POOL / 3); cr <- t(sapply(seq_len(ncx), function(.) sample.int(N_FOUND_POOL, 2)))
+  rows <- list(); par <- character(0); li <- 0
+  for (cx in seq_len(ncx)) for (s in seq_len(sample(2:4, 1))) {        # 2–4 full sibs per founder cross → families
+    li <- li + 1; rows[[li]] <- descend(Fdr[cr[cx, 1], ], Fdr[cr[cx, 2], ])
+    par[li] <- sprintf("%s-F%02d×%s-F%02d", tag, cr[cx, 1], tag, cr[cx, 2]) }
+  L <- do.call(rbind, rows)[seq_len(N_LINE_POOL), , drop = FALSE]
+  rownames(L) <- sprintf("%s-%03d", tag, seq_len(N_LINE_POOL)); colnames(L) <- colnames(M)
+  list(M = L, parents = par[seq_len(N_LINE_POOL)])
+}
+pA <- build_pool("PLA", +0.28); pB <- build_pool("PLB", -0.28)
+M_pool  <- rbind(pA$M, pB$M)
+pool_of <- setNames(c(rep("Pool A", N_LINE_POOL), rep("Pool B", N_LINE_POOL)), rownames(M_pool))
+bv_pool <- proc_bv_for(M_pool)                                   # processing BV, same architecture as the funnel
+perse_z <- { z <- sapply(names(W_PROC), function(tr) { v <- bv_pool[, tr]; (v - mean(v)) / (sd(v) + 1e-9) })
+            setNames(rowSums(sweep(z, 2, W_PROC, "*")), rownames(M_pool)) }   # per-se processing index per line
+
+## inbred-line facts (heterotic pool / per-se merit / native disease trait / founder parents). The full
+## pools feed within-pool recycling; per_se is the line's own processing merit; the native trait is
+## carriage of the resistance allele at RES_LOCUS — the dual-source gate (ADR-0020).
+inbreds <- data.frame(name = rownames(M_pool), role = "line", pool = unname(pool_of),
+                      per_se = round(unname(perse_z), 3), nclb = as.integer(M_pool[, RES_LOCUS] >= 1),
+                      parents = unname(c(pA$parents, pB$parents)), stringsAsFactors = FALSE)
+
+## testcross a representative ELITE sample of each pool (top by per-se) to common testers → the GCA trial
+## that feeds the across-pool PRODUCT cross. F1 = mid-parent + GCA + SCA + heterosis + MET noise (so the
+## kernel recovers a high Baker's ratio + a per-se↔GCA divergence). The full pools above feed recycling.
+tc_n        <- 18
+elite_tc    <- unlist(lapply(c("Pool A", "Pool B"), function(pl) { m <- names(pool_of)[pool_of == pl]; m[order(-perse_z[m])][seq_len(tc_n)] }))
+tester_ids  <- found_c1[1:3]                                     # 3 common inbred testers (from the funnel)
+BV_proc_all <- rbind(BV[["processing"]], bv_pool)                # testcross BV table spans funnel + pools
+
+sim_hybrid <- function(lines, testers, year, locs, reps, measured, loc_prefix, bvt) {
   het    <- c(yield = 7, brix = 0.05, firmness = 0.5, fruit_wt = 5, maturity = -1, shelf_life = 0.3)  # F1 vigour
   sca_sd <- c(yield = 2.0, brix = 0.12, firmness = 1.3, fruit_wt = 1.8, maturity = 0.9, shelf_life = 0.6)
   cr  <- expand.grid(line = lines, tester = testers, stringsAsFactors = FALSE)
@@ -287,18 +325,8 @@ sim_hybrid <- function(lines, testers, year, locs, reps, measured, loc_prefix) {
   }
   do.call(rbind, rows)
 }
-ht <- sim_hybrid(elite, tester_ids, 2024, locs = 3, reps = 2, measured = TRAITS, loc_prefix = "CAHYB")
+ht <- sim_hybrid(elite_tc, tester_ids, 2024, locs = 3, reps = 2, measured = TRAITS, loc_prefix = "CAHYB", bvt = BV_proc_all)
 add_trial("S3-2024-TXH", "S3", "Testcross (GCA)", 2024, "processing", "Proc-Hybrid", 3, 2, "line×tester MET", TRAITS, ht)
-
-## inbred-line facts for combining ability (heterotic pool / per-se merit / native disease trait). per_se
-## is the line's OWN processing merit (z-index on its breeding value); the native trait is carriage of the
-## resistance allele at RES_LOCUS — the dual-source gate (ADR-0020): GCA index ranks, native trait culls.
-elite_bv <- BV[["processing"]][elite, , drop = FALSE]
-perse_z  <- { z <- sapply(names(W_PROC), function(tr) { v <- elite_bv[, tr]; (v - mean(v)) / (sd(v) + 1e-9) })
-             rowSums(sweep(z, 2, W_PROC, "*")) }
-inbreds <- data.frame(name = elite, role = "line", pool = unname(ht_pool[elite]),
-                      per_se = round(perse_z, 3), nclb = as.integer(M[elite, RES_LOCUS] >= 1),
-                      stringsAsFactors = FALSE)
 
 ## ---- write outputs ------------------------------------------------------------------------------
 args <- commandArgs(trailingOnly = TRUE)
@@ -309,8 +337,9 @@ dir.create(file.path(outdir, "trials"), recursive = TRUE, showWarnings = FALSE)
 
 for (id in names(trials)) write.csv(trials[[id]], file.path(outdir, "trials", paste0(id, ".csv")), row.names = FALSE)
 
-## markers.csv (genotype, m001..mNNN)
-mk_df <- data.frame(genotype = rownames(M), M, check.names = FALSE, stringsAsFactors = FALSE)
+## markers.csv (genotype, m001..mNNN) — the funnel lines + the recycling-pool inbreds (founder descendants)
+M_all <- rbind(M, M_pool)
+mk_df <- data.frame(genotype = rownames(M_all), M_all, check.names = FALSE, stringsAsFactors = FALSE)
 write.csv(mk_df, file.path(outdir, "markers.csv"), row.names = FALSE)
 
 ## inbreds.csv — combining-ability inbred facts for the testcross lines (pool / per-se / native trait).
@@ -352,8 +381,8 @@ truth <- list(
   checks = CHECKS)
 write_json(truth, file.path(outdir, "truth.json"), auto_unbox = TRUE, pretty = TRUE, digits = 5, na = "null")
 
-cat(sprintf("tomato corpus → %s\n  %d trials, %d genotypes, %d markers\n",
-            outdir, length(trials), n_line, N_LOCI))
+cat(sprintf("tomato corpus → %s\n  %d trials, %d funnel + %d pool genotypes, %d markers\n  pools: 2 × %d lines from %d founders each\n",
+            outdir, length(trials), n_line, nrow(M_pool), N_LOCI, N_LINE_POOL, N_FOUND_POOL))
 for (mt in manifest_trials)
   cat(sprintf("  %-14s %s %d %-11s tag=%-11s entries=%d loc=%d rep=%d\n",
               mt$trial_id, mt$stage, mt$year, mt$tpe, mt$market_tag, mt$n_entries, mt$n_loc, mt$n_rep))

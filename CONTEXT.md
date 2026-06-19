@@ -213,9 +213,18 @@ decision*: which matings to make. Two modes, not one tool:
   crosses are unmade → SCA unknowable); **no OCS/coancestry penalty** — the heterotic-pool split *is* the
   diversity, and a terminal F1 has no inbreeding to manage. A client-side derivation over
   `combining_ability` (`lib/cross-plan.ts`).
-- **Recycling cross** — within-pool line × line → the **next inbred generation**. Recurrent selection, so
-  **optimal-contribution selection** (gain vs. group coancestry; genomic, no pedigree) *is* the right
-  tool here. *Deferred.* Maps to the **Parents·GCA** Selection level (vs. **Hybrids** = product cross).
+- **Recycling cross** — within-pool line × line → the **next inbred generation**. *Built* (2026-06-19,
+  ADR-0024 amendment): the Cross step's **Recycle** mode shows two methods side by side so the breeder
+  learns the contrast — **usefulness** (`μ + i·σ`, greedy, chases gain, over-uses related elites) vs
+  **OCS** (optimal-contribution selection: maximise gain s.t. a cap on group coancestry — genomic, no
+  pedigree — spreading parents to hold diversity). The teaching payoff is the gain-vs-coancestry
+  **frontier** + where the two plans diverge. `cross-recycling.R` / `tomato-recycling.ts`. Needs a pool
+  with **family structure** (so gain and diversity are in tension) — the corpus builds each pool from 16
+  founders → 60 descendants for exactly this.
+- **Usefulness criterion** — a cross's value for a SELECTION program: `μ + i·σ`, the expected mean of its
+  selected progeny (Schnell). For inbred parents `σ²ᵢⱼ = ¼ Σₖ aₖ²(Mᵢₖ−Mⱼₖ)²` — marker-effect-weighted
+  parental divergence. The product F1 is terminal (no progeny selection) so usefulness is a *recycling*
+  concept, not a product-cross one.
 
 ## Program organization vocabulary (the two axes — see [DOMAIN-MODEL.md](docs/DOMAIN-MODEL.md))
 - **Stage** — a candidate's position on the program's *ordered* advancement ladder (e.g.

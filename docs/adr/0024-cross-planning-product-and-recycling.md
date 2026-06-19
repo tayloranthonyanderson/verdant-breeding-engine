@@ -99,3 +99,32 @@ limits recompute instantly — no kernel/pipeline/contract/fixture change.
   pools' GCAs are on one comparable scale (good enough — and a real early-stage practice). A reciprocal
   design (Pool-A lines × Pool-B testers and vice versa) would make GCA pool-specific; recorded as a
   later sim-corpus upgrade, not needed for the product-cross surface.
+
+## Amendment (2026-06-19) — mode 2 BUILT: within-pool recycling (usefulness vs OCS), taught by contrast
+
+The recycling module is now built, as **both methods side by side** — the comparison *is* the teaching
+content (the breeder sees OCS trade gain for diversity where greedy usefulness would burn the pool).
+
+- **Kernel** `services/kernel/cross-recycling.R` (target-agnostic: takes breeding values + marker
+  dosages). Per pool it computes (1) **usefulness** `U = μ + i·σ`, where the inbred-progeny variance has
+  the closed form `σ²ᵢⱼ = ¼ Σₖ aₖ²(Mᵢₖ−Mⱼₖ)²` (marker-effect-weighted parental divergence), greedily
+  selected; (2) **OCS** — maximise gain `g'c` s.t. group coancestry `c'Gc` (VanRaden G), swept into a
+  gain-vs-coancestry **frontier**; (3) the **contrast**, read off each discrete plan's realized
+  contributions: gain, group coancestry, effective parents `1/Σcᵢ²`. Marker effects are trained on the
+  **full pool germplasm** (both pools) so the 200 effects — hence σ — are identifiable.
+- **Pipeline** `packages/pipeline/src/tomato-recycling.ts` runs the kernel per pool from inbreds.csv +
+  markers.csv and attaches `combining_ability.recycling`. **UI**: the Cross step gains a **Product |
+  Recycle** mode toggle; Recycle shows the two summary cards, the frontier chart, the divergence
+  sentence, and both mating lists (`CrossPlanner.tsx` → `RecyclePlanner`).
+- **Corpus prerequisite (built):** the demo contrast only exists if gain and diversity are in tension —
+  which needs germplasm where the elite lines are *related*. `sim-corpus.R` now builds each pool from
+  **16 founders → 60 line descendants** via within-pool crossing (full/half-sib families) with
+  pool-specific allele freqs (heterotic divergence). The funnel (S1–S4) is preserved byte-for-byte (the
+  BV machinery was refactored to score appended germplasm on the same architecture without disturbing
+  the RNG). Result on a structured pool: usefulness 5.8 effective parents / coancestry 0.21 vs OCS 15.0 /
+  0.03 — OCS trades ~24% gain to nearly triple diversity. The product cross still builds (18 lines/pool).
+- **σ is modest in a narrow pool (by design):** 16 founders → limited segregating variance, so the
+  variance term is a tiebreaker, not the driver — the OCS-vs-usefulness contrast carries the lesson.
+- **Still deferred:** interactive operating-point (slide along the frontier — needs per-point
+  contributions emitted); the usefulness criterion's transgressive-segregation story is muted here and
+  would sharpen on a broader pool; persisting a chosen recycling plan as decisions.

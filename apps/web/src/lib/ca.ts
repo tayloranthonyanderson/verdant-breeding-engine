@@ -170,3 +170,29 @@ export function gcaBundleForPool(ca: CombiningAbility, pool: string, exclude?: S
   };
   return stub as unknown as ResultBundle;
 }
+
+// --- Within-pool recycling (ADR-0024 mode 2): usefulness vs OCS, per heterotic pool ------------
+// The kernel (cross-recycling.R) computes, for each pool, two mating plans (greedy usefulness μ+i·σ vs
+// coancestry-capped OCS) + the gain-vs-coancestry frontier. The teaching payoff is the CONTRAST.
+export interface RecycleCross { p1: string; p2: string; midparent: number; sigma: number; usefulness: number; coancestry: number }
+export interface RecyclePlanBlock { crosses: RecycleCross[]; n_crosses: number; n_parents: number; gain: number; coancestry: number; eff_parents: number; target_coancestry?: number }
+export interface RecyclePoint { gain: number; coancestry: number; eff_parents: number }
+export interface RecyclePool {
+  pool: string; n_members: number; sel_prop: number; selection_intensity: number; n_crosses: number;
+  members: Array<{ id: string; bv: number; contribution: number }>;
+  candidates: RecycleCross[];
+  usefulness_plan: RecyclePlanBlock;
+  ocs_plan: RecyclePlanBlock;
+  frontier: Array<{ gain: number; coancestry: number }>;
+  comparison: {
+    coancestry_floor: number; shared_crosses: number;
+    usefulness_point: RecyclePoint; ocs_point: RecyclePoint;
+    gain_cost: number; coancestry_saved: number; eff_parents_gained: number;
+  };
+}
+export type Recycling = Record<string, RecyclePool>;
+/** The per-pool recycling plans attached to combining_ability (null when the pools were too small). */
+export function getRecycling(ca: CombiningAbility | null): Recycling | null {
+  const r = (ca as { recycling?: unknown } | null)?.recycling;
+  return r && typeof r === "object" && Object.keys(r).length ? (r as Recycling) : null;
+}
