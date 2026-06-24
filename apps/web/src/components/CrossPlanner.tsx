@@ -18,16 +18,13 @@ type CaT = NonNullable<ReturnType<typeof getCombiningAbility>>;
 
 // The Cross step: two crossing modes (ADR-0024). Product = across-pool A×B (which F1 to sell); Recycle =
 // within-pool line×line (what to recombine to keep the pool productive), shown as usefulness-vs-OCS.
-export default function CrossPlanner({ bundle, testcrossTrials = [], included = [], onAddTestcross }: {
+export default function CrossPlanner({ bundle }: {
   bundle: ResultBundle;
-  testcrossTrials?: { trial_id: string; label: string }[];
-  included?: string[];
-  onAddTestcross?: (id: string) => void;
 }) {
   const ca = useMemo(() => getCombiningAbility(bundle), [bundle]);
   const recycling = useMemo(() => getRecycling(ca), [ca]);
   const [mode, setMode] = useState<"product" | "recycle">("product");
-  if (!ca) return <NoCrosses testcrossTrials={testcrossTrials} included={included} onAdd={onAddTestcross} />;
+  if (!ca) return <NoCrosses />;
   return (
     <section className="space-y-4">
       <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs">
@@ -309,35 +306,19 @@ function Empty({ msg }: { msg: string }) {
   );
 }
 
-// Shown when the cut carries no testcross trial (so no combining ability to plan from). Explains why and
-// offers a one-click add of an available testcross trial — making cross-planning discoverable from any cut.
-function NoCrosses({ testcrossTrials, included, onAdd }: {
-  testcrossTrials: { trial_id: string; label: string }[]; included: string[]; onAdd?: (id: string) => void;
-}) {
-  const addable = testcrossTrials.filter((t) => !included.includes(t.trial_id));
-  const presentButThin = testcrossTrials.some((t) => included.includes(t.trial_id));
+// Every cut is an F1 testcross, so combining ability is normally estimable. This shows only when the cut
+// is too THIN — fewer than ~4 candidate parents — for a stable GCA fit (e.g. a hand-picked sliver). The
+// fix is to compose a fuller trial, not to "add a testcross": there is no separate testcross to add.
+function NoCrosses() {
   return (
     <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 px-6 py-10 text-center">
       <div className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-emerald-50 text-emerald-600"><Combine size={18} /></div>
-      <p className="mt-3 text-sm font-medium text-slate-700">No crosses to plan on this cut</p>
+      <p className="mt-3 text-sm font-medium text-slate-700">Too few parents to estimate combining ability</p>
       <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-slate-500">
-        Product cross-planning ranks across-pool A×B crosses by <b>combining ability</b>, so it needs an
-        F1 <b>testcross</b> trial in the cut to estimate GCA. This cut has none
-        {presentButThin ? " with enough lines for a GCA fit" : ""}.
+        Cross-planning decomposes the cut&apos;s F1 testcrosses into <b>GCA</b>, which needs at least a
+        handful of candidate parents crossed to the common testers. This cut is too narrow — compose a
+        fuller trial (an AYT or a PYT) and re-run to plan crosses.
       </p>
-      {addable.length > 0 && onAdd && (
-        <>
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-            {addable.map((t) => (
-              <button key={t.trial_id} type="button" onClick={() => onAdd(t.trial_id)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-emerald-700">
-                <Plus size={13} /> Add {t.label}
-              </button>
-            ))}
-          </div>
-          <p className="mt-2 text-[11px] text-slate-400">Adds it to your cut and opens the Model step — press Run to plan crosses.</p>
-        </>
-      )}
     </div>
   );
 }

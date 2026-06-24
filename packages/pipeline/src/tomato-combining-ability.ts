@@ -59,6 +59,10 @@ export function buildTomatoCombiningAbility(assembled: AssembledCut): CombiningA
 
   const inbreds = loadInbreds();
   const facts = lines.map((l) => inbreds.get(l));
+  // per-se merit is per-TPE (a parent attribute): a fresh-east cut reads fresh per-se, processing reads
+  // processing per-se — so the per-se↔GCA divergence is shown in the cut's own market context.
+  const perSe = (f: (typeof facts)[number]) =>
+    assembled.cut.tpe === 'fresh-east' ? (f?.per_se_fresh ?? f?.per_se ?? null) : (f?.per_se ?? null);
   const payload = {
     traits,
     tester_fixed_max: 8,
@@ -76,7 +80,7 @@ export function buildTomatoCombiningAbility(assembled: AssembledCut): CombiningA
       name: lines,
       role: lines.map(() => 'line'),
       pool: facts.map((f) => f?.pool ?? 'Unassigned'),
-      per_se: facts.map((f) => f?.per_se ?? null),
+      per_se: facts.map((f) => perSe(f)),
       nclb: facts.map((f) => f?.nclb ?? null),
     },
     objective,

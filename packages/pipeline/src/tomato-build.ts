@@ -56,7 +56,7 @@ function readinessBlock(assembled: AssembledCut, readiness: { scale: unknown; co
     scale: readiness.scale, connectivity: readiness.connectivity, replication: readiness.replication,
     grids: readiness.grids, unlocks: plan.unlocks,
     cut: { id: cut.id, purpose: cut.purpose, market: cut.market, market_label: cut.market_label, tpe: cut.tpe,
-      label: cut.label, custom: cut.custom ?? false, n_checks: composition.n_checks, trial_ids: trials.map((tt) => tt.trial_id),
+      label: cut.label, custom: cut.custom ?? false, n_testers: composition.n_testers, trial_ids: trials.map((tt) => tt.trial_id),
       trials: trials.map((tt) => ({ trial_id: tt.trial_id, stage: tt.stage, year: tt.year, market_tag: tt.market_tag, n_entries: tt.n_entries, n_loc: tt.n_loc })),
       stages: composition.stages, years: composition.years },
   } as unknown as ResultBundle['data_readiness'];
@@ -286,7 +286,7 @@ export function buildCutBundle(assembled: AssembledCut, opts: CutRunOpts = {}): 
 
   const broad = cut.purpose === 'prediction';
   const warnings: ResultBundle['warnings'] = [];
-  if (broad) warnings.push({ code: 'cut_pools_stages', message: `This prediction cut pools ${composition.n_trials} trials across stages ${composition.stages.join('+')} and years ${composition.years.join('+')}, connected by ${composition.n_checks} common checks. Including the early-stage records the selection used de-biases the variance components.`, severity: 'info' });
+  if (broad) warnings.push({ code: 'cut_pools_stages', message: `This prediction cut pools ${composition.n_trials} trials across stages ${composition.stages.join('+')} and years ${composition.years.join('+')}, connected by ${composition.n_testers} common testers (every entry is an F1 testcross). Including the early-stage records the selection used de-biases the variance components.`, severity: 'info' });
   else warnings.push({ code: 'cut_is_narrow', message: `This advancement cut is the latest-stage decision set (${composition.n_geno} entries); variance components from so few lines are less precise than the broad prediction cut.`, severity: 'info' });
   if (wantGxe && !fittedGxe) warnings.push({ code: 'gxe_not_separated', message: 'GxE was requested but not estimable for this cut (early-stage founders appear in a single environment); fit uses phenotypic BLUPs.', severity: 'info' });
   if (combiningAbility) warnings.push({ code: 'synthetic_inbred_data', message: 'Combining-ability inbred facts (heterotic pool, per-se merit, native disease trait) are SYNTHETIC scaffolding (ADR-0020). Real tomato inbred genotyping replaces them.', severity: 'info' });

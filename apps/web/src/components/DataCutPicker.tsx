@@ -17,7 +17,7 @@ export interface CatalogTrial {
   trial_id: string; stage: string; stage_label: string; year: number; tpe: string;
   market_tag: string; n_entries: number; n_loc: number; n_rep: number; design: string;
 }
-export interface Composition { n_geno: number; n_env: number; n_obs: number; n_checks: number; n_trials: number; stages: string[]; years: number[] }
+export interface Composition { n_geno: number; n_env: number; n_obs: number; n_testers: number; n_trials: number; stages: string[]; years: number[] }
 export interface SavedCutCard { id: string; name: string; market: string; market_label: string; trialIds: string[]; n_geno: number; stages: string[]; years: number[] }
 export interface TaxNode { id: string; label: string; parent: string | null; tpe: string | null; depth: number; isMarket: boolean; trialCount: number }
 export interface Taxonomy { nodes: TaxNode[]; markets: Array<{ id: string; label: string; tpe: string | null }> }

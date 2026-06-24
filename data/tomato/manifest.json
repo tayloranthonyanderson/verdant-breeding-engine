@@ -1,5 +1,5 @@
 {
-  "program": "Verdant tomato (synthetic)",
+  "program": "Verdant tomato (synthetic, F1 hybrid)",
   "generated_by": "services/kernel/sim-corpus.R",
   "traits": ["yield", "brix", "firmness", "fruit_wt", "maturity", "shelf_life"],
   "tpes": {
@@ -43,17 +43,6 @@
         "maturity": -0.1
       }
     },
-    "Proc-Hybrid": {
-      "parent": "Processing",
-      "tpe": "processing",
-      "label": "Processing · hybrid testcross (GCA)",
-      "weights": {
-        "yield": 0.4,
-        "brix": 0.25,
-        "firmness": 0.2,
-        "maturity": -0.15
-      }
-    },
     "Fresh-East": {
       "parent": "All",
       "tpe": "fresh-east",
@@ -80,10 +69,10 @@
       "tpe": "processing",
       "market_tag": "All",
       "location": "S1-2024-OBS",
-      "n_entries": 246,
+      "n_entries": 144,
       "n_loc": 1,
       "n_rep": 1,
-      "design": "single-plot",
+      "design": "line×tester single-plot",
       "traits_measured": ["yield", "maturity", "fruit_wt"],
       "file": "trials/S1-2024-OBS.csv"
     },
@@ -95,10 +84,10 @@
       "tpe": "processing",
       "market_tag": "Processing",
       "location": "S2-2024-PROC",
-      "n_entries": 66,
+      "n_entries": 108,
       "n_loc": 3,
       "n_rep": 2,
-      "design": "RCBD",
+      "design": "line×tester RCBD",
       "traits_measured": ["yield", "maturity", "fruit_wt", "brix", "firmness"],
       "file": "trials/S2-2024-PROC.csv"
     },
@@ -110,10 +99,10 @@
       "tpe": "fresh-east",
       "market_tag": "Fresh-East",
       "location": "S2-2024-FRESH",
-      "n_entries": 36,
+      "n_entries": 72,
       "n_loc": 3,
       "n_rep": 2,
-      "design": "RCBD",
+      "design": "line×tester RCBD",
       "traits_measured": ["yield", "maturity", "fruit_wt", "shelf_life"],
       "file": "trials/S2-2024-FRESH.csv"
     },
@@ -125,10 +114,10 @@
       "tpe": "processing",
       "market_tag": "Proc-Brix",
       "location": "S3-2024-BRIX",
-      "n_entries": 19,
+      "n_entries": 48,
       "n_loc": 6,
       "n_rep": 3,
-      "design": "MET",
+      "design": "line×tester MET",
       "traits_measured": ["yield", "brix", "firmness", "fruit_wt", "maturity", "shelf_life"],
       "file": "trials/S3-2024-BRIX.csv"
     },
@@ -140,10 +129,10 @@
       "tpe": "processing",
       "market_tag": "Proc-Firmness",
       "location": "S3-2024-FIRM",
-      "n_entries": 19,
+      "n_entries": 48,
       "n_loc": 6,
       "n_rep": 3,
-      "design": "MET",
+      "design": "line×tester MET",
       "traits_measured": ["yield", "brix", "firmness", "fruit_wt", "maturity", "shelf_life"],
       "file": "trials/S3-2024-FIRM.csv"
     },
@@ -155,10 +144,10 @@
       "tpe": "fresh-east",
       "market_tag": "East",
       "location": "S3-2024-FRESH",
-      "n_entries": 16,
+      "n_entries": 42,
       "n_loc": 6,
       "n_rep": 3,
-      "design": "MET",
+      "design": "line×tester MET",
       "traits_measured": ["yield", "brix", "firmness", "fruit_wt", "maturity", "shelf_life"],
       "file": "trials/S3-2024-FRESH.csv"
     },
@@ -170,10 +159,10 @@
       "tpe": "processing",
       "market_tag": "Proc-Brix",
       "location": "S4-2025-BRIX",
-      "n_entries": 11,
+      "n_entries": 18,
       "n_loc": 10,
       "n_rep": 2,
-      "design": "on-farm strips",
+      "design": "line×tester on-farm strips",
       "traits_measured": ["yield", "brix", "firmness", "fruit_wt", "maturity", "shelf_life"],
       "file": "trials/S4-2025-BRIX.csv"
     },
@@ -185,10 +174,10 @@
       "tpe": "processing",
       "market_tag": "Proc-Firmness",
       "location": "S4-2025-FIRM",
-      "n_entries": 11,
+      "n_entries": 18,
       "n_loc": 10,
       "n_rep": 2,
-      "design": "on-farm strips",
+      "design": "line×tester on-farm strips",
       "traits_measured": ["yield", "brix", "firmness", "fruit_wt", "maturity", "shelf_life"],
       "file": "trials/S4-2025-FIRM.csv"
     },
@@ -200,10 +189,10 @@
       "tpe": "fresh-east",
       "market_tag": "East",
       "location": "S4-2025-FRESH",
-      "n_entries": 10,
+      "n_entries": 15,
       "n_loc": 8,
       "n_rep": 2,
-      "design": "on-farm strips",
+      "design": "line×tester on-farm strips",
       "traits_measured": ["yield", "brix", "firmness", "fruit_wt", "maturity", "shelf_life"],
       "file": "trials/S4-2025-FRESH.csv"
     },
@@ -215,27 +204,12 @@
       "tpe": "processing",
       "market_tag": "All",
       "location": "S1-2025-OBS",
-      "n_entries": 206,
+      "n_entries": 72,
       "n_loc": 1,
       "n_rep": 1,
-      "design": "single-plot",
+      "design": "line×tester single-plot",
       "traits_measured": ["yield", "maturity", "fruit_wt"],
       "file": "trials/S1-2025-OBS.csv"
-    },
-    {
-      "trial_id": "S3-2024-TXH",
-      "stage": "S3",
-      "stage_label": "Testcross (GCA)",
-      "year": 2024,
-      "tpe": "processing",
-      "market_tag": "Proc-Hybrid",
-      "location": "S3-2024-TXH",
-      "n_entries": 108,
-      "n_loc": 3,
-      "n_rep": 2,
-      "design": "line×tester MET",
-      "traits_measured": ["yield", "brix", "firmness", "fruit_wt", "maturity", "shelf_life"],
-      "file": "trials/S3-2024-TXH.csv"
     }
   ]
 }

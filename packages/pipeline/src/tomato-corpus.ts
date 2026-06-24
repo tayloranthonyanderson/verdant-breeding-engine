@@ -98,10 +98,8 @@ export interface AssembledCut {
   /** Every market whose TPE is represented in the cut — the cut is ranked under EACH (one fit, many
    *  lenses); the Select step switches between them. */
   relevantMarkets: CutMarket[];
-  composition: { n_trials: number; n_env: number; n_geno: number; n_obs: number; n_checks: number; stages: string[]; years: number[] };
+  composition: { n_trials: number; n_env: number; n_geno: number; n_obs: number; n_testers: number; stages: string[]; years: number[] };
 }
-
-const isCheck = (g: string) => g.startsWith('CHK-');
 
 function readTrial(t: TrialMeta, traits: string[]): AssembledCut['records'] {
   const rows = parse(readFileSync(join(tomatoCorpusDir(), t.file)), { columns: true, skip_empty_lines: true }) as Record<string, string>[];
@@ -117,7 +115,7 @@ function readTrial(t: TrialMeta, traits: string[]): AssembledCut['records'] {
 }
 
 // ---- combining-ability inbred fixture (ADR-0019/0020) -------------------------------------------
-export interface InbredFact { name: string; role: string; pool: string; per_se: number | null; nclb: number | null }
+export interface InbredFact { name: string; role: string; pool: string; per_se: number | null; per_se_fresh: number | null; nclb: number | null }
 let _inbreds: Map<string, InbredFact> | null = null;
 /** The testcross lines' inbred facts (heterotic pool / per-se merit / native disease trait) from
  *  data/tomato/inbreds.csv — the combining-ability driver's parent-level data. */
@@ -130,6 +128,7 @@ export function loadInbreds(): Map<string, InbredFact> {
     for (const r of rows) m.set(r.name, {
       name: r.name, role: r.role, pool: r.pool,
       per_se: r.per_se === '' || r.per_se === 'NA' ? null : Number(r.per_se),
+      per_se_fresh: r.per_se_fresh === '' || r.per_se_fresh == null || r.per_se_fresh === 'NA' ? null : Number(r.per_se_fresh),
       nclb: r.nclb === '' || r.nclb === 'NA' ? null : Number(r.nclb),
     });
   } catch { /* no inbred fixture → combining ability simply won't run */ }
@@ -168,7 +167,10 @@ function compose(cut: Cut, trials: TrialMeta[], rankMarket: string, m: Manifest)
     relevantMarkets: relevantMarketsFor(trials, m),
     composition: {
       n_trials: trials.length, n_env: new Set(records.map((r) => r.environment)).size, n_geno: germplasm.length,
-      n_obs: records.length, n_checks: germplasm.filter(isCheck).length,
+      n_obs: records.length,
+      // connectivity glue in a hybrid program = the common TESTERS (every cross shares them, recurring
+      // across stages/years), not check lines — distinct non-null parent2 across the cut.
+      n_testers: new Set(records.map((r) => r.parent2).filter(Boolean)).size,
       stages: [...new Set(trials.map((t) => t.stage))].sort((a, b) => STAGE_ORDER.indexOf(a) - STAGE_ORDER.indexOf(b)),
       years: [...new Set(trials.map((t) => t.year))].sort(),
     },

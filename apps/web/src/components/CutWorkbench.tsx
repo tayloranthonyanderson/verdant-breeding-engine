@@ -42,6 +42,9 @@ export default function CutWorkbench({ cuts, catalog, taxonomy, savedCuts, initi
   // The result of an EPHEMERAL run (fit, not persisted) — held in memory, shown in the result tabs, and
   // discarded if the cut/model changes. Save (below) is the explicit persist step.
   const [transient, setTransient] = useState<ResultBundle | null>(null);
+  // Advancement picks made on an UNSAVED run — held in memory (mirrors the ephemeral fit) so the Select
+  // step records into the Advance ledger before Save; persisted on Save like the run itself.
+  const [localAdv, setLocalAdv] = useState<Array<{ candidate: string; unit: string; pool: string | null; disposition: string }>>([]);
   const [active, setActive] = useState(initial ? 1 : 0);
   const [, startPreview] = useTransition();
   const [fitting, startFit] = useTransition();
@@ -52,13 +55,23 @@ export default function CutWorkbench({ cuts, catalog, taxonomy, savedCuts, initi
   // Results are fresh only if the current composition matches what was fit (a model override invalidates).
   const resultFresh = !!initial && sameSet(trialIds, initial.trialIds) && !hasOverrides;
   const matchedTemplate = useMemo(() => cuts.find((c) => sameSet(trialIds, c.trial_ids)), [cuts, trialIds]);
+  // In-memory advancement for an unsaved run (toggle one; or batch-add). Mirrors the server toggle so the
+  // Select buttons + Advance ledger behave identically before and after Save.
+  const toggleLocalAdv = (candidate: string, unit: string, pool: string | null, disposition: string) =>
+    setLocalAdv((prev) => {
+      const cur = prev.find((a) => a.unit === unit && a.candidate === candidate);
+      const without = prev.filter((a) => !(a.unit === unit && a.candidate === candidate));
+      return cur && cur.disposition === disposition ? without : [...without, { candidate, unit, pool, disposition }];
+    });
+  const addLocalAdvMany = (rows: Array<{ candidate: string; unit: string; pool: string | null; disposition: string }>) =>
+    setLocalAdv((prev) => [...prev.filter((a) => !rows.some((r) => r.unit === a.unit && r.candidate === a.candidate)), ...rows]);
 
   // Live pre-fit preview (data quality + planner) whenever the composition or the model overrides change.
   const sig = trialIds.slice().sort().join(",") + "|" + JSON.stringify(ov);
   useEffect(() => {
     if (!trialIds.length) { setPreview(null); return; }
     let cancelled = false;
-    setTransient(null); // editing the cut/model invalidates any unsaved run
+    setTransient(null); setLocalAdv([]); // editing the cut/model invalidates any unsaved run + its picks
     startPreview(async () => {
       const res = await previewAnalysis({ trialIds, overrides: ov });
       if (!cancelled) setPreview(res);
@@ -83,7 +96,7 @@ export default function CutWorkbench({ cuts, catalog, taxonomy, savedCuts, initi
     startFit(async () => {
       const res = await fitCut({ trialIds, overrides: ov });
       if (res.status === "error") { setErr(res.error); return; }
-      setTransient(res.bundle);
+      setTransient(res.bundle); setLocalAdv([]); // fresh run → fresh in-memory ledger
       setActive(3); // jump to the first result tab (Fit)
     });
   };
@@ -92,9 +105,11 @@ export default function CutWorkbench({ cuts, catalog, taxonomy, savedCuts, initi
     setErr(null);
     const nm = name.trim() || (matchedTemplate ? `${matchedTemplate.label} · custom model` : "");
     if (!nm) { setErr("Name this analysis to save it."); return; }
+    const picks = (ephemeral ? localAdv : []).map((a) => ({ candidate: a.candidate, unit: a.unit as "inbred" | "hybrid", pool: a.pool, disposition: a.disposition }));
     startRun(async () => {
-      const res = await runAnalysis({ name: nm, trialIds, overrides: ov });
+      const res = await runAnalysis({ name: nm, trialIds, overrides: ov, advancements: picks });
       if (res.status === "error") { setErr(res.error); return; }
+      setTransient(null); setLocalAdv([]); // the run is now persisted — drop the in-memory copies
       router.push(`/?cut=${res.cutId}`);
     });
   };
@@ -104,12 +119,6 @@ export default function CutWorkbench({ cuts, catalog, taxonomy, savedCuts, initi
   const result = transient ?? (resultFresh ? initial!.bundle : null);
   const ephemeral = !!transient;
   const hasGenomic = !!(result as { genomic?: unknown } | null)?.genomic;
-  // The catalog's testcross/hybrid trials — offered as one-click "add it" in the Cross step's empty-state
-  // so cross-planning is discoverable from ANY cut, not only one that already carries crosses.
-  const testcrossTrials = useMemo(() => catalog
-    .filter((t) => /testcross|hybrid/i.test(t.stage_label) || /hybrid/i.test(t.market_tag))
-    .map((t) => ({ trial_id: t.trial_id, label: t.stage_label })), [catalog]);
-  const addTestcross = (id: string) => { setTrialIds((ids) => (ids.includes(id) ? ids : [...ids, id])); setActive(2); };
   const studyName = cutLabel(result) ?? matchedTemplate?.label ?? cutLabel(previewBundle) ?? "new cut";
 
   const RunGate = ({ what }: { what: string }) => (
@@ -166,12 +175,17 @@ export default function CutWorkbench({ cuts, catalog, taxonomy, savedCuts, initi
     { id: "select", label: "Select", sublabel: "rank by market & choose", icon: <ListChecks size={14} />,
       content: result ? (
         <SelectionSection bundle={result} analysisRunId={ephemeral ? -1 : initial!.runId} ephemeral={ephemeral}
-          advancements={ephemeral ? [] : initial!.advancements.map((a) => ({ candidate: a.candidate, unit: a.unit, pool: a.pool, disposition: a.disposition }))} />
+          advancements={ephemeral ? localAdv : initial!.advancements.map((a) => ({ candidate: a.candidate, unit: a.unit, pool: a.pool, disposition: a.disposition }))}
+          onEphemeralAdvance={toggleLocalAdv} onEphemeralAdvanceMany={addLocalAdvMany} />
       ) : <RunGate what="the rankings" /> },
     { id: "advance", label: "Advance", sublabel: "record decisions", icon: <ClipboardCheck size={14} />,
-      content: result ? (ephemeral ? <UnsavedBanner onSave={() => setActive(2)} what="record advancement decisions" /> : <AdvanceStep advancements={initial!.advancements} />) : <RunGate what="advancement decisions" /> },
+      content: result
+        ? (ephemeral
+            ? <div className="space-y-3"><UnsavedBanner onSave={() => setActive(2)} what="persist these advancement decisions" /><AdvanceStep advancements={localAdv} /></div>
+            : <AdvanceStep advancements={initial!.advancements} />)
+        : <RunGate what="advancement decisions" /> },
     { id: "cross", label: "Cross", sublabel: "plan next season's product crosses", icon: <Combine size={14} />,
-      content: result ? <CrossPlanner bundle={result} testcrossTrials={testcrossTrials} included={trialIds} onAddTestcross={addTestcross} /> : <RunGate what="the cross plan" /> },
+      content: result ? <CrossPlanner bundle={result} /> : <RunGate what="the cross plan" /> },
     ...(hasGenomic ? [{ id: "genomics", label: "Genomics", sublabel: "relationship, structure, GEBVs", icon: <Dna size={14} />, content: <GenomicWorkspace bundle={result!} /> } as Step] : []),
   ];
 

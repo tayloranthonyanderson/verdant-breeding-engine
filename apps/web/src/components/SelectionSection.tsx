@@ -18,15 +18,15 @@ type Level = "hybrids" | "parents";
 type HybridView = "index" | "performance";
 
 export default function SelectionSection({
-  bundle, analysisRunId, advancements, ephemeral,
-}: { bundle: ResultBundle; analysisRunId: number; advancements: AdvancementRow[]; ephemeral?: boolean }) {
+  bundle, analysisRunId, advancements, ephemeral, onEphemeralAdvance, onEphemeralAdvanceMany,
+}: { bundle: ResultBundle; analysisRunId: number; advancements: AdvancementRow[]; ephemeral?: boolean;
+  onEphemeralAdvance?: AdvanceFn;
+  onEphemeralAdvanceMany?: (rows: Array<{ candidate: string; unit: "inbred" | "hybrid"; pool: string | null; disposition: string }>) => void; }) {
   const ca = useMemo(() => getCombiningAbility(bundle), [bundle]);
   const [level, setLevel] = useState<Level>(ca ? "parents" : "hybrids");
   const [hybridView, setHybridView] = useState<HybridView>("index");
   const [, start] = useTransition();
   const [busyKey, setBusyKey] = useState<string | null>(null);
-  // On an unsaved run there's no persisted analysis to attach decisions to — recording is gated on Save.
-  const [note, setNote] = useState<string | null>(null);
 
   const advancedKeys = useMemo(
     () => new Map(advancements.map((a) => [`${a.unit}:${a.candidate}`, a.disposition])),
@@ -34,7 +34,7 @@ export default function SelectionSection({
   );
 
   const advance: AdvanceFn = (candidate, unit, pool, disposition) => {
-    if (ephemeral) { setNote("This is an unsaved run — Save it (in the Model step) to record advancement decisions."); return; }
+    if (ephemeral) { onEphemeralAdvance?.(candidate, unit, pool, disposition); return; } // in-memory until Save
     const key = `${unit}:${candidate}`;
     setBusyKey(key);
     start(async () => {
@@ -44,16 +44,16 @@ export default function SelectionSection({
     });
   };
   const advanceMany = (rows: Array<{ candidate: string; unit: "inbred" | "hybrid"; pool: string | null; disposition: string }>) => {
-    if (ephemeral) { setNote("This is an unsaved run — Save it (in the Model step) to record advancement decisions."); return; }
+    if (ephemeral) { onEphemeralAdvanceMany?.(rows); return; } // in-memory until Save
     setBusyKey("__batch__");
     start(async () => { await recordAdvancement({ analysisRunId, candidates: rows }); setBusyKey(null); });
   };
 
   return (
     <section className="space-y-4">
-      {note && (
+      {ephemeral && (
         <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
-          <Lock size={14} /> {note}
+          <Lock size={14} /> Unsaved run — the lines you advance show in the Advance step but live only in memory; Save it (in the Model step) to persist them.
         </div>
       )}
       <div className="flex flex-wrap items-center gap-3">

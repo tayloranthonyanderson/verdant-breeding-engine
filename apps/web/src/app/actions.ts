@@ -8,7 +8,7 @@
 import { revalidatePath } from "next/cache";
 import { and, eq, inArray } from "drizzle-orm";
 import { db, analysisRun, resultBundle, study, advancementDecision } from "@verdant/db";
-import { runMetAnalysis, runTomatoCut, buildCustomCut, fitCustomCut, previewCustomCut, type ModelOverrides, type CutPreview, type CutExclusions } from "@verdant/pipeline";
+import { runMetAnalysis, runTomatoCut, buildCustomCut, fitCustomCut, persistCutBundle, assembleCustom, previewCustomCut, type ModelOverrides, type CutPreview, type CutExclusions } from "@verdant/pipeline";
 import type { AnalysisRequest, ResultBundle } from "@verdant/contracts";
 import { answer, type Answer } from "@verdant/ai";
 import { getLatestResult, getCutResult } from "@/lib/data";
@@ -17,6 +17,19 @@ import { getLatestResult, getCutResult } from "@/lib/data";
 function cutSlug(name: string): string {
   const s = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
   return `cut-${s || "untitled"}`;
+}
+
+// Save reuse cache: Run (fitCut) already produced a SERVER-computed bundle; cache it so Save can persist
+// THAT exact result instead of re-fitting (the expensive BLUPF90/Docker step) a second time. Still never
+// stores a client-supplied bundle — the cached bundle never left the server. Keyed by the composition +
+// model so it only ever reuses an identical fit; a stale/missing entry just falls back to a re-fit.
+function fitSig(trialIds: string[], overrides?: ModelOverrides, exclusions?: CutExclusions): string {
+  return JSON.stringify([trialIds.slice().sort(), overrides ?? {}, exclusions ?? []]);
+}
+const _fitCache = new Map<string, ResultBundle>();
+function cacheFit(sig: string, bundle: ResultBundle): void {
+  _fitCache.set(sig, bundle);
+  while (_fitCache.size > 8) _fitCache.delete(_fitCache.keys().next().value as string); // bound memory
 }
 
 // --- Advancement (DOMAIN-MODEL §4) — record/withdraw the staging move that closes analysis→select→
@@ -80,6 +93,7 @@ export async function fitCut(input: { trialIds: string[]; overrides?: ModelOverr
   try {
     if (!input.trialIds?.length) return { status: "error", error: "Pick at least one trial." };
     const { bundle } = fitCustomCut({ id: "ephemeral", name: "Unsaved run", trialIds: input.trialIds }, { overrides: input.overrides, exclusions: input.exclusions });
+    cacheFit(fitSig(input.trialIds, input.overrides, input.exclusions), bundle); // so Save can reuse it
     return { status: "ok", bundle };
   } catch (e) {
     return { status: "error", error: (e as Error).message };
@@ -113,13 +127,23 @@ export async function previewAnalysis(input: { trialIds: string[]; overrides?: M
 
 // RUN: fit the (possibly overridden / outlier-excluded) model on the composition and persist it as a
 // named, re-runnable cut. The explicit gate after the breeder has reviewed data + model.
-export async function runAnalysis(input: { name: string; trialIds: string[]; overrides?: ModelOverrides; exclusions?: CutExclusions }): Promise<{ status: "ok"; cutId: string } | { status: "error"; error: string }> {
+export async function runAnalysis(input: { name: string; trialIds: string[]; overrides?: ModelOverrides; exclusions?: CutExclusions; advancements?: AdvanceInput["candidates"] }): Promise<{ status: "ok"; cutId: string } | { status: "error"; error: string }> {
   try {
     const name = (input.name ?? "").trim();
     if (!name) return { status: "error", error: "Name this analysis so you can find it later." };
     if (!input.trialIds?.length) return { status: "error", error: "Pick at least one trial." };
     const id = cutSlug(name);
-    await buildCustomCut({ id, name, trialIds: input.trialIds }, { overrides: input.overrides, exclusions: input.exclusions });
+    // Reuse the fit from Run when it's the same composition+model — persist that exact bundle instead of
+    // re-fitting. Cache miss (Save without a prior Run, or after an edit) → fall back to a fresh fit.
+    const cached = _fitCache.get(fitSig(input.trialIds, input.overrides, input.exclusions));
+    let analysisRunId: number;
+    if (cached) {
+      analysisRunId = await persistCutBundle(assembleCustom({ id, name, trialIds: input.trialIds }).cut, cached, "tomato-cut");
+    } else {
+      ({ analysisRunId } = await buildCustomCut({ id, name, trialIds: input.trialIds }, { overrides: input.overrides, exclusions: input.exclusions }));
+    }
+    // Carry the in-memory advancement picks from the unsaved run onto the persisted run (else they're lost).
+    if (input.advancements?.length) await recordAdvancement({ analysisRunId, candidates: input.advancements });
     revalidatePath("/");
     return { status: "ok", cutId: id };
   } catch (e) {

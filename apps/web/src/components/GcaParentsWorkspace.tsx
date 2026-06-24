@@ -51,7 +51,7 @@ export default function GcaParentsWorkspace({
           {pools.map((p) => (
             <button key={p} type="button" onClick={() => setPool(p)}
               className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition ${pool === p ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
-              <span className="h-2 w-2 rounded-full" style={{ background: POOL_COLOR[p] ?? "#64748b" }} /> Pool {p}
+              <span className="h-2 w-2 rounded-full" style={{ background: POOL_COLOR[p] ?? "#64748b" }} /> {/^pool\b/i.test(p) ? p : `Pool ${p}`}
             </button>
           ))}
         </div>

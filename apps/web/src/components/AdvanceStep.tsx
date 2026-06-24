@@ -41,7 +41,7 @@ function LedgerCol({ title, rows }: { title: string; rows: AdvanceRow[] }) {
         <ul className="flex flex-wrap gap-1.5">
           {rows.map((r) => (
             <li key={r.candidate} className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700 ring-1 ring-emerald-200">
-              {r.pool && <span className={`h-1.5 w-1.5 rounded-full ${r.pool === "A" ? "bg-sky-500" : "bg-violet-500"}`} />}
+              {r.pool && <span className={`h-1.5 w-1.5 rounded-full ${/(^|\s)A$/.test(r.pool) || r.pool === "A" ? "bg-sky-500" : "bg-violet-500"}`} />}
               {r.candidate}
             </li>
           ))}
