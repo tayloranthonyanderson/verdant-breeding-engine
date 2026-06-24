@@ -1,0 +1,75 @@
+<svg viewBox="0 0 1200 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Verdant — AI-native plant-breeding analytics platform">
+  <title>Verdant — Breeding Analytics Platform</title>
+  <desc>AI-native mixed-model genetics: BLUPs, genomic prediction, combining ability and cross planning, narrated by a grounded AI assistant.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#06281d"/>
+      <stop offset="0.5" stop-color="#0a3f2c"/>
+      <stop offset="1" stop-color="#04190f"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.8" cy="0.05" r="0.7">
+      <stop offset="0" stop-color="#10b981" stop-opacity="0.40"/>
+      <stop offset="1" stop-color="#10b981" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="logo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#34d399"/>
+      <stop offset="1" stop-color="#059669"/>
+    </linearGradient>
+    <linearGradient id="fadeGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.85"/>
+    </linearGradient>
+    <mask id="fade">
+      <rect width="1200" height="340" fill="black"/>
+      <rect x="800" y="0" width="400" height="340" fill="url(#fadeGrad)"/>
+    </mask>
+    <pattern id="cell" x="0" y="0" width="38" height="38" patternUnits="userSpaceOnUse">
+      <rect x="4" y="4" width="30" height="30" rx="6" fill="#34d399" fill-opacity="0.10"/>
+    </pattern>
+  </defs>
+
+  <rect width="1200" height="340" fill="url(#bg)"/>
+  <rect width="1200" height="340" fill="url(#glow)"/>
+
+  <g mask="url(#fade)">
+    <rect x="800" y="40" width="392" height="260" fill="url(#cell)"/>
+    <rect x="966" y="82" width="30" height="30" rx="6" fill="#6ee7b7" fill-opacity="0.45"/>
+    <rect x="1042" y="120" width="30" height="30" rx="6" fill="#34d399" fill-opacity="0.40"/>
+    <rect x="1118" y="82" width="30" height="30" rx="6" fill="#34d399" fill-opacity="0.30"/>
+    <rect x="1004" y="196" width="30" height="30" rx="6" fill="#34d399" fill-opacity="0.35"/>
+    <rect x="1118" y="196" width="30" height="30" rx="6" fill="#6ee7b7" fill-opacity="0.40"/>
+    <rect x="1080" y="158" width="30" height="30" rx="6" fill="#34d399" fill-opacity="0.28"/>
+  </g>
+
+  <path d="M762,232 C 860,210 940,182 1020,152 S 1140,108 1176,92" fill="none" stroke="#34d399" stroke-opacity="0.30" stroke-width="2"/>
+  <circle cx="1020" cy="152" r="3.5" fill="#6ee7b7" fill-opacity="0.6"/>
+  <circle cx="1176" cy="92" r="3.5" fill="#6ee7b7" fill-opacity="0.6"/>
+
+  <g transform="translate(64,56)">
+    <rect width="88" height="88" rx="22" fill="url(#logo)"/>
+    <rect width="88" height="88" rx="22" fill="#ffffff" fill-opacity="0.05"/>
+    <g transform="rotate(-12 44 44)">
+      <path d="M44,15 C 63,28 63,55 44,73 C 25,55 25,28 44,15 Z" fill="#ffffff"/>
+      <path d="M44,21 L44,67" stroke="#059669" stroke-width="2.6" stroke-linecap="round" opacity="0.5"/>
+      <path d="M44,37 L33,29 M44,37 L55,29 M44,51 L34,45 M44,51 L54,45" stroke="#059669" stroke-width="2.4" stroke-linecap="round" opacity="0.4"/>
+    </g>
+  </g>
+
+  <text x="176" y="108" font-family="'Segoe UI', system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="56" font-weight="700" fill="#ffffff" letter-spacing="-0.5">Verdant</text>
+  <text x="178" y="138" font-family="'Segoe UI', system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="18" font-weight="500" fill="#d1fae5" fill-opacity="0.85" letter-spacing="2">Breeding analytics platform</text>
+
+  <text x="66" y="190" font-family="'Segoe UI', system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="20" font-weight="400" fill="#ffffff" fill-opacity="0.85">From raw trial data to next season&#39;s cross plan.</text>
+
+  <g font-family="'Segoe UI', system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="15" font-weight="500">
+    <rect x="66"  y="210" width="157" height="32" rx="16" fill="#10b981" fill-opacity="0.16" stroke="#6ee7b7" stroke-opacity="0.40"/>
+    <text x="144" y="231" text-anchor="middle" fill="#a7f3d0">Mixed-model BLUPs</text>
+    <rect x="236" y="210" width="165" height="32" rx="16" fill="#10b981" fill-opacity="0.16" stroke="#6ee7b7" stroke-opacity="0.40"/>
+    <text x="318" y="231" text-anchor="middle" fill="#a7f3d0">Genomic prediction</text>
+    <rect x="414" y="210" width="157" height="32" rx="16" fill="#10b981" fill-opacity="0.16" stroke="#6ee7b7" stroke-opacity="0.40"/>
+    <text x="492" y="231" text-anchor="middle" fill="#a7f3d0">Combining ability</text>
+    <rect x="584" y="210" width="134" height="32" rx="16" fill="#10b981" fill-opacity="0.16" stroke="#6ee7b7" stroke-opacity="0.40"/>
+    <text x="651" y="231" text-anchor="middle" fill="#a7f3d0">Cross planning</text>
+  </g>
+
+  <text x="66" y="292" font-family="'Segoe UI', system-ui, -apple-system, Helvetica, Arial, sans-serif" font-size="14.5" font-weight="500" fill="#6ee7b7" fill-opacity="0.9">TypeScript orchestrator&#160;&#160;·&#160;&#160;R compute kernel&#160;&#160;·&#160;&#160;grounded AI assistant&#160;&#160;·&#160;&#160;public + synthetic data</text>
+</svg>

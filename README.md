@@ -1,3 +1,5 @@
+<img src="docs/banner.svg" alt="Verdant — AI-native plant-breeding analytics: mixed-model BLUPs, genomic prediction, combining ability, and cross planning" width="100%">
+
 # Verdant — Breeding Analytics Platform
 
 An AI-native breeding **management + analysis** platform. Upload a trial → get correct
