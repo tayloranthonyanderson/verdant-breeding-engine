@@ -36,10 +36,6 @@ The **engine contract** (`packages/contracts/`, versioned JSON Schema) is the la
 | `docs/` | ADRs, DOMAIN-MODEL, MVP-PLAN, validation reports, agent guides. |
 | `evals/` | AI groundedness eval harness. |
 
-Legacy / not the live path: `engine/` (the M0 `breedeng` R package), `api/` (the M0 plumber stack),
-`frontend/` (the M0 single-trial app), `prototype/` (the original Shiny spike). The current product is
-`apps/web` + `packages/*` + `services/kernel`.
-
 ## Run it
 
 > `pnpm` is invoked via **`corepack pnpm`** on this machine (it's not on PATH). Needs Node ≥22, R 4.6+
@@ -85,6 +81,9 @@ The analysis engine is built and validated on the **G2F maize MET**, end to end:
   the genomic UI + **Model Studio** breeder overrides (ADR-0017/0018).
 - **Combining ability** — GCA/SCA from the cross-graph topology, within-pool ranking, per-se↔GCA
   divergence, recorded advancement (ADR-0019/0020).
+- **Cross planning (closes the cycle)** — every trial is an F1 testcross, so GCA comes off *any*
+  composed cut; the Cross step ranks across-pool **A×B product crosses** by combined GCA and contrasts
+  within-pool **recycling** (usefulness vs optimal-contribution selection) side by side (ADR-0024/0025).
 - **Trust layer** — pre-fit **Data Quality** (robust outliers, missingness, box-and-whisker by
   environment) + post-fit **Model QC** (real spatially-adjusted residuals → residual-vs-fitted, normal
   Q-Q, the raw→trend→residual **field triptych**, influential observations) + a breeder-dispositioned
@@ -93,3 +92,7 @@ The analysis engine is built and validated on the **G2F maize MET**, end to end:
 **Ahead:** natural-language Q&A over the results (the headline differentiator); the ingestion front door
 (Trait Library + unit harmonization, ADR-0022); persistence-in-UI + multi-tenancy; trial designer; mobile
 capture; decision-support optimization. See [ROADMAP.md](ROADMAP.md) and [docs/MVP-PLAN.md](docs/MVP-PLAN.md).
+
+## License
+
+MIT — see [LICENSE](LICENSE). Built on public ([G2F](https://www.genomes2fields.org/)) and synthetic data only.
