@@ -24,6 +24,10 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
+# Local Claude Code tooling (machine-specific paths — keep out of the repo)
+.claude/launch.json
+.claude/settings.local.json
+
 # Build / data outputs
 *.rds
 /tmp/
