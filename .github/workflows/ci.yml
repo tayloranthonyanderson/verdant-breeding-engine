@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  node-tests:
+    name: Contracts + groundedness eval (Node)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Enable corepack (pnpm)
+        run: corepack enable
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+      - name: Contract tests (JSON Schema conformance)
+        run: corepack pnpm contracts:test
+      - name: Groundedness eval (offline, deterministic answerer)
+        run: corepack pnpm test:evals
+
+  r-kernel:
+    name: R kernel correctness suites
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - name: Install R packages
+        run: Rscript -e 'install.packages(c("jsonlite", "lme4", "rrBLUP", "SpATS"))'
+      - name: Kernel correctness (BLUPs recover known-truth genetic values)
+        run: Rscript services/kernel/tests/correctness.R
+      - name: Data-quality diagnostics
+        run: Rscript services/kernel/tests/data-quality-test.R
+      - name: Model-QC diagnostics
+        run: Rscript services/kernel/tests/model-qc-test.R
