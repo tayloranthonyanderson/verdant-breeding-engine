@@ -11,6 +11,10 @@ answers from the computed result bundle.
 Read [PRODUCT.md](PRODUCT.md), [ROADMAP.md](ROADMAP.md), [docs/MVP-PLAN.md](docs/MVP-PLAN.md), the
 shared vocabulary in [CONTEXT.md](CONTEXT.md), and the decisions in [docs/adr/](docs/adr/).
 
+> *Personal project, built on my own time and equipment using publicly available or
+> self-collected data. Not affiliated with, funded by, or derived from any employer's
+> work, data, or systems.*
+
 ## Architecture (ADR-0001, ADR-0012)
 
 ```
