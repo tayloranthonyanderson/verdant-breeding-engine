@@ -1,8 +1,8 @@
-<img src="docs/banner.svg" alt="Verdant — AI-native plant-breeding analytics: mixed-model BLUPs, genomic prediction, combining ability, and cross planning" width="100%">
+<img src="docs/banner.svg" alt="Verdant — plant-breeding analytics: mixed-model BLUPs, genomic prediction, combining ability, and cross planning" width="100%">
 
 # Verdant — Breeding Analytics Platform
 
-An AI-native breeding **management + analysis** platform. Upload a trial → get correct
+A breeding **management + analysis** platform. Upload a trial → get correct
 mixed-model **BLUPs/BLUEs**, **heritability**, genomic **GEBVs**, **combining ability**, and a live,
 re-weightable **selection ranking** — with a pre-fit **data-quality** pass and post-fit **model-QC**
 diagnostics so you can trust the answer, all narratable by a grounded **AI assistant** that only
