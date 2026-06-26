@@ -63,14 +63,24 @@ async function completeAnthropic(system: string, user: string): Promise<LlmResul
     apiKey: process.env.ANTHROPIC_API_KEY,
     baseURL: process.env.VERDANT_ANTHROPIC_BASE_URL || "https://api.anthropic.com",
   });
-  const resp = await client.messages.create({
-    model,
-    // Generous headroom so adaptive thinking can't consume the whole budget and leave no answer text.
-    max_tokens: 4096,
-    thinking: { type: "adaptive" },
-    system,
-    messages: [{ role: "user", content: user }],
-  });
+  let resp;
+  try {
+    resp = await client.messages.create({
+      model,
+      // Generous headroom so adaptive thinking can't consume the whole budget and leave no answer text.
+      max_tokens: 4096,
+      thinking: { type: "adaptive" },
+      system,
+      messages: [{ role: "user", content: user }],
+    });
+  } catch (err) {
+    // Mirror the Gemini path's explicit failure: an API error (auth, rate limit, overload, network)
+    // surfaces as a clear typed error rather than an opaque SDK throw. The SDK's APIError carries a
+    // status + message; fall back to the raw message otherwise.
+    const e = err as { status?: number; message?: string };
+    const status = e?.status != null ? ` ${e.status}` : "";
+    throw new Error(`Anthropic${status}: ${e?.message ?? String(err)}`);
+  }
   const text = (resp.content as Array<{ type: string; text?: string }>)
     .filter((b) => b.type === "text")
     .map((b) => b.text ?? "")
@@ -99,6 +109,9 @@ async function completeGemini(system: string, user: string): Promise<LlmResult> 
     candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
     modelVersion?: string;
   };
-  const text = (data.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join("").trim();
+  const text = (data.candidates?.[0]?.content?.parts ?? [])
+    .map((p) => p.text ?? "")
+    .join("")
+    .trim();
   return { text, model: data.modelVersion || model };
 }

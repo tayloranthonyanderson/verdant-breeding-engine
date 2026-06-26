@@ -6,11 +6,15 @@
 // binary). This module is crop-agnostic: it takes generic (genotype, environment, trait values)
 // rows and derives everything BLUPF90 needs (alpha_size, missing handling, starting values) FROM
 // THE DATA — no crop or G2F assumptions.
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
-import { mkdirSync } from 'node:fs';
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { mkdirSync } from "node:fs";
+
+/** Wall-clock ceiling for the containerized BLUPF90 run (ms). AI-REML can iterate, so the default is
+ *  generous (10 min); override with BLUPF90_TIMEOUT_MS. A hung container fails loud, not forever. */
+const BLUPF90_TIMEOUT_MS = Number(process.env.BLUPF90_TIMEOUT_MS) || 600_000;
 
 export interface GeneticCovarianceInput {
   /** Stable trait ids, in the order the matrices are reported. */
@@ -51,20 +55,20 @@ export interface GeneticCovarianceResult {
   engine: string;
 }
 
-const IMAGE = 'verdant-blupf90';
+const IMAGE = "verdant-blupf90";
 // colima mounts the user home dir into the VM, so the work dir must live under $HOME (not /tmp,
 // which macOS places under /var/folders and colima does not mount).
-const WORK_ROOT = join(homedir(), '.verdant', 'blupf90');
+const WORK_ROOT = join(homedir(), ".verdant", "blupf90");
 
 /** Estimate the genetic (and residual) covariance matrices across traits via BLUPF90 AI-REML. */
 export function estimateGeneticCovariance(input: GeneticCovarianceInput): GeneticCovarianceResult {
   const { variableIds, rows } = input;
   const n = variableIds.length;
   const image = input.image ?? IMAGE;
-  if (n < 2) throw new Error('genetic covariance needs at least two traits');
+  if (n < 2) throw new Error("genetic covariance needs at least two traits");
 
   mkdirSync(WORK_ROOT, { recursive: true });
-  const dir = mkdtempSync(join(WORK_ROOT, 'run-'));
+  const dir = mkdtempSync(join(WORK_ROOT, "run-"));
   try {
     // 1. Data file. Columns: env genotype [geno_env] t1..tK [w1..wK] — NA→0 (BLUPF90 missing code),
     //    drop all-missing rows. `interaction` adds a genotype@environment level (GxE); a weighted
@@ -79,20 +83,25 @@ export function estimateGeneticCovariance(input: GeneticCovarianceInput): Geneti
       const ge = `${r.genotype}@${r.environment}`;
       maxIdLen = Math.max(maxIdLen, r.genotype.length, r.environment.length, gxe ? ge.length : 0);
       const vals = r.values.map((v) => (v == null || !Number.isFinite(v) ? MISSING : v));
-      let line = gxe ? `${r.environment} ${r.genotype} ${ge} ${vals.join(' ')}`
-                     : `${r.environment} ${r.genotype} ${vals.join(' ')}`;
+      let line = gxe
+        ? `${r.environment} ${r.genotype} ${ge} ${vals.join(" ")}`
+        : `${r.environment} ${r.genotype} ${vals.join(" ")}`;
       if (weighted) {
         // 1/SE² per trait; present value with no/invalid weight → 1 (neutral); missing value → 1.
         const ws = r.values.map((v, j) => {
           const w = r.weights?.[j];
-          return v == null || !Number.isFinite(v) ? 1 : Number.isFinite(w) && (w as number) > 0 ? (w as number) : 1;
+          return v == null || !Number.isFinite(v)
+            ? 1
+            : Number.isFinite(w) && (w as number) > 0
+              ? (w as number)
+              : 1;
         });
-        line += ` ${ws.join(' ')}`;
+        line += ` ${ws.join(" ")}`;
       }
       lines.push(line);
     }
-    if (lines.length === 0) throw new Error('no usable rows for genetic covariance');
-    writeFileSync(join(dir, 'met.dat'), lines.join('\n') + '\n');
+    if (lines.length === 0) throw new Error("no usable rows for genetic covariance");
+    writeFileSync(join(dir, "met.dat"), lines.join("\n") + "\n");
 
     // 2. Starting (co)variances from empirical trait variances, split genetic/residual with small
     //    non-zero covariances so AI-REML estimates the FULL matrices (zero starts stay at zero).
@@ -109,50 +118,75 @@ export function estimateGeneticCovariance(input: GeneticCovarianceInput): Geneti
     //    trait renumf90 requirement). Random effects are diagonal (IID) = identity relationship.
     const genoEnvCol = gxe ? 1 : 0;
     const firstTrait = 3 + genoEnvCol;
-    const traitCols = Array.from({ length: n }, (_, i) => i + firstTrait).join(' ');
+    const traitCols = Array.from({ length: n }, (_, i) => i + firstTrait).join(" ");
     const firstWeight = firstTrait + n;
-    const weightCols = weighted ? Array.from({ length: n }, (_, i) => i + firstWeight).join(' ') : '';
+    const weightCols = weighted ? Array.from({ length: n }, (_, i) => i + firstWeight).join(" ") : "";
     const effects = [
-      'EFFECT', `${repeat('1', n)} cross alpha`,   // environment (fixed)
-      'EFFECT', `${repeat('2', n)} cross alpha`,   // genotype (random) → G
-      'RANDOM', 'diagonal',
-      '(CO)VARIANCES', matrixBlock(gStart),
+      "EFFECT",
+      `${repeat("1", n)} cross alpha`, // environment (fixed)
+      "EFFECT",
+      `${repeat("2", n)} cross alpha`, // genotype (random) → G
+      "RANDOM",
+      "diagonal",
+      "(CO)VARIANCES",
+      matrixBlock(gStart),
     ];
-    if (gxe) effects.push(
-      'EFFECT', `${repeat('3', n)} cross alpha`,   // genotype×environment (random) → GxE
-      'RANDOM', 'diagonal',
-      '(CO)VARIANCES', matrixBlock(geStart),
-    );
-    const par = [
-      'DATAFILE', 'met.dat',
-      'TRAITS', traitCols,
-      'FIELDS_PASSED TO OUTPUT', '',
-      'WEIGHT(S)', weightCols,
-      'RESIDUAL_VARIANCE', matrixBlock(rStart),
-      ...effects,
-      'OPTION method VCE',
-      `OPTION maxrounds ${input.maxRounds ?? 100}`,
-      `OPTION alpha_size ${Math.max(20, maxIdLen + 4)}`,
-    ].join('\n') + '\n';
-    writeFileSync(join(dir, 'renum.par'), par);
+    if (gxe)
+      effects.push(
+        "EFFECT",
+        `${repeat("3", n)} cross alpha`, // genotype×environment (random) → GxE
+        "RANDOM",
+        "diagonal",
+        "(CO)VARIANCES",
+        matrixBlock(geStart),
+      );
+    const par =
+      [
+        "DATAFILE",
+        "met.dat",
+        "TRAITS",
+        traitCols,
+        "FIELDS_PASSED TO OUTPUT",
+        "",
+        "WEIGHT(S)",
+        weightCols,
+        "RESIDUAL_VARIANCE",
+        matrixBlock(rStart),
+        ...effects,
+        "OPTION method VCE",
+        `OPTION maxrounds ${input.maxRounds ?? 100}`,
+        `OPTION alpha_size ${Math.max(20, maxIdLen + 4)}`,
+      ].join("\n") + "\n";
+    writeFileSync(join(dir, "renum.par"), par);
 
     // 4. Run renumf90 then blupf90+ in the container (work dir mounted at /work).
     const script =
-      'cd /work && echo renum.par | renumf90 > renum.log 2>&1 && echo renf90.par | blupf90+ > blup.log 2>&1';
-    const proc = spawnSync('docker', ['run', '--rm', '-v', `${dir}:/work`, image, 'sh', '-c', script], {
-      encoding: 'utf8',
+      "cd /work && echo renum.par | renumf90 > renum.log 2>&1 && echo renf90.par | blupf90+ > blup.log 2>&1";
+    const proc = spawnSync("docker", ["run", "--rm", "-v", `${dir}:/work`, image, "sh", "-c", script], {
+      encoding: "utf8",
       maxBuffer: 1 << 26,
+      timeout: BLUPF90_TIMEOUT_MS,
     });
+    // Spawn failure (no docker) or timeout/signal kill — distinct from a clean non-zero exit below.
+    if (proc.error || proc.signal) {
+      const reason =
+        proc.signal === "SIGTERM"
+          ? `timed out after ${BLUPF90_TIMEOUT_MS} ms`
+          : proc.signal
+            ? `killed by ${proc.signal}`
+            : String(proc.error);
+      throw new Error(`BLUPF90 ${reason}\n${proc.stderr ?? ""}`);
+    }
     if (proc.status !== 0) {
-      const log = safeRead(join(dir, 'blup.log')) || safeRead(join(dir, 'renum.log'));
+      const log = safeRead(join(dir, "blup.log")) || safeRead(join(dir, "renum.log"));
       throw new Error(`BLUPF90 failed (exit ${proc.status}):\n${log}\n${proc.stderr}`);
     }
 
     // 5. Parse the converged (co)variance matrices from blup.log. With GxE there are TWO genetic
     //    blocks (effect 2 = genotype → G, effect 3 = genotype×env → GxE), printed in effect order.
-    const log = readFileSync(join(dir, 'blup.log'), 'utf8');
+    const log = readFileSync(join(dir, "blup.log"), "utf8");
     const geneticBlocks = parseAllMatrices(log, /Genetic variance\(s\)[^\n]*\n/, n);
-    if (geneticBlocks.length === 0) throw new Error('no genetic (co)variance block in BLUPF90 output');
+    if (geneticBlocks.length === 0) throw new Error("no genetic (co)variance block in BLUPF90 output");
     const G = geneticBlocks[0];
     const GxE = gxe ? geneticBlocks[1] : undefined;
     const R = parseMatrix(log, /Residual variance\(s\)[^\n]*\n/, n);
@@ -171,7 +205,7 @@ export function estimateGeneticCovariance(input: GeneticCovarianceInput): Geneti
       blups,
       converged: /convergence=\s*[\d.]+E?-(0[6-9]|1[0-9])/.test(log) || rounds != null,
       rounds,
-      engine: 'blupf90+',
+      engine: "blupf90+",
     };
   } finally {
     if (!process.env.VERDANT_KEEP_DIR) rmSync(dir, { recursive: true, force: true });
@@ -181,7 +215,7 @@ export function estimateGeneticCovariance(input: GeneticCovarianceInput): Geneti
 
 // ---- helpers ---------------------------------------------------------------------------------
 
-function empiricalVariances(rows: GeneticCovarianceInput['rows'], n: number): number[] {
+function empiricalVariances(rows: GeneticCovarianceInput["rows"], n: number): number[] {
   const out: number[] = [];
   for (let j = 0; j < n; j++) {
     const xs = rows.map((r) => r.values[j]).filter((v): v is number => v != null && Number.isFinite(v));
@@ -208,15 +242,15 @@ function covStart(vars: number[], fraction: number, seedCorr: number): number[][
 }
 
 function matrixBlock(M: number[][]): string {
-  return M.map((row) => row.map((x) => x.toPrecision(8)).join(' ')).join('\n');
+  return M.map((row) => row.map((x) => x.toPrecision(8)).join(" ")).join("\n");
 }
 
-const repeat = (s: string, k: number) => Array.from({ length: k }, () => s).join(' ');
+const repeat = (s: string, k: number) => Array.from({ length: k }, () => s).join(" ");
 
 /** Pull the first n*n finite numbers out of `text` (an N×N matrix block), or null if too few. */
 function numsAfter(text: string, n: number): number[] | null {
   const nums: number[] = [];
-  for (const line of text.split('\n')) {
+  for (const line of text.split("\n")) {
     const toks = line.trim().split(/\s+/).filter(Boolean);
     if (toks.length === 0) continue;
     const row = toks.map(Number);
@@ -235,14 +269,14 @@ function parseMatrix(log: string, header: RegExp, n: number): number[][] {
   const m = header.exec(log);
   if (!m) throw new Error(`could not find matrix header ${header} in BLUPF90 output`);
   const nums = numsAfter(log.slice(m.index + m[0].length), n);
-  if (!nums) throw new Error('incomplete matrix in BLUPF90 output');
+  if (!nums) throw new Error("incomplete matrix in BLUPF90 output");
   return toMatrix(nums, n);
 }
 
 /** Read EVERY N×N matrix that follows each header match, in order (multi-effect AI-REML prints one
  *  genetic block per random effect: effect 2 = genotype, effect 3 = genotype×env). */
 function parseAllMatrices(log: string, header: RegExp, n: number): number[][][] {
-  const re = new RegExp(header.source, 'g');
+  const re = new RegExp(header.source, "g");
   const out: number[][][] = [];
   let m: RegExpExecArray | null;
   while ((m = re.exec(log)) !== null) {
@@ -260,7 +294,7 @@ function parseGenotypeBlups(
 ): Array<{ genotype: string; values: Array<number | null> }> {
   const level2name = new Map<number, string>();
   let inEff2 = false;
-  for (const line of safeRead(join(dir, 'renf90.tables')).split('\n')) {
+  for (const line of safeRead(join(dir, "renf90.tables")).split("\n")) {
     if (/Effect group/.test(line)) {
       inEff2 = /effect #\s*2\b/.test(line);
       continue;
@@ -269,14 +303,17 @@ function parseGenotypeBlups(
     const toks = line.trim().split(/\s+/).filter(Boolean);
     if (toks.length < 3) continue;
     const level = Number(toks[toks.length - 1]);
-    const name = toks.slice(0, toks.length - 2).join(' '); // id may contain '/', not spaces
+    const name = toks.slice(0, toks.length - 2).join(" "); // id may contain '/', not spaces
     if (Number.isFinite(level) && name) level2name.set(level, name);
   }
   const byGeno = new Map<string, Array<number | null>>();
-  for (const line of safeRead(join(dir, 'solutions')).split('\n')) {
+  for (const line of safeRead(join(dir, "solutions")).split("\n")) {
     const t = line.trim().split(/\s+/);
     if (t.length < 4) continue;
-    const trait = Number(t[0]), effect = Number(t[1]), level = Number(t[2]), sol = Number(t[3]);
+    const trait = Number(t[0]),
+      effect = Number(t[1]),
+      level = Number(t[2]),
+      sol = Number(t[3]);
     if (effect !== 2 || !Number.isFinite(sol) || !(trait >= 1 && trait <= nTraits)) continue;
     const name = level2name.get(level);
     if (!name) continue;
@@ -299,8 +336,8 @@ function lastRound(log: string): number | null {
 
 function safeRead(p: string): string {
   try {
-    return readFileSync(p, 'utf8');
+    return readFileSync(p, "utf8");
   } catch {
-    return '';
+    return "";
   }
 }

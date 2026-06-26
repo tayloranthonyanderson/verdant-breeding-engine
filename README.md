@@ -42,6 +42,25 @@ The **engine contract** (`packages/contracts/`, versioned JSON Schema) is the la
 | `docs/` | ADRs, DOMAIN-MODEL, MVP-PLAN, validation reports, agent guides. |
 | `evals/` | AI groundedness eval harness. |
 
+## How it stays correct
+
+Three load-bearing seams, each independently checked:
+
+- **Known-truth test suites (R).** Three suites under `services/kernel/tests/`. `correctness.R` simulates
+  a multi-environment trial with *known* true genetic values and entry-mean heritabilities, runs it through
+  the real seam, and asserts the recovered BLUPs correlate with truth (per-trait floor; observed r ≈ 0.89–0.96)
+  and that reported h² recovers the true value within tolerance. `data-quality-test.R` and `model-qc-test.R`
+  assert edge-case behavior (outliers, missingness, residual diagnostics). Together ~two dozen assertions —
+  the science is regression-tested, not asserted by hand.
+- **Groundedness guard.** `packages/ai/src/grounding.ts` verifies that every number and every
+  germplasm/trait/market name in an LLM answer is present in the computed result bundle. `answer.ts`
+  regenerates once on a miss, then withholds any answer that still can't be verified (the breeder never sees
+  an unverified figure). The **same** checker backs both the CI eval (`evals/groundedness/`) and the
+  production path — so the gate and the runtime guardrail cannot drift.
+- **Contract seam.** `packages/contracts/` holds versioned JSON Schemas (the source of truth), validated at
+  runtime via `ajv` at every R↔TS and DB boundary; the TS types are code-generated from those schemas, so the
+  wire format and the type system can't disagree.
+
 ## Run it
 
 > `pnpm` is invoked via **`corepack pnpm`** on this machine (it's not on PATH). Needs Node ≥22, R 4.6+

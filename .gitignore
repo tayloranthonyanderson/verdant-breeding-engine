@@ -43,3 +43,6 @@ playwright-report/
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+# Local scratch: working plans / PRDs / issue drafts (kept on disk, out of the repo)
+.scratch/
