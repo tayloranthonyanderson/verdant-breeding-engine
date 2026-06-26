@@ -9,8 +9,8 @@ suppressWarnings(suppressPackageStartupMessages(library(jsonlite)))
 ## traits in the sim df -> contract variable ids (stable, uppercase) + display names + units
 .SIM_VARIABLES <- list(
   list(col = "yield",    variable_id = "YIELD",    name = "Yield",         unit = "t/ha"),
-  list(col = "grain_protein",     variable_id = "GRAIN_PROTEIN",     name = "grain_protein",          unit = "degree"),
-  list(col = "plant_height", variable_id = "PLANT_HEIGHT", name = "Plant height",  unit = "g"),
+  list(col = "grain_protein",     variable_id = "GRAIN_PROTEIN",     name = "Grain protein",          unit = "%"),
+  list(col = "plant_height", variable_id = "PLANT_HEIGHT", name = "Plant height",  unit = "cm"),
   list(col = "maturity", variable_id = "MATURITY", name = "Days to maturity", unit = "day")
 )
 

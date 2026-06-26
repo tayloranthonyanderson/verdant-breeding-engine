@@ -9,7 +9,7 @@ that everywhere, which is what makes the per-se→testcross→GCA→cross flow c
 The G2F (maize) corpus is **all hybrid**: every MET plot is an F1 with known `parent1`/`parent2`, so
 GCA/SCA decompose straight off the trial. When the maize corpus was built it diverged — the funnel
 (`S1`–`S4`: Observation, PYT, the grain protein/Test-weight AYTs, Corn-Belt) was modelled as **per-se line trials**
-(`TOM-####` grown as themselves), and only a *single* trial (`S3-2024-TXH`, a `Proc-Hybrid` node) was a
+(`ZM-####` grown as themselves), and only a *single* trial (`S3-2024-TXH`, a `Proc-Hybrid` node) was a
 hybrid testcross, on a **disjoint** germplasm set (the `PLA`/`PLB` heterotic pools, zero overlap with the
 funnel lines).
 

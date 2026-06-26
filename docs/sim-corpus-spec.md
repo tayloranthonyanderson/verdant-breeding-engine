@@ -47,10 +47,10 @@ connectivity, and a **marker scaffold on the inbreds** so the GRM can glue the w
 
 | Stage | ~Entries | Locs × Reps | Traits measured (cumulative) | Planner should choose |
 |---|---|---|---|---|
-| S1 — Observation (single-plot) | 600 | 1 × 1 | yield est, maturity, gross fruit type | spatial-only, genotype fixed/BLUP, **no GxE**, single-stage |
+| S1 — Observation (single-plot) | 600 | 1 × 1 | yield est, maturity, plant height | spatial-only, genotype fixed/BLUP, **no GxE**, single-stage |
 | S2 — PYT | 80 | 3 × 2 | + grain protein, test weight, basic disease | spatial + replication; GxE marginal |
 | S3 — AYT | 20 | 6 × 3 | + full quality + disease panel | **two-stage MET**, GxE, stability |
-| S4 — Pre-commercial / wide | 5 | 12 on-farm strips × — | + shelf-life, processing yield | wide-adaptation MET; stability emphasis |
+| S4 — Pre-commercial / wide | 5 | 12 on-farm strips × — | + test weight, standability | wide-adaptation MET; stability emphasis |
 | Commercial | 1–2 | — | — | reporting (BLUE) |
 
 *(Counts/design are the breeder-confirmed maize defaults; tune in one place.)*
@@ -72,10 +72,10 @@ connectivity, and a **marker scaffold on the inbreds** so the GRM can glue the w
 Three Segments, chosen to exercise **both** definition modes:
 
 - **Dryland · grain protein** — trait-defined. TPE = western dryland processing locations. TPP index weights grain protein.
-- **Dryland · Test-weight/viscosity** — trait-defined. **Shares the dryland TPE** with the
-  above (⇒ one fit, two index lenses). TPP index weights test weight/viscosity.
+- **Dryland · Grain-quality (test weight)** — trait-defined. **Shares the dryland TPE** with the
+  above (⇒ one fit, two index lenses). TPP index weights test weight.
 - **Corn-Belt · East** — environment-defined. **Own TPE** (eastern Corn Belt) → its own fit; carries
-  GCA×E vs. the processing TPE. TPP weights size/appearance/flavor/shelf-life.
+  GCA×E vs. the dryland TPE. TPP weights yield/standability/test weight/maturity.
 
 Material is **sorted into Segments across stages**: broad early (scored vs. all three), specific late
 (Advancement Decisions narrow it). Membership is never stored on the germplasm — it is the

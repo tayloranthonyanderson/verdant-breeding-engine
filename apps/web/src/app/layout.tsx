@@ -8,7 +8,7 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 export const metadata: Metadata = {
   title: "Verdant — Breeding Analytics",
   description:
-    "AI-native breeding analysis. Trustworthy BLUPs, heritability, and selection decisions — from real trials.",
+    "Open-source breeding analysis with a grounded AI assistant. Trustworthy BLUPs, heritability, and selection decisions — from real trials.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

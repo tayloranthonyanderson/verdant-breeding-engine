@@ -3,7 +3,7 @@
 **Status:** Accepted (2026-06-11)
 
 ## Context
-"AI-native, easy to chat with" could mean a chat-first app or a GUI-first app with a
+"AI-assisted, easy to chat with" could mean a chat-first app or a GUI-first app with a
 pervasive AI. A breeder making selection decisions needs to *see* rankings, *drag* weights,
 *scan* biplots — high-bandwidth visual work that pure chat makes slower. But the AI must be
 more than a Q&A sidecar to be a real differentiator.

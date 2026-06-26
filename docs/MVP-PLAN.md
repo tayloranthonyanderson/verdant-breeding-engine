@@ -15,7 +15,7 @@ shared **vocabulary** in [CONTEXT.md](../CONTEXT.md) — read those first; this 
 | Pillar | Concretely | We'll know it's real when |
 |---|---|---|
 | **Trustworthy** | Every number correct *and provably* so; the AI never fabricates. | Validation suite green vs. known truth; AI answers cite tool outputs (ADR-0002). |
-| **AI-native** | You can *talk to* and *direct* your program; the AI advises, explains, narrates, and acts. | A breeder reaches a selection decision through a GUI with a pervasive, action-capable AI (ADR-0003). |
+| **Grounded AI assistant** | You can *talk to* and *direct* your program; the AI advises, explains, narrates, and acts. | A breeder reaches a selection decision through a GUI with a pervasive, action-capable AI (ADR-0003). |
 | **Beautiful & fun** | Premium, instant-feeling, alive. | Consistent design system; sub-second perceived response; people *want* to demo it. |
 | **Rock-solid** | Real data never lost; degrades gracefully; secure by default. | Stateless R kernel + durable queue; no sync request hangs the UI (ADR-0001). |
 | **Makes you a better breeder** | Surfaces insight a non-statistician misses; teaches as it works. | Auto-narrative flags the yield–grain protein trade-off, GxE, unstable lines, design flaws — unprompted and correct. |
@@ -208,7 +208,7 @@ decision-support. **Highest-value first:** resource/strategy **allocation** (bud
 stages/traits, entries×locations×reps) on the Stage/SelectionCriteria/cost model. **At-scale later:**
 operational **logistics** (harvester routing, sample-to-lab scheduling under capacity, crossing/
 pollination ops). Both **optimization** (fast) and **simulation** (flexible, slower). Surfaced
-AI-forward, transparent, and easy — never raw OR tooling. Deep, specialized; earned later.
+Surfaced through the AI assistant, transparent, and easy — never raw OR tooling. Deep, specialized; earned later.
 
 ---
 

@@ -83,7 +83,7 @@ dimension per market (years-to-commercialization), relevant to product-supply pl
 
 ### 2.4 Selection criteria: gates + index, per (Segment × Stage)
 Selection is **gates + index**, not a single index:
-- **Gates** — independent culling on must-have traits (disease package, fruit type, color…); fail
+- **Gates** — independent culling on must-have traits (disease package, kernel-row number, color…); fail
   and you're out regardless of index.
 - **Index** — directions + weights (transparent + Smith–Hazel, ADR-0006) on survivors' quantitative
   traits.
@@ -306,7 +306,7 @@ germplasm collection (M5) but its data model is shaped now.
 - **Data scoping is deliberate** — discovery/exotic material isolated from pipeline predictions.
 - **Relationship structure is a first-class engine input** — A/G/H are configurations, not forks.
 - **BrAPI naming where it exists; parametric over reproductive biology; tenant-scoped to Program.**
-- **Advanced methods stay AI-forward and simple** — optimization/simulation are driven by
+- **Advanced methods stay AI-assisted and simple** — optimization/simulation are driven by
   plain-language goals/constraints the AI formulates and explains, never an OR interface dumped on
   the user (effective, trustworthy, transparent, fun, easy — ADR-0011).
 

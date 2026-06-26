@@ -6,7 +6,7 @@ automates, and the *minimal* data model needed to run it. We build to this, no m
 ## The breeder's loop (what actually happens)
 1. Breeder runs a **trial**: many genotypes (lines/hybrids), in a **design**
    (reps/blocks), possibly across **environments** (sites × years), measured for
-   **traits** (yield, grain protein, fruit weight, maturity, disease, etc.).
+   **traits** (yield, grain protein, kernel weight, maturity, disease, etc.).
 2. They have a messy table and a question: *which entries do I advance?*
 3. Today they either eyeball means (wrong) or pay/beg for a statistician.
 

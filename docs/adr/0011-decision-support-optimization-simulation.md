@@ -1,4 +1,4 @@
-# ADR-0011 — Decision-support: optimization & simulation as an AI-forward layer
+# ADR-0011 — Decision-support: optimization & simulation as an AI-assisted layer
 
 **Status:** Accepted (2026-06-11) · post-MVP differentiator, architected-for now
 
@@ -28,7 +28,7 @@ under capacity, and optimizing crossing/pollination operations. Existing tools d
     budget-constrained).
   - **Operational logistics** (harvester routing, sample-to-lab scheduling under capacity, and
     **crossing/pollination operations**). Classic OR; **most valuable at scale.**
-- **Surfaced AI-forward and simple.** The user expresses goals and constraints in plain terms; the AI
+- **Surfaced through the AI assistant and simple.** The user expresses goals and constraints in plain terms; the AI
   formulates the optimization/simulation, the solver runs, results are transparent and explained.
   Hard requirement: effective, trustworthy, transparent, and **fun/easy** — never an OR interface
   dumped on the user. Same proposes/confirms and Visible-Reversible-Agency tenets (ADR-0002/0003).

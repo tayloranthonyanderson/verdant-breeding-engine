@@ -1,6 +1,6 @@
-<svg viewBox="0 0 1200 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Verdant — AI-native plant-breeding analytics platform">
+<svg viewBox="0 0 1200 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Verdant — open-source plant-breeding analytics project">
   <title>Verdant — Breeding Analytics Platform</title>
-  <desc>AI-native mixed-model genetics: BLUPs, genomic prediction, combining ability and cross planning, narrated by a grounded AI assistant.</desc>
+  <desc>Open-source mixed-model genetics: BLUPs, genomic prediction, combining ability and cross planning, narrated by a grounded AI assistant.</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#06281d"/>

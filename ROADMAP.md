@@ -105,7 +105,7 @@ deliberately deferred until the slice above it is real and validated.
 - Barcode/QR plot scanning; on-the-spot validation.
 
 ## Phase 6 — Image-based phenotyping
-- Extract traits from images (fruit count/size/color, disease scoring).
+- Extract traits from images (ear/kernel-row counts, kernel size/color, disease scoring).
 - Likely a Python service; start with one or two high-value traits.
 
 ## Phase 7 — Genomics & cross planning  *(genomic prediction built)*

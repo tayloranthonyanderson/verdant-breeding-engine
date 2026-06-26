@@ -18,12 +18,12 @@ post-MVP requirements are directional.
 
 ## 1. Vision & pillars
 
-An AI-native breeding management + analysis project that lets a breeder *upload a trial, get the
+An open-source breeding management + analysis project that lets a breeder *upload a trial, get the
 right answer, ask in plain English, and act* — without a statistician on staff. Every requirement
 serves five pillars (each testable):
 
 1. **Trustworthy** — every number correct and provably so; the AI never fabricates.
-2. **AI-native** — you can talk to *and direct* the program; the AI advises, explains, narrates, acts.
+2. **Grounded AI assistant** — you can talk to *and direct* the program; the AI advises, explains, narrates, acts.
 3. **Beautiful & fun** — premium, instant-feeling, alive; people *want* to use it.
 4. **Rock-solid** — never loses work; degrades gracefully; secure by default.
 5. **Makes you a better breeder** — surfaces insight a non-statistician would miss; teaches as it works.

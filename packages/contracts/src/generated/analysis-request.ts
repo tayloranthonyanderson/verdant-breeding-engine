@@ -292,7 +292,7 @@ export interface AnalysisRequest {
       variable_id: string;
       operator: '>=' | '<=' | '>' | '<' | '==' | '!=' | 'in' | 'not_in';
       /**
-       * Number for quantitative gates; string/array for categorical (e.g. accepted fruit types).
+       * Number for quantitative gates; string/array for categorical (e.g. accepted ear types).
        */
       threshold: number | string | unknown[];
     }[];

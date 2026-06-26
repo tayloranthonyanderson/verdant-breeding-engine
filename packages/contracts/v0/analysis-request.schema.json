@@ -167,7 +167,7 @@
             "properties": {
               "variable_id": { "type": "string" },
               "operator": { "type": "string", "enum": [">=", "<=", ">", "<", "==", "!=", "in", "not_in"] },
-              "threshold": { "description": "Number for quantitative gates; string/array for categorical (e.g. accepted fruit types).", "type": ["number", "string", "array"] }
+              "threshold": { "description": "Number for quantitative gates; string/array for categorical (e.g. accepted ear types).", "type": ["number", "string", "array"] }
             }
           }
         },

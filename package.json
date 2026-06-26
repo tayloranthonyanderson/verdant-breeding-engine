@@ -5,7 +5,7 @@
   "engines": {
     "node": ">=22"
   },
-  "description": "Verdant — AI-native breeding management + analysis platform. Monorepo root (ADR-0012).",
+  "description": "Verdant — open-source breeding management + analysis project. Monorepo root (ADR-0012).",
   "scripts": {
     "contracts:codegen": "pnpm --filter @verdant/contracts codegen",
     "contracts:test": "pnpm --filter @verdant/contracts test",
