@@ -32,7 +32,7 @@ const DEFAULT_OBJECTIVE = {
 };
 
 // The combining_ability facet shape now lives once in the engine contract; re-exported here so existing
-// importers (met-build, tomato-combining-ability, the pipeline barrel) keep their import path.
+// importers (met-build, maize-combining-ability, the pipeline barrel) keep their import path.
 export type { CombiningAbility };
 
 /** Run the GCA/SCA fit and return the combining_ability section. Reuses the MET fixture (parentage +
@@ -94,7 +94,7 @@ async function latestHybridBundle(): Promise<{ bundle: ResultBundle; studyId: nu
 
 /** Attach the combining-ability facet to an existing hybrid bundle → one unified analysis bundle. */
 export function attachCombiningAbility(hybrid: ResultBundle, ca: CombiningAbility): ResultBundle {
-  const note = { code: 'synthetic_inbred_data', message: 'Combining-ability inbred facts (heterotic pool, per-se value, NCLB native trait) are SYNTHETIC scaffolding (ADR-0020) — G2F gives parent identity only. Real tomato inbred data replaces them.', severity: 'info' as const };
+  const note = { code: 'synthetic_inbred_data', message: 'Combining-ability inbred facts (heterotic pool, per-se value, NCLB native trait) are SYNTHETIC scaffolding (ADR-0020) — G2F gives parent identity only. Real maize inbred data replaces them.', severity: 'info' as const };
   return {
     ...hybrid,
     combining_ability: ca as unknown as ResultBundle['combining_ability'],

@@ -1,4 +1,4 @@
-"name","role","pool","per_se","per_se_fresh","nclb","parents"
+"name","role","pool","per_se","per_se_cb","nclb","parents"
 "PLA-001","line","Pool A",1.089,0.249,0,"PLA-F10×PLA-F16"
 "PLA-002","line","Pool A",1.619,0.026,0,"PLA-F10×PLA-F16"
 "PLA-003","line","Pool A",-0.625,-3.452,0,"PLA-F10×PLA-F16"

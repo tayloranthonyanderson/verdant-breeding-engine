@@ -1,9 +1,9 @@
-## sim-corpus.R — synthetic tomato HYBRID breeding program with known truth (extends sim.R from one MET
+## sim-corpus.R — synthetic maize HYBRID breeding program with known truth (extends sim.R from one MET
 ## to a staged, multi-year, multi-market funnel). IP-clean: fully simulated (ADR-0008). Pure base R
 ## + jsonlite. The corpus the product demos a *program* on, and the substrate for the data-cut model
 ## (docs/sim-corpus-spec.md, ADR-0023).
 ##
-## HYBRID-ONLY (ADR-0025): tomato is an F1 crop, so EVERY trial is a TESTCROSS — candidate inbreds (drawn
+## HYBRID-ONLY (ADR-0025): maize is an F1 crop, so EVERY trial is a TESTCROSS — candidate inbreds (drawn
 ## from the two heterotic pools) crossed to a small set of common testers, grown as F1 hybrids with known
 ## parentage. There is no per-se line trial and no separate "testcross" node: GCA/SCA are estimable from
 ## ANY composed cut (every cut is hybrid), and the crossing module reads GCA off whatever cut the breeder
@@ -13,14 +13,14 @@
 ##
 ## What it builds:
 ##   - Genetic values are MARKER-BASED (a real GRM can later glue the wide prediction cut). Per-locus
-##     effects are correlated across traits, preserving the yield<->brix trade-off from sim.R.
-##   - Two TPEs (Processing = arid CA; Fresh-East = humid East) with GCA×TPE: a parent's processing and
-##     fresh general combining abilities are correlated < 1, so the Fresh market genuinely needs its own fit.
+##     effects are correlated across traits, preserving the yield<->protein trade-off from sim.R.
+##   - Two TPEs (Dryland = western arid; Corn-Belt = eastern high-yield) with GCA×TPE: a parent's dryland
+##     and corn-belt general combining abilities are correlated < 1, so the Corn-Belt market needs its own fit.
 ##   - A funnel across 2 cycles (years). Surviving CANDIDATES carry forward (selected on OBSERVED testcross
 ##     means, so selection bias + Bulmer variance compression are real). The design ramps (locs/reps/trait
 ##     panel grow). Common TESTERS appear in every trial — the connectivity glue across stages and years.
 ##
-## Output (default data/tomato/): per-trial long CSVs (each carrying parent1/parent2), manifest.json (the
+## Output (default data/maize-sim/): per-trial long CSVs (each carrying parent1/parent2), manifest.json (the
 ## trial catalog, each trial tagged stage/year/tpe/market), markers.csv, inbreds.csv, truth.json.
 ##
 ##   Rscript services/kernel/sim-corpus.R [outdir]
@@ -36,26 +36,27 @@ suppressWarnings(suppressPackageStartupMessages(library(jsonlite)))
 
 set.seed(73)
 
-TRAITS <- c("yield", "brix", "firmness", "fruit_wt", "maturity", "shelf_life")
-## trait means (processing-tomato-ish) and target GENETIC sds
-g_mean <- c(yield = 85, brix = 5.0, firmness = 40, fruit_wt = 70, maturity = 115, shelf_life = 18)
-g_sd   <- c(yield = 8,  brix = 0.45, firmness = 5, fruit_wt = 7,  maturity = 3.5, shelf_life = 2.5)
+TRAITS <- c("yield", "grain_protein", "test_weight", "plant_height", "maturity", "standability")
+## trait means (grain-maize-ish: yield Mg/ha, protein %, test weight kg/hL, height cm, days, 1-9 score)
+g_mean <- c(yield = 11, grain_protein = 9.0, test_weight = 74, plant_height = 250, maturity = 120, standability = 7.5)
+g_sd   <- c(yield = 1.6, grain_protein = 0.7, test_weight = 3.0, plant_height = 14, maturity = 3.5, standability = 1.0)
 
-## genetic correlation among traits — yield<->brix trade-off (-0.45) carried from sim.R; firmness and
-## shelf_life mildly favourable with brix; fruit_wt trades against brix (big watery fruit, lower solids).
+## genetic correlation among traits — yield<->protein dilution trade-off (-0.45) carried from sim.R;
+## test_weight and standability mildly favourable with protein; plant_height trades against protein (taller,
+## more vegetative, lower grain protein).
 G_corr <- matrix(c(
-#        yield   brix  firm  fruit   matur  shelf
+#        yield   prot  testwt  ht    matur  stand
          1.00, -0.45,  0.10,  0.35, -0.10,  0.05,   # yield
-        -0.45,  1.00,  0.25, -0.30,  0.15,  0.20,   # brix
-         0.10,  0.25,  1.00, -0.05,  0.05,  0.45,   # firmness
-         0.35, -0.30, -0.05,  1.00, -0.10, -0.15,   # fruit_wt
+        -0.45,  1.00,  0.25, -0.30,  0.15,  0.20,   # grain_protein
+         0.10,  0.25,  1.00, -0.05,  0.05,  0.45,   # test_weight
+         0.35, -0.30, -0.05,  1.00, -0.10, -0.15,   # plant_height
         -0.10,  0.15,  0.05, -0.10,  1.00,  0.00,   # maturity
-         0.05,  0.20,  0.45, -0.15,  0.00,  1.00),  # shelf_life
+         0.05,  0.20,  0.45, -0.15,  0.00,  1.00),  # standability
   6, 6, byrow = TRUE)
 dimnames(G_corr) <- list(TRAITS, TRAITS)
 
-## cross-TPE genetic correlation (GCA×TPE): processing vs fresh-east breeding value of the same parent.
-## < 1 → a top processing parent is not automatically a top fresh parent → Fresh-East needs its OWN fit.
+## cross-TPE genetic correlation (GCA×TPE): dryland vs corn-belt breeding value of the same parent.
+## < 1 → a top dryland parent is not automatically a top corn-belt parent → Corn-Belt needs its OWN fit.
 CROSS_TPE_R <- 0.55
 
 N_LOCI <- 200
@@ -66,8 +67,8 @@ N_LOCI <- 200
 n_found_c1 <- 240
 n_found_c2 <- 200
 n_check    <- 6
-line_ids <- c(sprintf("TOM-%04d", seq_len(n_found_c1)),
-              sprintf("TOM-%04d", 1000 + seq_len(n_found_c2)),
+line_ids <- c(sprintf("ZM-%04d", seq_len(n_found_c1)),
+              sprintf("ZM-%04d", 1000 + seq_len(n_found_c2)),
               sprintf("CHK-%02d", seq_len(n_check)))
 n_line <- length(line_ids)
 
@@ -78,38 +79,38 @@ colnames(M) <- sprintf("m%03d", seq_len(N_LOCI))
 rownames(M) <- line_ids
 ## per-locus additive effects (correlated across traits per G_corr), KEPT (not generated-and-discarded)
 ## so appended germplasm — the heterotic pools below — can be scored on the SAME genetic architecture.
-## Two effect sets (common + TPE-specific) build correlated-but-distinct processing/fresh breeding values.
+## Two effect sets (common + TPE-specific) build correlated-but-distinct dryland/corn-belt breeding values.
 center_vec <- colMeans(M)                                       # the backbone's per-locus mean dosage
 draw_A <- function() .rmvn(N_LOCI, rep(0, length(TRAITS)), G_corr)   # n_loci x n_traits, cov ~ G_corr
-A_set  <- list(common = draw_A(), proc = draw_A(), fresh = draw_A())  # 3 draws — same RNG order as before
+A_set  <- list(common = draw_A(), dry = draw_A(), cb = draw_A())  # 3 draws — same RNG order as before
 .colbv <- function(Msub, A) sweep(Msub, 2, center_vec, "-") %*% A
 .cscl  <- lapply(A_set, function(A) g_sd / apply(.colbv(M, A), 2, sd))  # per-trait scale, from the backbone
 ## the three scaled effect-set BVs for any marker matrix (identical to the old locus_effects() on the backbone)
 effset_bv <- function(Msub) setNames(lapply(names(A_set), function(k) sweep(.colbv(Msub, A_set[[k]]), 2, .cscl[[k]], "*")), names(A_set))
-bvo <- effset_bv(M); bv_common <- bvo$common; bv_proc_sp <- bvo$proc; bv_fresh_sp <- bvo$fresh
+bvo <- effset_bv(M); bv_common <- bvo$common; bv_dry_sp <- bvo$dry; bv_cb_sp <- bvo$cb
 
 ## TPE breeding values: sqrt(r)*common + sqrt(1-r)*specific → cross-TPE corr ≈ CROSS_TPE_R. Scale factors
 ## come from the backbone lines so appended germplasm lands on the same scale.
 .tcomb <- function(common, specific) sqrt(CROSS_TPE_R) * common + sqrt(1 - CROSS_TPE_R) * specific
-.tscl  <- list(processing = g_sd / apply(.tcomb(bv_common, bv_proc_sp), 2, sd),
-               `fresh-east` = g_sd / apply(.tcomb(bv_common, bv_fresh_sp), 2, sd))
+.tscl  <- list(dryland = g_sd / apply(.tcomb(bv_common, bv_dry_sp), 2, sd),
+               cornbelt = g_sd / apply(.tcomb(bv_common, bv_cb_sp), 2, sd))
 tpe_bv <- function(common, specific, tpe) sweep(sweep(.tcomb(common, specific), 2, .tscl[[tpe]], "*"), 2, g_mean, "+")
-BV <- list(processing = tpe_bv(bv_common, bv_proc_sp, "processing"),
-           `fresh-east` = tpe_bv(bv_common, bv_fresh_sp, "fresh-east"))
+BV <- list(dryland = tpe_bv(bv_common, bv_dry_sp, "dryland"),
+           cornbelt = tpe_bv(bv_common, bv_cb_sp, "cornbelt"))
 for (tpe in names(BV)) rownames(BV[[tpe]]) <- line_ids
 ## TPE BV for APPENDED germplasm (consistent scale with the backbone) — used by the pools/candidates. Both
-## TPEs available, so a pool line carries a processing AND a fresh-east breeding value (GCA×TPE applies).
+## TPEs available, so a pool line carries a dryland AND a corn-belt breeding value (GCA×TPE applies).
 bv_for <- function(Msub, tpe) { b <- effset_bv(Msub)
-  spec <- if (tpe == "processing") b$proc else b$fresh
+  spec <- if (tpe == "dryland") b$dry else b$cb
   m <- tpe_bv(b$common, spec, tpe); rownames(m) <- rownames(Msub); m }
 
 ## ---- trial noise + selection helpers ------------------------------------------------------------
 ## GxE / residual / block sds (yield most plastic). Trait panel measured per trial passed in `measured`.
-ge_sd  <- c(yield = 6, brix = 0.25, firmness = 3, fruit_wt = 3, maturity = 1.5, shelf_life = 1.2)
-res_sd <- c(yield = 7, brix = 0.35, firmness = 4, fruit_wt = 5, maturity = 2.2, shelf_life = 1.6)
+ge_sd  <- c(yield = 1.2, grain_protein = 0.4, test_weight = 1.8, plant_height = 6, maturity = 1.5, standability = 0.5)
+res_sd <- c(yield = 1.4, grain_protein = 0.55, test_weight = 2.4, plant_height = 10, maturity = 2.2, standability = 0.65)
 ## spatial field-trend amplitude per trait — a smooth row×col surface SpATS can recover (the reason a
 ## field layout exists at all). Comparable to block/residual, not dominating.
-spat_sd <- c(yield = 5, brix = 0.30, firmness = 3, fruit_wt = 4, maturity = 2, shelf_life = 1.5)
+spat_sd <- c(yield = 1.0, grain_protein = 0.45, test_weight = 1.8, plant_height = 8, maturity = 2.0, standability = 0.6)
 
 ## candidate (parent) means on the measured traits — selection between stages is on a parent's mean
 ## TESTCROSS performance (its GCA proxy), so survivors are chosen on combining ability, not per se.
@@ -139,23 +140,24 @@ select_top_bal <- function(means, weights, n) {
   picks[seq_len(min(n, length(picks)))]
 }
 
-## selection weights (sign = direction). Processing favours yield/brix/firmness/earliness;
-## fresh favours fruit_wt/shelf_life/yield. maturity negative = earlier is better.
-W_PROC  <- c(yield = 1.0, brix = 1.0, firmness = 0.6, maturity = -0.4)
-W_FRESH <- c(yield = 0.8, fruit_wt = 1.0, shelf_life = 0.9, maturity = -0.3)
+## selection weights (sign = direction). Dryland favours yield/protein/test-weight/earliness;
+## corn-belt favours plant-height/standability/yield. maturity negative = earlier is better.
+W_DRY <- c(yield = 1.0, grain_protein = 1.0, test_weight = 0.6, maturity = -0.4)
+W_CB  <- c(yield = 0.8, plant_height = 1.0, standability = 0.9, maturity = -0.3)
 
 ## ===== Heterotic pools (the PARENTS) — built FIRST, since the whole funnel is their testcrosses =====
 ## Each pool is FOUNDED by a dozen+ inbreds and grown by within-pool crossing, so it carries real FAMILY
 ## STRUCTURE (full/half sibs share haplotypes). That gives the GRM genuine relatedness and makes the
 ## gain↔diversity tension REAL — a strong founder spawns a strong, RELATED family, so chasing gain
 ## concentrates kinship (exactly what optimal-contribution selection exists to manage). The two pools are
-## genetically DIVERGENT (pool-specific allele freqs at a subset of loci) → distinct heterotic groups:
-## across-pool A×B is the product cross (mode 1), within-pool line×line is recycling (mode 2).
+## genetically DIVERGENT (pool-specific allele freqs at a subset of loci) → distinct heterotic groups
+## (think Stiff-Stalk vs Non-Stiff-Stalk): across-pool A×B is the product cross (mode 1), within-pool
+## line×line is recycling (mode 2).
 set.seed(910)
 N_FOUND_POOL <- 16     # founder inbreds per pool (≥ a dozen)
 N_LINE_POOL  <- 60     # current-generation inbred lines per pool (the full recycling roster)
 N_DIVERGENT  <- 60     # loci differentiating the pools (heterotic divergence)
-RES_LOCUS    <- "m007" # marker standing in for the native disease-resistance gene (the native-trait gate)
+RES_LOCUS    <- "m007" # marker standing in for the native disease-resistance gene (NCLB / Ht1 — the gate)
 
 div_loci  <- sample.int(N_LOCI, N_DIVERGENT)
 pool_freq <- function(shift) { pp <- p; pp[div_loci] <- pmin(0.95, pmax(0.05, pp[div_loci] + shift)); pp }
@@ -177,11 +179,11 @@ M_pool  <- rbind(pA$M, pB$M)
 pool_of <- setNames(c(rep("Pool A", N_LINE_POOL), rep("Pool B", N_LINE_POOL)), rownames(M_pool))
 
 ## per-se merit per TPE (a PARENT ATTRIBUTE — the per-se↔GCA divergence is now a parent fact, not a trial).
-bv_pool   <- list(processing = bv_for(M_pool, "processing"), `fresh-east` = bv_for(M_pool, "fresh-east"))
+bv_pool   <- list(dryland = bv_for(M_pool, "dryland"), cornbelt = bv_for(M_pool, "cornbelt"))
 perse_idx <- function(bv, W) { z <- sapply(names(W), function(tr) { v <- bv[, tr]; (v - mean(v)) / (sd(v) + 1e-9) })
   setNames(rowSums(sweep(z, 2, W, "*")), rownames(bv)) }
-perse_proc  <- perse_idx(bv_pool$processing, W_PROC)
-perse_fresh <- perse_idx(bv_pool$`fresh-east`, W_FRESH)
+perse_dry <- perse_idx(bv_pool$dryland, W_DRY)
+perse_cb  <- perse_idx(bv_pool$cornbelt, W_CB)
 
 ## ===== Candidates + testers + the F1 testcross simulator =========================================
 ## Candidates = elite pool lines (BOTH pools) that get testcrossed through the funnel. A small common
@@ -190,21 +192,21 @@ perse_fresh <- perse_idx(bv_pool$`fresh-east`, W_FRESH)
 ## only ~3 crosses (sparse), so elite×elite product hybrids stay UNMADE — the hybrid-prediction target.
 n_cand   <- 24                                                  # elite candidates per pool for the 2024 funnel
 n_cand25 <- 12                                                  # new candidates entering at the top in 2025
-ord_A <- { m <- names(pool_of)[pool_of == "Pool A"]; m[order(-perse_proc[m])] }
-ord_B <- { m <- names(pool_of)[pool_of == "Pool B"]; m[order(-perse_proc[m])] }
+ord_A <- { m <- names(pool_of)[pool_of == "Pool A"]; m[order(-perse_dry[m])] }
+ord_B <- { m <- names(pool_of)[pool_of == "Pool B"]; m[order(-perse_dry[m])] }
 cand    <- c(ord_A[seq_len(n_cand)],                ord_B[seq_len(n_cand)])
 cand25  <- c(ord_A[n_cand + seq_len(n_cand25)],     ord_B[n_cand + seq_len(n_cand25)])
-testers <- sprintf("TOM-%04d", 1:3)                             # 3 common inbred testers (from the backbone)
+testers <- sprintf("ZM-%04d", 1:3)                              # 3 common inbred testers (from the backbone)
 
 ## BV tables spanning every entity that can appear in a cross (testers + all pool candidates), per TPE.
-BV_all <- list(processing  = rbind(BV[["processing"]],  bv_pool[["processing"]]),
-               `fresh-east` = rbind(BV[["fresh-east"]], bv_pool[["fresh-east"]]))
+BV_all <- list(dryland  = rbind(BV[["dryland"]],  bv_pool[["dryland"]]),
+               cornbelt = rbind(BV[["cornbelt"]], bv_pool[["cornbelt"]]))
 
 ## STABLE per-cross SCA + F1 vigour, drawn ONCE for every candidate×tester so a cross is genetically
 ## consistent across stages (only env/GxE/spatial/residual change between trials). F1 = mid-parent +
 ## GCA + SCA + heterosis + MET noise (so the kernel recovers a high Baker's ratio + a per-se↔GCA divergence).
-het    <- c(yield = 7, brix = 0.05, firmness = 0.5, fruit_wt = 5, maturity = -1, shelf_life = 0.3)  # F1 vigour
-sca_sd <- c(yield = 2.0, brix = 0.12, firmness = 1.3, fruit_wt = 1.8, maturity = 0.9, shelf_life = 0.6)
+het    <- c(yield = 1.4, grain_protein = 0.08, test_weight = 0.3, plant_height = 10, maturity = -1, standability = 0.12)  # F1 vigour
+sca_sd <- c(yield = 0.4, grain_protein = 0.18, test_weight = 0.8, plant_height = 3.6, maturity = 0.9, standability = 0.25)
 all_cross <- expand.grid(line = unique(c(cand, cand25)), tester = testers, stringsAsFactors = FALSE)
 SCA <- sapply(TRAITS, function(tr) stats::rnorm(nrow(all_cross), 0, sca_sd[[tr]]))   # fixed SCA per cross×trait
 rownames(SCA) <- paste(all_cross$line, all_cross$tester, sep = "x")
@@ -214,14 +216,14 @@ sim_tc <- function(cand_set, tpe, year, locs, reps, measured, loc_prefix) {
   cr  <- expand.grid(line = cand_set, tester = testers, stringsAsFactors = FALSE)
   env_names <- sprintf("%s-%d-L%d", loc_prefix, year, seq_len(locs))
   env_eff <- .rmvn(locs, rep(0, length(TRAITS)),
-                   diag((c(yield = 12, brix = 0.6, firmness = 5, fruit_wt = 6, maturity = 4, shelf_life = 3))^2))
+                   diag((c(yield = 2.4, grain_protein = 0.9, test_weight = 3.0, plant_height = 12, maturity = 4.0, standability = 1.2))^2))
   rows <- list(); k <- 0
   for (e in seq_len(locs)) {
     ## FIELD LAYOUT: place every plot (crosses × reps) on a row×col grid, randomized, with a smooth
     ## low-frequency field surface (so spatial de-trending is meaningful).
     np <- nrow(cr) * reps; ncol <- ceiling(sqrt(np)); nrowg <- ceiling(np / ncol)
     w <- stats::rnorm(3); plot_order <- sample.int(np)
-    block_shift <- lapply(seq_len(reps), function(r) stats::rnorm(length(TRAITS), 0, c(2.5, 0.12, 1.5, 1.5, 0.8, 0.6)))
+    block_shift <- lapply(seq_len(reps), function(r) stats::rnorm(length(TRAITS), 0, c(0.5, 0.18, 0.9, 3, 0.8, 0.25)))
     p <- 0
     for (r in seq_len(reps)) for (ci in seq_len(nrow(cr))) {
       k <- k + 1; p <- p + 1; pos <- plot_order[p]
@@ -254,76 +256,76 @@ add_trial <- function(id, stage, stage_label, year, tpe, market, locs, reps, des
 }
 
 ## ===== Cycle 2024 =====
-## S1 Observation — every candidate testcrossed, central station (proc-TPE proxy), single plot. Tagged ALL
+## S1 Observation — every candidate testcrossed, central station (dryland-TPE proxy), single plot. Tagged ALL
 ## (broad: candidate for every market). Cheap trait panel only.
-s1 <- sim_tc(cand, "processing", 2024, locs = 1, reps = 1,
-             measured = c("yield", "maturity", "fruit_wt"), loc_prefix = "CENTRAL")
-add_trial("S1-2024-OBS", "S1", "Observation", 2024, "processing", "All", 1, 1, "line×tester single-plot",
-          c("yield", "maturity", "fruit_wt"), s1)
-m1 <- cand_means(s1, c("yield", "maturity", "fruit_wt"))
-## route candidates: top 36 by testcross merit to processing, a (partly overlapping) top 24 by fruit to fresh
-proc_s2  <- select_top_bal(m1, c(yield = 1.0, maturity = -0.4, fruit_wt = 0.3), 36)
-fresh_s2 <- select_top_bal(m1, c(fruit_wt = 1.0, yield = 0.6, maturity = -0.2), 24)
-selection_log[["S1-2024->S2"]] <- list(processing = proc_s2, `fresh-east` = fresh_s2)
+s1 <- sim_tc(cand, "dryland", 2024, locs = 1, reps = 1,
+             measured = c("yield", "maturity", "plant_height"), loc_prefix = "CENTRAL")
+add_trial("S1-2024-OBS", "S1", "Observation", 2024, "dryland", "All", 1, 1, "line×tester single-plot",
+          c("yield", "maturity", "plant_height"), s1)
+m1 <- cand_means(s1, c("yield", "maturity", "plant_height"))
+## route candidates: top 36 by testcross merit to dryland, a (partly overlapping) top 24 by height to corn-belt
+dry_s2 <- select_top_bal(m1, c(yield = 1.0, maturity = -0.4, plant_height = 0.3), 36)
+cb_s2  <- select_top_bal(m1, c(plant_height = 1.0, yield = 0.6, maturity = -0.2), 24)
+selection_log[["S1-2024->S2"]] <- list(dryland = dry_s2, cornbelt = cb_s2)
 
-## S2 PYT — split by destination TPE. Processing PYT in CA arid; Fresh PYT in East. Tagged at the TPE node.
-## Quality traits come online. Testcrosses re-grown in the destination TPE → GCA×TPE shows up here.
-s2p <- sim_tc(proc_s2, "processing", 2024, locs = 3, reps = 2,
-              measured = c("yield", "maturity", "fruit_wt", "brix", "firmness"), loc_prefix = "CA")
-add_trial("S2-2024-PROC", "S2", "PYT", 2024, "processing", "Processing", 3, 2, "line×tester RCBD",
-          c("yield", "maturity", "fruit_wt", "brix", "firmness"), s2p)
-s2f <- sim_tc(fresh_s2, "fresh-east", 2024, locs = 3, reps = 2,
-              measured = c("yield", "maturity", "fruit_wt", "shelf_life"), loc_prefix = "EAST")
-add_trial("S2-2024-FRESH", "S2", "PYT", 2024, "fresh-east", "Fresh-East", 3, 2, "line×tester RCBD",
-          c("yield", "maturity", "fruit_wt", "shelf_life"), s2f)
+## S2 PYT — split by destination TPE. Dryland PYT in the west; Corn-Belt PYT in the east. Tagged at the TPE
+## node. Quality traits come online. Testcrosses re-grown in the destination TPE → GCA×TPE shows up here.
+s2d <- sim_tc(dry_s2, "dryland", 2024, locs = 3, reps = 2,
+              measured = c("yield", "maturity", "plant_height", "grain_protein", "test_weight"), loc_prefix = "WEST")
+add_trial("S2-2024-DRY", "S2", "PYT", 2024, "dryland", "Dryland", 3, 2, "line×tester RCBD",
+          c("yield", "maturity", "plant_height", "grain_protein", "test_weight"), s2d)
+s2c <- sim_tc(cb_s2, "cornbelt", 2024, locs = 3, reps = 2,
+              measured = c("yield", "maturity", "plant_height", "standability"), loc_prefix = "EAST")
+add_trial("S2-2024-CB", "S2", "PYT", 2024, "cornbelt", "Corn-Belt", 3, 2, "line×tester RCBD",
+          c("yield", "maturity", "plant_height", "standability"), s2c)
 
-m2p <- cand_means(s2p, c("yield", "brix", "firmness", "maturity"))
-m2f <- cand_means(s2f, c("yield", "fruit_wt", "shelf_life", "maturity"))
-## PROGRESSIVE NARROWING: at S3 the processing program clarifies into SPECIFIC market targets — a
-## Brix-focused AYT and a Firmness-focused AYT, each advancing the candidates whose TESTCROSSES are best
-## for that target (with natural overlap for all-rounders). Late trials are tagged at the LEAF market.
-brix_s3 <- select_top_bal(m2p, c(yield = 1.0, brix = 1.3, maturity = -0.4), 16)
-firm_s3 <- select_top_bal(m2p, c(yield = 1.0, firmness = 1.3, maturity = -0.4), 16)
-fresh_s3 <- select_top_bal(m2f, W_FRESH, 14)
-selection_log[["S2-2024->S3"]] <- list(`Proc-Brix` = brix_s3, `Proc-Firmness` = firm_s3, East = fresh_s3)
+m2d <- cand_means(s2d, c("yield", "grain_protein", "test_weight", "maturity"))
+m2c <- cand_means(s2c, c("yield", "plant_height", "standability", "maturity"))
+## PROGRESSIVE NARROWING: at S3 the dryland program clarifies into SPECIFIC market targets — a
+## protein-focused (food-grade) AYT and a test-weight-focused (grain-quality) AYT, each advancing the
+## candidates whose TESTCROSSES are best for that target (with natural overlap for all-rounders).
+prot_s3 <- select_top_bal(m2d, c(yield = 1.0, grain_protein = 1.3, maturity = -0.4), 16)
+tw_s3   <- select_top_bal(m2d, c(yield = 1.0, test_weight = 1.3, maturity = -0.4), 16)
+cb_s3   <- select_top_bal(m2c, W_CB, 14)
+selection_log[["S2-2024->S3"]] <- list(`Food-grade` = prot_s3, `Grain-quality` = tw_s3, Grain = cb_s3)
 
-## S3 AYT — full panel, many locs. Processing splits into market-specific testcross trials (tag = leaf market).
-s3b <- sim_tc(brix_s3, "processing", 2024, locs = 6, reps = 3, measured = TRAITS, loc_prefix = "CA")
-add_trial("S3-2024-BRIX", "S3", "AYT", 2024, "processing", "Proc-Brix", 6, 3, "line×tester MET", TRAITS, s3b)
-s3fm <- sim_tc(firm_s3, "processing", 2024, locs = 6, reps = 3, measured = TRAITS, loc_prefix = "CA")
-add_trial("S3-2024-FIRM", "S3", "AYT", 2024, "processing", "Proc-Firmness", 6, 3, "line×tester MET", TRAITS, s3fm)
-s3f <- sim_tc(fresh_s3, "fresh-east", 2024, locs = 6, reps = 3, measured = TRAITS, loc_prefix = "EAST")
-add_trial("S3-2024-FRESH", "S3", "AYT", 2024, "fresh-east", "East", 6, 3, "line×tester MET", TRAITS, s3f)
+## S3 AYT — full panel, many locs. Dryland splits into market-specific testcross trials (tag = leaf market).
+s3p <- sim_tc(prot_s3, "dryland", 2024, locs = 6, reps = 3, measured = TRAITS, loc_prefix = "WEST")
+add_trial("S3-2024-FOOD", "S3", "AYT", 2024, "dryland", "Food-grade", 6, 3, "line×tester MET", TRAITS, s3p)
+s3t <- sim_tc(tw_s3, "dryland", 2024, locs = 6, reps = 3, measured = TRAITS, loc_prefix = "WEST")
+add_trial("S3-2024-QUAL", "S3", "AYT", 2024, "dryland", "Grain-quality", 6, 3, "line×tester MET", TRAITS, s3t)
+s3c <- sim_tc(cb_s3, "cornbelt", 2024, locs = 6, reps = 3, measured = TRAITS, loc_prefix = "EAST")
+add_trial("S3-2024-GRAIN", "S3", "AYT", 2024, "cornbelt", "Grain", 6, 3, "line×tester MET", TRAITS, s3c)
 
-m3b <- cand_means(s3b, c("yield", "brix", "firmness", "maturity"))
-m3fm <- cand_means(s3fm, c("yield", "brix", "firmness", "maturity"))
-m3f <- cand_means(s3f, c("yield", "fruit_wt", "shelf_life", "maturity"))
-brix_s4 <- select_top_bal(m3b, c(yield = 1.0, brix = 1.3, maturity = -0.4), 6)
-firm_s4 <- select_top_bal(m3fm, c(yield = 1.0, firmness = 1.3, maturity = -0.4), 6)
-fresh_s4 <- select_top_bal(m3f, W_FRESH, 5)
-selection_log[["S3-2024->S4"]] <- list(`Proc-Brix` = brix_s4, `Proc-Firmness` = firm_s4, East = fresh_s4)
+m3p <- cand_means(s3p, c("yield", "grain_protein", "test_weight", "maturity"))
+m3t <- cand_means(s3t, c("yield", "grain_protein", "test_weight", "maturity"))
+m3c <- cand_means(s3c, c("yield", "plant_height", "standability", "maturity"))
+prot_s4 <- select_top_bal(m3p, c(yield = 1.0, grain_protein = 1.3, maturity = -0.4), 6)
+tw_s4   <- select_top_bal(m3t, c(yield = 1.0, test_weight = 1.3, maturity = -0.4), 6)
+cb_s4   <- select_top_bal(m3c, W_CB, 5)
+selection_log[["S3-2024->S4"]] <- list(`Food-grade` = prot_s4, `Grain-quality` = tw_s4, Grain = cb_s4)
 
 ## ===== Cycle 2025 =====
 ## S4 Pre-commercial — 2024 survivors' testcrosses to wide on-farm strips (cross-YEAR connectivity via the
 ## common testers + surviving candidates). Still market-specific (leaf tags).
-s4b <- sim_tc(brix_s4, "processing", 2025, locs = 10, reps = 2, measured = TRAITS, loc_prefix = "CAFARM")
-add_trial("S4-2025-BRIX", "S4", "Pre-commercial", 2025, "processing", "Proc-Brix", 10, 2, "line×tester on-farm strips", TRAITS, s4b)
-s4fm <- sim_tc(firm_s4, "processing", 2025, locs = 10, reps = 2, measured = TRAITS, loc_prefix = "CAFARM")
-add_trial("S4-2025-FIRM", "S4", "Pre-commercial", 2025, "processing", "Proc-Firmness", 10, 2, "line×tester on-farm strips", TRAITS, s4fm)
-s4f <- sim_tc(fresh_s4, "fresh-east", 2025, locs = 8, reps = 2, measured = TRAITS, loc_prefix = "EASTFARM")
-add_trial("S4-2025-FRESH", "S4", "Pre-commercial", 2025, "fresh-east", "East", 8, 2, "line×tester on-farm strips", TRAITS, s4f)
+s4p <- sim_tc(prot_s4, "dryland", 2025, locs = 10, reps = 2, measured = TRAITS, loc_prefix = "WESTFARM")
+add_trial("S4-2025-FOOD", "S4", "Pre-commercial", 2025, "dryland", "Food-grade", 10, 2, "line×tester on-farm strips", TRAITS, s4p)
+s4t <- sim_tc(tw_s4, "dryland", 2025, locs = 10, reps = 2, measured = TRAITS, loc_prefix = "WESTFARM")
+add_trial("S4-2025-QUAL", "S4", "Pre-commercial", 2025, "dryland", "Grain-quality", 10, 2, "line×tester on-farm strips", TRAITS, s4t)
+s4c <- sim_tc(cb_s4, "cornbelt", 2025, locs = 8, reps = 2, measured = TRAITS, loc_prefix = "EASTFARM")
+add_trial("S4-2025-GRAIN", "S4", "Pre-commercial", 2025, "cornbelt", "Grain", 8, 2, "line×tester on-farm strips", TRAITS, s4c)
 
 ## New S1 for cycle 2025 (fresh candidates enter the top of the funnel) — keeps the program "alive".
-s1b <- sim_tc(cand25, "processing", 2025, locs = 1, reps = 1,
-              measured = c("yield", "maturity", "fruit_wt"), loc_prefix = "CENTRAL")
-add_trial("S1-2025-OBS", "S1", "Observation", 2025, "processing", "All", 1, 1, "line×tester single-plot",
-          c("yield", "maturity", "fruit_wt"), s1b)
+s1b <- sim_tc(cand25, "dryland", 2025, locs = 1, reps = 1,
+              measured = c("yield", "maturity", "plant_height"), loc_prefix = "CENTRAL")
+add_trial("S1-2025-OBS", "S1", "Observation", 2025, "dryland", "All", 1, 1, "line×tester single-plot",
+          c("yield", "maturity", "plant_height"), s1b)
 
 ## ---- write outputs ------------------------------------------------------------------------------
 args <- commandArgs(trailingOnly = TRUE)
 self_dir <- { a <- commandArgs(FALSE); f <- sub("^--file=", "", a[grep("^--file=", a)])
               if (length(f)) dirname(normalizePath(f)) else "." }
-outdir <- if (length(args) >= 1) args[1] else normalizePath(file.path(self_dir, "..", "..", "data", "tomato"), mustWork = FALSE)
+outdir <- if (length(args) >= 1) args[1] else normalizePath(file.path(self_dir, "..", "..", "data", "maize-sim"), mustWork = FALSE)
 dir.create(file.path(outdir, "trials"), recursive = TRUE, showWarnings = FALSE)
 
 for (id in names(trials)) write.csv(trials[[id]], file.path(outdir, "trials", paste0(id, ".csv")), row.names = FALSE)
@@ -335,10 +337,10 @@ write.csv(mk_df, file.path(outdir, "markers.csv"), row.names = FALSE)
 
 ## inbreds.csv — parent facts for the candidate pool (heterotic pool / per-se merit per TPE / native trait /
 ## founder parents). The full pools feed within-pool recycling; per_se is the parent's own merit (kept for
-## the per-se↔GCA divergence); per_se_fresh is its fresh-TPE merit; the native trait is carriage of the
-## resistance allele at RES_LOCUS — the dual-source gate (ADR-0020).
+## the per-se↔GCA divergence); per_se_cb is its corn-belt-TPE merit; the native trait is carriage of the
+## NCLB (Ht1) resistance allele at RES_LOCUS — the dual-source gate (ADR-0020).
 inbreds <- data.frame(name = rownames(M_pool), role = "line", pool = unname(pool_of),
-                      per_se = round(unname(perse_proc), 3), per_se_fresh = round(unname(perse_fresh), 3),
+                      per_se = round(unname(perse_dry), 3), per_se_cb = round(unname(perse_cb), 3),
                       nclb = as.integer(M_pool[, RES_LOCUS] >= 1),
                       parents = unname(c(pA$parents, pB$parents)), stringsAsFactors = FALSE)
 write.csv(inbreds, file.path(outdir, "inbreds.csv"), row.names = FALSE)
@@ -349,22 +351,22 @@ write.csv(inbreds, file.path(outdir, "inbreds.csv"), row.names = FALSE)
 ## leaves); inner nodes (All, the TPEs) are grouping levels material narrows through. EVERY trial is a
 ## hybrid testcross, so there is no separate "hybrid" node — GCA/SCA come off whatever cut is composed.
 manifest <- list(
-  program = "Verdant tomato (synthetic, F1 hybrid)",
+  program = "Verdant maize (synthetic, F1 hybrid)",
   generated_by = "services/kernel/sim-corpus.R",
   traits = TRAITS,
   tpes = list(
-    processing = list(label = "Processing (arid CA)"),
-    `fresh-east` = list(label = "Fresh-market East (humid)")),
+    dryland = list(label = "Dryland (western arid)"),
+    cornbelt = list(label = "Corn Belt (eastern, high-yield)")),
   hierarchy = list(
-    All            = list(parent = NA,           tpe = NA,           label = "All markets (early screen)"),
-    Processing     = list(parent = "All",        tpe = "processing", label = "Processing · arid CA"),
-    `Proc-Brix`    = list(parent = "Processing", tpe = "processing", label = "Processing · Brix",
-                          weights = list(brix = 0.45, yield = 0.30, firmness = 0.15, maturity = -0.10)),
-    `Proc-Firmness`= list(parent = "Processing", tpe = "processing", label = "Processing · Firmness",
-                          weights = list(firmness = 0.45, yield = 0.30, brix = 0.15, maturity = -0.10)),
-    `Fresh-East`   = list(parent = "All",        tpe = "fresh-east", label = "Fresh-market East · humid"),
-    East           = list(parent = "Fresh-East", tpe = "fresh-east", label = "Fresh-market · East",
-                          weights = list(fruit_wt = 0.35, shelf_life = 0.30, yield = 0.25, maturity = -0.10))),
+    All             = list(parent = NA,         tpe = NA,         label = "All markets (early screen)"),
+    Dryland         = list(parent = "All",      tpe = "dryland",  label = "Dryland · western arid"),
+    `Food-grade`    = list(parent = "Dryland",  tpe = "dryland",  label = "Dryland · food-grade",
+                           weights = list(grain_protein = 0.45, yield = 0.30, test_weight = 0.15, maturity = -0.10)),
+    `Grain-quality` = list(parent = "Dryland",  tpe = "dryland",  label = "Dryland · grain quality",
+                           weights = list(test_weight = 0.45, yield = 0.30, grain_protein = 0.15, maturity = -0.10)),
+    `Corn-Belt`     = list(parent = "All",      tpe = "cornbelt", label = "Corn Belt · eastern"),
+    Grain           = list(parent = "Corn-Belt", tpe = "cornbelt", label = "Corn Belt · grain",
+                           weights = list(yield = 0.40, standability = 0.30, test_weight = 0.20, maturity = -0.10))),
   trials = unname(manifest_trials))
 write_json(manifest, file.path(outdir, "manifest.json"), auto_unbox = TRUE, pretty = TRUE, na = "null")
 
@@ -379,7 +381,7 @@ truth <- list(
   testers = testers)
 write_json(truth, file.path(outdir, "truth.json"), auto_unbox = TRUE, pretty = TRUE, digits = 5, na = "null")
 
-cat(sprintf("tomato HYBRID corpus → %s\n  %d trials (all F1 testcross), %d pool candidates + %d common testers, %d markers\n  pools: 2 × %d lines from %d founders each\n",
+cat(sprintf("maize HYBRID corpus → %s\n  %d trials (all F1 testcross), %d pool candidates + %d common testers, %d markers\n  pools: 2 × %d lines from %d founders each\n",
             outdir, length(trials), nrow(M_pool), length(testers), N_LOCI, N_LINE_POOL, N_FOUND_POOL))
 for (mt in manifest_trials)
   cat(sprintf("  %-14s %s %d %-11s tag=%-13s entries=%d loc=%d rep=%d\n",

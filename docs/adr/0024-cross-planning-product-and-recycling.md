@@ -61,7 +61,7 @@ limits recompute instantly — no kernel/pipeline/contract/fixture change.
   *transmission* (crossing).
 - **Greedy portfolio** under a per-parent use cap → the recommended plan; the breeder tunes the cap /
   count / gates and can exclude a cross. Deterministic per-cross rationale ("strong Yield", "B covers
-  A's Firmness gap", "carries Pto").
+  A's Test-weight gap", "carries Ht1").
 - Files: `apps/web/src/lib/cross-plan.ts` (derivation), `apps/web/src/components/CrossPlanner.tsx`
   (the surface), wired as the **Cross** step after Advance in `CutWorkbench` (shown when the cut carries
   a testcross trial, i.e. `combining_ability` is present).
@@ -87,10 +87,10 @@ limits recompute instantly — no kernel/pipeline/contract/fixture change.
 
 - **The Cross step is the cycle-closing surface** and the terminal act of the flagship teaching demo:
   "from last season's trials to next season's cross plan." Verified end-to-end on `advance-proc-hybrid`
-  (12 across-pool crosses ranked on the processing index; requiring Pto reshapes the plan so every kept
+  (12 across-pool crosses ranked on the processing index; requiring Ht1 reshapes the plan so every kept
   cross carries it).
 - **Recycling / OCS is the next crossing increment** (a within-pool planner with a gain-vs-coancestry
-  optimizer, genomic coancestry from the GRM since tomato has no pedigree).
+  optimizer, genomic coancestry from the GRM since maize has no pedigree).
 - **Persisting cross decisions is deferred.** v1 is decision *support* (the plan is advisory, recomputed
   from the bundle, works on saved and ephemeral runs alike). Recording "make these crosses" as a
   first-class decision (a `cross` unit alongside `inbred`/`hybrid` in the advancement log) is a
@@ -112,7 +112,7 @@ content (the breeder sees OCS trade gain for diversity where greedy usefulness w
   gain-vs-coancestry **frontier**; (3) the **contrast**, read off each discrete plan's realized
   contributions: gain, group coancestry, effective parents `1/Σcᵢ²`. Marker effects are trained on the
   **full pool germplasm** (both pools) so the 200 effects — hence σ — are identifiable.
-- **Pipeline** `packages/pipeline/src/tomato-recycling.ts` runs the kernel per pool from inbreds.csv +
+- **Pipeline** `packages/pipeline/src/maize-recycling.ts` runs the kernel per pool from inbreds.csv +
   markers.csv and attaches `combining_ability.recycling`. **UI**: the Cross step gains a **Product |
   Recycle** mode toggle; Recycle shows the two summary cards, the frontier chart, the divergence
   sentence, and both mating lists (`CrossPlanner.tsx` → `RecyclePlanner`).

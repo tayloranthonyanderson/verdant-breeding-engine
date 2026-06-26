@@ -1,26 +1,26 @@
-// Build a contract-valid ResultBundle for ONE data cut of the synthetic tomato program, and persist
+// Build a contract-valid ResultBundle for ONE data cut of the synthetic maize program, and persist
 // it tagged with the cut descriptor so the web tier can load "the analysis of this cut" (ADR-0023,
-// docs/sim-corpus-spec.md). The cut model (which trials, broad vs narrow) lives in tomato-corpus.ts;
+// docs/sim-corpus-spec.md). The cut model (which trials, broad vs narrow) lives in maize-corpus.ts;
 // this module is the analysis: pool the cut's plots → multi-trait AI-REML (the same crop-agnostic
 // BLUPF90 engine the G2F MET path uses) → transparent + genetically-aware index for the market →
 // bundle. The prediction (broad) and advancement (narrow) cuts run through the identical analysis;
 // only the data scope differs — which is the whole point.
 //
-// Run (build + persist every canonical cut):  pnpm --filter @verdant/pipeline exec tsx src/tomato-build.ts
+// Run (build + persist every canonical cut):  pnpm --filter @verdant/pipeline exec tsx src/maize-build.ts
 import { eq, desc, and } from 'drizzle-orm';
 import { db, program, study, analysisRun, resultBundle } from '@verdant/db';
 import { validateResultBundle, type ResultBundle, type AnalysisRequest } from '@verdant/contracts';
 import { estimateGeneticCovariance } from './blupf90';
 import { spatialStage1 } from './stage1';
-import { buildGenomicBlock, markerReadiness } from './tomato-genomic';
-import { buildTomatoCombiningAbility, cutHasCrosses } from './tomato-combining-ability';
+import { buildGenomicBlock, markerReadiness } from './maize-genomic';
+import { buildMaizeCombiningAbility, cutHasCrosses } from './maize-combining-ability';
 import { runRKernel } from './kernel';
 import { isEntrypoint } from './entry';
 import { runPlanner, type ModelPlan, type ModelOverrides } from './planner';
 import { attachPlotIds, applyDataOverrides, runDataQuality, runModelQc, mergeTraitDiagnostics, boundaryFlags } from './data-quality-build';
-import { assembleCut, assembleCustom, listCuts, cutById, loadManifest, type Cut, type CutDef, type AssembledCut } from './tomato-corpus';
+import { assembleCut, assembleCustom, listCuts, cutById, loadManifest, type Cut, type CutDef, type AssembledCut } from './maize-corpus';
 
-const PROGRAM = 'Verdant tomato (synthetic)';
+const PROGRAM = 'Verdant maize (synthetic)';
 
 /** Pre-fit setup for a cut: the breeder reviews these BEFORE pressing Run (ADR-0021/0016). */
 export type CutExclusions = NonNullable<AnalysisRequest['data_overrides']>['exclusions'];
@@ -232,9 +232,9 @@ export function buildCutBundle(assembled: AssembledCut, opts: CutRunOpts = {}): 
   // Combining-ability facet — when the cut includes an F1 testcross trial (records carry parent1/parent2),
   // decompose the hybrids into GCA (the parent selection target) + SCA. Lights up the Understand
   // combining-ability panel and the Select Parents·GCA / Hybrids switcher (incl. the marker/native gates).
-  let combiningAbility: ReturnType<typeof buildTomatoCombiningAbility> = null;
+  let combiningAbility: ReturnType<typeof buildMaizeCombiningAbility> = null;
   if (cutHasCrosses(assembled)) {
-    try { combiningAbility = buildTomatoCombiningAbility(assembled); }
+    try { combiningAbility = buildMaizeCombiningAbility(assembled); }
     catch (e) { console.log(`combining ability skipped: ${(e as Error).message}`); }
   }
 
@@ -289,7 +289,7 @@ export function buildCutBundle(assembled: AssembledCut, opts: CutRunOpts = {}): 
   if (broad) warnings.push({ code: 'cut_pools_stages', message: `This prediction cut pools ${composition.n_trials} trials across stages ${composition.stages.join('+')} and years ${composition.years.join('+')}, connected by ${composition.n_testers} common testers (every entry is an F1 testcross). Including the early-stage records the selection used de-biases the variance components.`, severity: 'info' });
   else warnings.push({ code: 'cut_is_narrow', message: `This advancement cut is the latest-stage decision set (${composition.n_geno} entries); variance components from so few lines are less precise than the broad prediction cut.`, severity: 'info' });
   if (wantGxe && !fittedGxe) warnings.push({ code: 'gxe_not_separated', message: 'GxE was requested but not estimable for this cut (early-stage founders appear in a single environment); fit uses phenotypic BLUPs.', severity: 'info' });
-  if (combiningAbility) warnings.push({ code: 'synthetic_inbred_data', message: 'Combining-ability inbred facts (heterotic pool, per-se merit, native disease trait) are SYNTHETIC scaffolding (ADR-0020). Real tomato inbred genotyping replaces them.', severity: 'info' });
+  if (combiningAbility) warnings.push({ code: 'synthetic_inbred_data', message: 'Combining-ability inbred facts (heterotic pool, per-se merit, native disease trait) are SYNTHETIC scaffolding (ADR-0020). Real maize inbred genotyping replaces them.', severity: 'info' });
 
   const bundle: ResultBundle = {
     contract_version: 'v0', status: 'ok', intent: broad ? 'prediction' : 'selection',
@@ -304,23 +304,23 @@ export function buildCutBundle(assembled: AssembledCut, opts: CutRunOpts = {}): 
     indices,
     divergence,
     warnings,
-    provenance: { contract_version: 'v0', engine_versions: { blupf90: g.engine }, source: 'tomato-sim-corpus' } as ResultBundle['provenance'],
+    provenance: { contract_version: 'v0', engine_versions: { blupf90: g.engine }, source: 'maize-sim-corpus' } as ResultBundle['provenance'],
   };
   return validateResultBundle(bundle);
 }
 
-async function tomatoStudyId(cut: Cut, source: string): Promise<{ programId: number; studyId: number }> {
+async function maizeStudyId(cut: Cut, source: string): Promise<{ programId: number; studyId: number }> {
   await db.insert(program).values({ name: PROGRAM }).onConflictDoNothing();
   const [prog] = await db.select().from(program).where(eq(program.name, PROGRAM));
   // One study per cut (name = cut.id) so getCutResult can find the latest bundle for a cut. source
-  // distinguishes the built-in templates ('sim') from breeder-saved presets ('tomato-cut').
+  // distinguishes the built-in templates ('sim') from breeder-saved presets ('maize-cut').
   await db.insert(study).values({ programId: prog.id, name: cut.id, fieldLocation: cut.label, year: 2025, source }).onConflictDoNothing();
   const [s] = await db.select().from(study).where(and(eq(study.programId, prog.id), eq(study.name, cut.id)));
   return { programId: prog.id, studyId: s.id };
 }
 
 export async function persistCutBundle(cut: Cut, bundle: ResultBundle, source = 'sim'): Promise<number> {
-  const { programId, studyId } = await tomatoStudyId(cut, source);
+  const { programId, studyId } = await maizeStudyId(cut, source);
   const request: AnalysisRequest = {
     contract_version: 'v0', analysis_request_id: cut.id, intent: bundle.intent,
     variables: bundle.traits.map((t) => ({ variable_id: t.variable_id, name: t.variable_id, data_type: 'numeric' as const })) as AnalysisRequest['variables'],
@@ -333,16 +333,16 @@ export async function persistCutBundle(cut: Cut, bundle: ResultBundle, source = 
 }
 
 /** Preview (no fit) a built-in template cut by id — for the pre-fit Data + Model review. */
-export function previewTomatoCut(cutId: string, opts: CutRunOpts = {}): CutPreview {
+export function previewMaizeCut(cutId: string, opts: CutRunOpts = {}): CutPreview {
   const cut = cutById(cutId);
-  if (!cut) throw new Error(`unknown tomato cut: ${cutId}`);
+  if (!cut) throw new Error(`unknown maize cut: ${cutId}`);
   return previewCut(assembleCut(cut), opts);
 }
 
 /** Build (and optionally persist) one built-in template cut by id — the Server Action's run path. */
-export async function runTomatoCut(cutId: string, opts: { persist?: boolean } & CutRunOpts = {}): Promise<{ bundle: ResultBundle; analysisRunId: number | null }> {
+export async function runMaizeCut(cutId: string, opts: { persist?: boolean } & CutRunOpts = {}): Promise<{ bundle: ResultBundle; analysisRunId: number | null }> {
   const cut = cutById(cutId);
-  if (!cut) throw new Error(`unknown tomato cut: ${cutId}`);
+  if (!cut) throw new Error(`unknown maize cut: ${cutId}`);
   const assembled = assembleCut(cut);
   const bundle = buildCutBundle(assembled, opts);
   const analysisRunId = (opts.persist ?? true) ? await persistCutBundle(cut, bundle) : null;
@@ -355,11 +355,11 @@ export function previewCustomCut(def: CutDef, opts: CutRunOpts = {}): CutPreview
 }
 
 /** Build + persist a BREEDER-DEFINED cut (a saved preset): fit the hand-picked trials (with any model
- *  overrides / data exclusions) and store it as its own re-runnable study (source='tomato-cut'). */
+ *  overrides / data exclusions) and store it as its own re-runnable study (source='maize-cut'). */
 export async function buildCustomCut(def: CutDef, opts: CutRunOpts = {}): Promise<{ cutId: string; analysisRunId: number }> {
   const assembled = assembleCustom(def);
   const bundle = buildCutBundle(assembled, opts);
-  const analysisRunId = await persistCutBundle(assembled.cut, bundle, 'tomato-cut');
+  const analysisRunId = await persistCutBundle(assembled.cut, bundle, 'maize-cut');
   return { cutId: def.id, analysisRunId };
 }
 
@@ -373,10 +373,10 @@ export function fitCustomCut(def: CutDef, opts: CutRunOpts = {}): { bundle: Resu
 async function cli() {
   loadManifest();
   const cuts = listCuts();
-  console.log(`building ${cuts.length} tomato cuts ...`);
+  console.log(`building ${cuts.length} maize cuts ...`);
   for (const cut of cuts) {
     const t0 = Date.now();
-    const { analysisRunId } = await runTomatoCut(cut.id, { persist: true });
+    const { analysisRunId } = await runMaizeCut(cut.id, { persist: true });
     console.log(`  ${cut.id.padEnd(24)} → run ${analysisRunId} (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
   }
   await db.$client.end();

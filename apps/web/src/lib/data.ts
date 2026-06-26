@@ -40,7 +40,7 @@ export async function getLatestResult(): Promise<LoadedResult | null> {
   return { study: s ?? null, run, bundle: rb.bundle as ResultBundle, advancements };
 }
 
-/** The latest G2F MET analysis (the rich maize demo), regardless of any newer tomato cuts. */
+/** The latest G2F MET analysis (the rich maize demo), regardless of any newer maize cuts. */
 export async function getG2fResult(): Promise<LoadedResult | null> {
   const [row] = await db
     .select({ bundle: resultBundle.bundle, run: analysisRun, s: study })
@@ -58,11 +58,11 @@ export async function getG2fResult(): Promise<LoadedResult | null> {
   return { study: row.s, run: row.run, bundle: row.bundle as ResultBundle, advancements };
 }
 
-/** The breeder's saved cut presets (studies with source='tomato-cut'), newest first, each with the
+/** The breeder's saved cut presets (studies with source='maize-cut'), newest first, each with the
  *  scope recorded in its latest bundle. Powers the "your saved cuts" list. */
 export interface SavedCut { id: string; name: string; market: string; market_label: string; trialIds: string[]; n_geno: number; stages: string[]; years: number[] }
 export async function listSavedCuts(): Promise<SavedCut[]> {
-  const studies = await db.select().from(study).where(eq(study.source, "tomato-cut")).orderBy(desc(study.id));
+  const studies = await db.select().from(study).where(eq(study.source, "maize-cut")).orderBy(desc(study.id));
   const out: SavedCut[] = [];
   for (const s of studies) {
     const r = await getCutResult(s.name);
@@ -76,7 +76,7 @@ export async function listSavedCuts(): Promise<SavedCut[]> {
   return out;
 }
 
-/** The latest analysis for a named data cut (a tomato study whose name === the cut id). The cut
+/** The latest analysis for a named data cut (a maize study whose name === the cut id). The cut
  *  bundle carries its own data scope in data_readiness.cut, so this is "the analysis of this cut". */
 export async function getCutResult(cutId: string): Promise<LoadedResult | null> {
   const [s] = await db.select().from(study).where(eq(study.name, cutId));

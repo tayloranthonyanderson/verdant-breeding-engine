@@ -1,8 +1,0 @@
-{
-  "id": "yield-brix-tradeoff",
-  "bundle": "../../../packages/contracts/v0/examples/single-trial-bundle.example.json",
-  "question": "Why do the two selection indices disagree most on G1?",
-  "must_reference": [-0.74],
-  "good_answer": "The transparent and Smith-Hazel indices disagree most on G1 because yield and brix are negatively genetically correlated here (-0.74): G1 ranks high on yield but the genetically-aware index discounts it for the brix it tends to give up. G1 moves 2 ranks between the two views.",
-  "bad_answer": "The indices disagree on G1 because yield and brix are negatively correlated (-0.31), and G1's heritability of 0.55 makes its ranking unstable."
-}

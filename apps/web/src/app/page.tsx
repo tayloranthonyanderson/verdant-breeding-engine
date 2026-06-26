@@ -25,7 +25,7 @@ export const dynamic = "force-dynamic";
 // A synchronous override re-run (ADR-0018) can refit the model; give the Server Action headroom.
 export const maxDuration = 300;
 
-// The front door is the tomato PROGRAM as a deliberate analysis PIPELINE (ADR-0023): compose a data
+// The front door is the maize PROGRAM as a deliberate analysis PIPELINE (ADR-0023): compose a data
 // cut → review the data + outliers and the model the planner recommends (live, pre-fit) → Run → results.
 // The rich G2F MET demo is preserved behind ?view=g2f.
 export default async function Home({ searchParams }: { searchParams: Promise<{ cut?: string; view?: string }> }) {
@@ -34,7 +34,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
   return <G2fExperience />;
 }
 
-// ---- Tomato data-cut experience (the deliberate pipeline, driven by the client workbench) --------
+// ---- Maize data-cut experience (the deliberate pipeline, driven by the client workbench) --------
 async function CutExperience({ cutId }: { cutId: string | null }) {
   let cuts: CutCard[] = [];
   let catalog: CatalogTrial[] = [];
@@ -62,7 +62,7 @@ async function CutExperience({ cutId }: { cutId: string | null }) {
       };
     }
   }
-  const badge = (initial?.bundle.data_readiness as { cut?: { label?: string } } | undefined)?.cut?.label ?? "tomato program";
+  const badge = (initial?.bundle.data_readiness as { cut?: { label?: string } } | undefined)?.cut?.label ?? "maize program";
 
   return (
     <Shell badge={badge} altHref="/?view=g2f" altLabel="G2F MET demo">
@@ -137,7 +137,7 @@ async function G2fExperience() {
     : [];
 
   return (
-    <Shell badge={result?.study?.name ?? null} altHref="/" altLabel="← Tomato program" extra={ca ? "combining ability" : null}>
+    <Shell badge={result?.study?.name ?? null} altHref="/" altLabel="← Maize program" extra={ca ? "combining ability" : null}>
       {!result ? <EmptyState /> : <StepShell steps={steps} />}
     </Shell>
   );

@@ -18,7 +18,7 @@ shared **vocabulary** in [CONTEXT.md](../CONTEXT.md) — read those first; this 
 | **AI-native** | You can *talk to* and *direct* your program; the AI advises, explains, narrates, and acts. | A breeder reaches a selection decision through a GUI with a pervasive, action-capable AI (ADR-0003). |
 | **Beautiful & fun** | Premium 2026 SaaS, instant-feeling, alive. | Consistent design system; sub-second perceived response; people *want* to demo it. |
 | **Rock-solid** | Real data never lost; degrades gracefully; secure by default. | Stateless R kernel + durable queue; no sync request hangs the UI (ADR-0001). |
-| **Makes you a better breeder** | Surfaces insight a non-statistician misses; teaches as it works. | Auto-narrative flags the yield–brix trade-off, GxE, unstable lines, design flaws — unprompted and correct. |
+| **Makes you a better breeder** | Surfaces insight a non-statistician misses; teaches as it works. | Auto-narrative flags the yield–grain protein trade-off, GxE, unstable lines, design flaws — unprompted and correct. |
 
 **Governing rule (ADR-0010): buy infrastructure, build science.** Don't hand-roll auth,
 billing, or queues. Pour effort into the engine, the validation suite, and AI grounding —
@@ -131,22 +131,22 @@ Effort is relative (S/M/L/XL) at ~8–12 hrs/wk, not a date.
     The "Ask your results" UI says exactly what's enforced. Demonstrated live: a unit-conversion trap made
     Sonnet fabricate a bushels/acre value → caught → withheld → warned; a combining-ability question now
     answers from a **broadened digest** (testers + per-pool top-GCA lines, not just topology) and honestly
-    flags when a requested table isn't in the bundle. The tomato corpus + target-authoring assistant are
+    flags when a requested table isn't in the bundle. The maize corpus + target-authoring assistant are
     the follow-ons.
-  - ✅ **Staged tomato corpus + the data-cut model (the program, not a single trial) — 2026-06-14:** the
-    product moves off hardcoded G2F maize onto a synthetic **tomato program** (`sim-corpus.R` → 8 trials
+  - ✅ **Staged maize corpus + the data-cut model (the program, not a single trial) — 2026-06-14:** the
+    product moves off hardcoded G2F maize onto a synthetic **maize program** (`sim-corpus.R` → 8 trials
     across stages S1–S4 over 2 cycles, 446 genotypes, marker-based breeding values, GCA×TPE). On it, the
     **data cut** is the new primitive (ADR-0023 amendment): trials carry a stage-defaulted market tag,
     germplasm is never tagged, and the breeder picks a **purpose** — **Prediction** (broad: pool every
     relevant trial across stages & years) or **Hybrid advancement** (narrow: the latest-stage decision
     set) — and the cut assembles itself. Each cut runs through the *same* multi-trait AI-REML engine as
-    the maize MET; markets sharing a TPE share one fit (Brix/Firmness), an env-defined market gets its
-    own (Fresh-East, GCA×E). **Verified in-UI:** prediction (446 geno, S1–S4, both years) vs advancement
+    the maize MET; markets sharing a TPE share one fit (grain protein/Test-weight), an env-defined market gets its
+    own (Corn-Belt, GCA×E). **Verified in-UI:** prediction (446 geno, S1–S4, both years) vs advancement
     (11 geno, S4) re-rank live, the full trial catalog shows what's in/out of the cut, heritability +
     genetic correlations + the market ranking render per cut, and the grounded Q&A answers against the
     selected cut (Sonnet 4.6, every figure verified). The maize MET demo is preserved at `?view=g2f`.
     Next: genomic GBLUP on the wide cut (markers present, GRM unwired) and the target-authoring assistant.
-- **Validation suite (ADR-0008):** correctness vs. the tomato-flavored simulator's known truth; robustness vs.
+- **Validation suite (ADR-0008):** correctness vs. the maize-flavored simulator's known truth; robustness vs.
   a battery of public/G2F trials.
 - **Done when:** a real G2F MET produces spatially-adjusted BLUPs, Cullis h², a GxE/stability view, both
   indices with a narrated divergence, and an AI that reaches a defensible selection decision — every number

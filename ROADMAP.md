@@ -138,7 +138,7 @@ deliberately deferred until the slice above it is real and validated.
   the cross-graph readiness diagnostics, **native-trait gating** from directly-observed
   inbred data (dual-source gate), and recorded **advancement** (analysis→select→advance).
   Built on the G2F MET line×tester; the inbred-level facts (pool / per-se / native trait)
-  are **synthetic scaffolding** until real tomato inbred data lands. Combining ability is a
+  are **synthetic scaffolding** until real maize inbred data lands. Combining ability is a
   **facet of the one trial analysis** (attached to the hybrid bundle, not a separate page): the
   web app is one journey-ordered page whose **Selection** workspace switches **level**
   (Hybrids / Parents·GCA) × **lens** (Stated / Genetically-optimal / Compare) over the shared

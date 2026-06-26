@@ -18,7 +18,7 @@ slow bulk reads) for data that genomic prediction always consumes as a whole mat
 **Separate the *contract* from the *physical encoding*.**
 
 - **The crop/platform heterogeneity axis is the `VariantSet`**, not the storage format. Each panel /
-  platform / build is its own VariantSet (a maize 437k hybrid VCF, a tomato GBS run, an Illumina
+  platform / build is its own VariantSet (a maize 437k hybrid VCF, a maize GBS run, an Illumina
   array all coexist). A `Variant.idx` fixes each marker's ordinal position within its set; a
   `CallSet` belongs to one VariantSet. Adding a crop/platform = adding a VariantSet, no schema change.
 - **The canonical, portable model is the BrAPI long form** (VariantSet / Variant / Sample / CallSet /

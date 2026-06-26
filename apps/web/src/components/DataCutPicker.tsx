@@ -23,7 +23,7 @@ export interface TaxNode { id: string; label: string; parent: string | null; tpe
 export interface Taxonomy { nodes: TaxNode[]; markets: Array<{ id: string; label: string; tpe: string | null }> }
 
 const sameSet = (a: Set<string>, b: string[]) => a.size === b.length && b.every((x) => a.has(x));
-const shortMarket = (s: string) => s.replace(/^Processing · |^Fresh-market · /, "");
+const shortMarket = (s: string) => s.replace(/^Dryland · |^Corn Belt · /, "");
 
 export default function DataCutPicker({
   cuts, catalog, taxonomy, savedCuts, selected, composition, currentTrialIds, embedded, onComposition,

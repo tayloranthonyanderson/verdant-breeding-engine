@@ -2,7 +2,7 @@
 // directly-observed inbred marker calls, so we synthesize a small panel of qualitative resistance /
 // quality loci — each with two alleles — and a deterministic homozygous call per inbred (an inbred is
 // ~fully homozygous). The breeder gates advancement on "must carry allele X at locus L" — marker-assisted
-// selection. Scaffolding until real tomato inbred genotyping lands (Pto for bacterial speck, etc.).
+// selection. Scaffolding until real maize inbred genotyping lands (Ht1 for northern corn leaf blight, etc.).
 
 export interface Locus {
   locus: string;       // marker/gene symbol

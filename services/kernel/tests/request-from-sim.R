@@ -9,18 +9,18 @@ suppressWarnings(suppressPackageStartupMessages(library(jsonlite)))
 ## traits in the sim df -> contract variable ids (stable, uppercase) + display names + units
 .SIM_VARIABLES <- list(
   list(col = "yield",    variable_id = "YIELD",    name = "Yield",         unit = "t/ha"),
-  list(col = "brix",     variable_id = "BRIX",     name = "Brix",          unit = "degree"),
-  list(col = "fruit_wt", variable_id = "FRUIT_WT", name = "Fruit weight",  unit = "g"),
+  list(col = "grain_protein",     variable_id = "GRAIN_PROTEIN",     name = "grain_protein",          unit = "degree"),
+  list(col = "plant_height", variable_id = "PLANT_HEIGHT", name = "Plant height",  unit = "g"),
   list(col = "maturity", variable_id = "MATURITY", name = "Days to maturity", unit = "day")
 )
 
 #' Build an AnalysisRequest (as an R list) from a simulated MET data.frame.
-#' @param d      a data.frame from simulate_tomato_met()
+#' @param d      a data.frame from simulate_maize_met()
 #' @param traits which sim columns to include (default: all four)
 #' @param intent contract intent ("selection" -> BLUPs)
 #' No row/col layout is emitted, so the kernel takes the non-spatial MET path (lme4/BLUPF90),
 #' which is exactly the path the genetic-recovery assertions validate.
-request_from_sim <- function(d, traits = c("yield", "brix", "fruit_wt", "maturity"),
+request_from_sim <- function(d, traits = c("yield", "grain_protein", "plant_height", "maturity"),
                              intent = "selection") {
   vars <- Filter(function(v) v$col %in% traits, .SIM_VARIABLES)
 

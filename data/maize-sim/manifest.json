@@ -1,0 +1,215 @@
+{
+  "program": "Verdant maize (synthetic, F1 hybrid)",
+  "generated_by": "services/kernel/sim-corpus.R",
+  "traits": ["yield", "grain_protein", "test_weight", "plant_height", "maturity", "standability"],
+  "tpes": {
+    "dryland": {
+      "label": "Dryland (western arid)"
+    },
+    "cornbelt": {
+      "label": "Corn Belt (eastern, high-yield)"
+    }
+  },
+  "hierarchy": {
+    "All": {
+      "parent": null,
+      "tpe": null,
+      "label": "All markets (early screen)"
+    },
+    "Dryland": {
+      "parent": "All",
+      "tpe": "dryland",
+      "label": "Dryland · western arid"
+    },
+    "Food-grade": {
+      "parent": "Dryland",
+      "tpe": "dryland",
+      "label": "Dryland · food-grade",
+      "weights": {
+        "grain_protein": 0.45,
+        "yield": 0.3,
+        "test_weight": 0.15,
+        "maturity": -0.1
+      }
+    },
+    "Grain-quality": {
+      "parent": "Dryland",
+      "tpe": "dryland",
+      "label": "Dryland · grain quality",
+      "weights": {
+        "test_weight": 0.45,
+        "yield": 0.3,
+        "grain_protein": 0.15,
+        "maturity": -0.1
+      }
+    },
+    "Corn-Belt": {
+      "parent": "All",
+      "tpe": "cornbelt",
+      "label": "Corn Belt · eastern"
+    },
+    "Grain": {
+      "parent": "Corn-Belt",
+      "tpe": "cornbelt",
+      "label": "Corn Belt · grain",
+      "weights": {
+        "yield": 0.4,
+        "standability": 0.3,
+        "test_weight": 0.2,
+        "maturity": -0.1
+      }
+    }
+  },
+  "trials": [
+    {
+      "trial_id": "S1-2024-OBS",
+      "stage": "S1",
+      "stage_label": "Observation",
+      "year": 2024,
+      "tpe": "dryland",
+      "market_tag": "All",
+      "location": "S1-2024-OBS",
+      "n_entries": 144,
+      "n_loc": 1,
+      "n_rep": 1,
+      "design": "line×tester single-plot",
+      "traits_measured": ["yield", "maturity", "plant_height"],
+      "file": "trials/S1-2024-OBS.csv"
+    },
+    {
+      "trial_id": "S2-2024-DRY",
+      "stage": "S2",
+      "stage_label": "PYT",
+      "year": 2024,
+      "tpe": "dryland",
+      "market_tag": "Dryland",
+      "location": "S2-2024-DRY",
+      "n_entries": 108,
+      "n_loc": 3,
+      "n_rep": 2,
+      "design": "line×tester RCBD",
+      "traits_measured": ["yield", "maturity", "plant_height", "grain_protein", "test_weight"],
+      "file": "trials/S2-2024-DRY.csv"
+    },
+    {
+      "trial_id": "S2-2024-CB",
+      "stage": "S2",
+      "stage_label": "PYT",
+      "year": 2024,
+      "tpe": "cornbelt",
+      "market_tag": "Corn-Belt",
+      "location": "S2-2024-CB",
+      "n_entries": 72,
+      "n_loc": 3,
+      "n_rep": 2,
+      "design": "line×tester RCBD",
+      "traits_measured": ["yield", "maturity", "plant_height", "standability"],
+      "file": "trials/S2-2024-CB.csv"
+    },
+    {
+      "trial_id": "S3-2024-FOOD",
+      "stage": "S3",
+      "stage_label": "AYT",
+      "year": 2024,
+      "tpe": "dryland",
+      "market_tag": "Food-grade",
+      "location": "S3-2024-FOOD",
+      "n_entries": 48,
+      "n_loc": 6,
+      "n_rep": 3,
+      "design": "line×tester MET",
+      "traits_measured": ["yield", "grain_protein", "test_weight", "plant_height", "maturity", "standability"],
+      "file": "trials/S3-2024-FOOD.csv"
+    },
+    {
+      "trial_id": "S3-2024-QUAL",
+      "stage": "S3",
+      "stage_label": "AYT",
+      "year": 2024,
+      "tpe": "dryland",
+      "market_tag": "Grain-quality",
+      "location": "S3-2024-QUAL",
+      "n_entries": 48,
+      "n_loc": 6,
+      "n_rep": 3,
+      "design": "line×tester MET",
+      "traits_measured": ["yield", "grain_protein", "test_weight", "plant_height", "maturity", "standability"],
+      "file": "trials/S3-2024-QUAL.csv"
+    },
+    {
+      "trial_id": "S3-2024-GRAIN",
+      "stage": "S3",
+      "stage_label": "AYT",
+      "year": 2024,
+      "tpe": "cornbelt",
+      "market_tag": "Grain",
+      "location": "S3-2024-GRAIN",
+      "n_entries": 42,
+      "n_loc": 6,
+      "n_rep": 3,
+      "design": "line×tester MET",
+      "traits_measured": ["yield", "grain_protein", "test_weight", "plant_height", "maturity", "standability"],
+      "file": "trials/S3-2024-GRAIN.csv"
+    },
+    {
+      "trial_id": "S4-2025-FOOD",
+      "stage": "S4",
+      "stage_label": "Pre-commercial",
+      "year": 2025,
+      "tpe": "dryland",
+      "market_tag": "Food-grade",
+      "location": "S4-2025-FOOD",
+      "n_entries": 18,
+      "n_loc": 10,
+      "n_rep": 2,
+      "design": "line×tester on-farm strips",
+      "traits_measured": ["yield", "grain_protein", "test_weight", "plant_height", "maturity", "standability"],
+      "file": "trials/S4-2025-FOOD.csv"
+    },
+    {
+      "trial_id": "S4-2025-QUAL",
+      "stage": "S4",
+      "stage_label": "Pre-commercial",
+      "year": 2025,
+      "tpe": "dryland",
+      "market_tag": "Grain-quality",
+      "location": "S4-2025-QUAL",
+      "n_entries": 18,
+      "n_loc": 10,
+      "n_rep": 2,
+      "design": "line×tester on-farm strips",
+      "traits_measured": ["yield", "grain_protein", "test_weight", "plant_height", "maturity", "standability"],
+      "file": "trials/S4-2025-QUAL.csv"
+    },
+    {
+      "trial_id": "S4-2025-GRAIN",
+      "stage": "S4",
+      "stage_label": "Pre-commercial",
+      "year": 2025,
+      "tpe": "cornbelt",
+      "market_tag": "Grain",
+      "location": "S4-2025-GRAIN",
+      "n_entries": 15,
+      "n_loc": 8,
+      "n_rep": 2,
+      "design": "line×tester on-farm strips",
+      "traits_measured": ["yield", "grain_protein", "test_weight", "plant_height", "maturity", "standability"],
+      "file": "trials/S4-2025-GRAIN.csv"
+    },
+    {
+      "trial_id": "S1-2025-OBS",
+      "stage": "S1",
+      "stage_label": "Observation",
+      "year": 2025,
+      "tpe": "dryland",
+      "market_tag": "All",
+      "location": "S1-2025-OBS",
+      "n_entries": 72,
+      "n_loc": 1,
+      "n_rep": 1,
+      "design": "line×tester single-plot",
+      "traits_measured": ["yield", "maturity", "plant_height"],
+      "file": "trials/S1-2025-OBS.csv"
+    }
+  ]
+}

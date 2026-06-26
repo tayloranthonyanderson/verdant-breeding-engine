@@ -1,7 +1,7 @@
 // Seed the SYNTHETIC inbred-line fixture (ADR-0020) for the G2F maize dev set. G2F gives us parent
 // IDENTITY only — no inbred pool, no per-se phenotype, no directly-observed native-trait call — so
 // we synthesize those here, deterministically, purely to wire the combining-ability engine + UI.
-// Real tomato inbred data replaces this later. Nothing here is real maize biology.
+// Real maize inbred data replaces this later. Nothing here is real maize biology.
 //
 //   pnpm --filter @verdant/pipeline exec tsx src/seed-inbred.ts
 //

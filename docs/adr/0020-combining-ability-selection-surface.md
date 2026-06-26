@@ -15,7 +15,7 @@ objective, because **complementation** lets one parent's weakness be covered by 
   stronger pool and collapse the heterotic structure — treated as a correctness requirement, not a
   preference. Pools are ranked separately; pool membership comes from the topology detector.
 - **The index reads GCA; gates may read a *different* value source.** A native-trait gate ("only
-  advance inbreds carrying the Pto/bacterial-speck allele") references **directly-observed
+  advance inbreds carrying the Ht1/northern corn leaf blight allele") references **directly-observed
   inbred-level data** — per-se phenotype or direct inbred genotyping — never a value inferred from
   hybrid data (which a breeder would not trust; hybrid marker genotypes are parental averages). So
   in GCA mode the gate and the index draw from two value sources keyed to the same parent: GCA
@@ -30,16 +30,16 @@ objective, because **complementation** lets one parent's weakness be covered by 
 G2F provides parent **identity** only — no direct inbred genotype and no inbred per-se phenotype
 (its marker file is a hybrid-level TASSEL build; its trait files are all hybrid-level). So GCA
 modelling and within-pool ranking are demonstrable on G2F, but the native-trait gate is
-**buildable yet unfixturable** there, and it is really a **tomato-beachhead** workflow (Pto is a
-tomato gene), not a maize one.
+**buildable yet unfixturable** there, and it is really a **maize-beachhead** workflow (Ht1 is a
+maize gene), not a maize one.
 
 We chose to **build a small synthetic inbred fixture now** — a per-inbred table over the G2F
 parent names carrying a synthetic pool label and one or more presence/absence native-trait scores
 — purely to **wire the engine and UI end-to-end** (the inbred-per-se value source, within-pool
 ranking, the dual-source gate). It is explicitly scaffolding: the native-trait gate is validated
-and shipped for real only against a genuine **tomato inbred dataset** (per-se + Pto-style marker
+and shipped for real only against a genuine **maize inbred dataset** (per-se + Ht1-style marker
 scores) later. Rejected alternatives: fabricating maize inbred *genotypes* (a detour from the
-tomato go-to-market), and sourcing a maize inbred panel from G2F (same detour).
+maize go-to-market), and sourcing a maize inbred panel from G2F (same detour).
 
 ## Deferred (mapped, not built)
 

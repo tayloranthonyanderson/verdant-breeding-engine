@@ -21,9 +21,9 @@ engines like ASReml) are expensive, desktop-era, siloed, and assume the user
 already has statistical expertise. That assumption is the opening.
 
 ## Target user (beachhead)
-**Tomato breeders outside the big-company orbit** — fresh-market, heirloom,
-specialty, organic, and CEA tomato programs — then adjacent vegetable programs.
-Tomato-first because of the owner's domain depth and a ready demo genome set.
+**Maize breeders outside the big-company orbit** — fresh-market, heirloom,
+specialty, organic, and CEA maize programs — then adjacent vegetable programs.
+Maize-first because of the owner's domain depth and a ready demo genome set.
 
 ## The moat
 Not a dataset (public data is reproducible by anyone). The defensibility is:
@@ -37,7 +37,7 @@ Not a dataset (public data is reproducible by anyone). The defensibility is:
    incumbents can't manufacture that.
 
 **Demo asset (not a moat):** a privately funded, IP-clean library of hundreds of
-variant-called tomato whole genomes (public data + owner's own money) — useful
+variant-called maize whole genomes (public data + owner's own money) — useful
 for compelling demo insights and genomic-prediction showcases, not defensible.
 
 ## MVP (the first vertical slice)
@@ -51,7 +51,7 @@ is roadmap, not v1.
   user doesn't have to know what a BLUP is.
 - **Natural-language layer** over results — structurally hard for incumbents to
   retrofit; native for us.
-- **Genomic prediction built in** for tomato via the variant library.
+- **Genomic prediction built in** for maize via the variant library.
 - **A founder who can teach it** — distribution via content/video, not just sales.
 
 ## Business model

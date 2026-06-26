@@ -41,7 +41,7 @@
         "additionalProperties": false,
         "properties": {
           "variable_id": { "type": "string", "description": "Stable id used as the key in observations." },
-          "name": { "type": "string", "description": "Human-readable trait name (e.g. 'Yield', 'Brix')." },
+          "name": { "type": "string", "description": "Human-readable trait name (e.g. 'Yield', 'grain protein')." },
           "data_type": { "type": "string", "enum": ["numeric", "ordinal", "nominal", "date", "boolean"], "description": "Drives how the kernel can model the variable. MVP analyzes 'numeric'." },
           "unit": { "type": ["string", "null"], "description": "Measurement unit, if any." },
           "analyze": { "type": "boolean", "default": true, "description": "Whether this variable is a response to be fit. False = present for context/gating only." }

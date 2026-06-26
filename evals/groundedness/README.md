@@ -11,7 +11,7 @@ Each case (`cases/*.json`) is:
 
 ```jsonc
 {
-  "id": "yield-brix-tradeoff",
+  "id": "yield-grain protein-tradeoff",
   "bundle": "../../../packages/contracts/v0/examples/single-trial-bundle.example.json",  // relative to cases/
   "question": "Why do the two indices disagree on G1?",
   "must_reference": [-0.74],          // values a correct answer should surface

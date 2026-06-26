@@ -3,13 +3,13 @@
   "analysis_request_id": "example-single-trial-001",
   "intent": "selection",
   "scope": {
-    "segment_id": "fresh-market-us",
+    "segment_id": "corn-belt-us",
     "stage": "stage-2",
     "is_discovery": false
   },
   "variables": [
     { "variable_id": "YIELD", "name": "Yield", "data_type": "numeric", "unit": "t/ha", "analyze": true },
-    { "variable_id": "BRIX", "name": "Soluble solids (Brix)", "data_type": "numeric", "unit": "degBx", "analyze": true }
+    { "variable_id": "GRAIN_PROTEIN", "name": "Grain protein", "data_type": "numeric", "unit": "%", "analyze": true }
   ],
   "observation_units": [
     { "observation_unit_id": "P1", "germplasm_id": "G1", "environment_id": "LOC1-2025", "layout": { "row": 1, "col": 1, "rep": "R1" } },
@@ -23,21 +23,21 @@
   ],
   "observations": [
     { "observation_unit_id": "P1", "variable_id": "YIELD", "value": 5.2 },
-    { "observation_unit_id": "P1", "variable_id": "BRIX", "value": 4.5 },
+    { "observation_unit_id": "P1", "variable_id": "GRAIN_PROTEIN", "value": 4.5 },
     { "observation_unit_id": "P2", "variable_id": "YIELD", "value": 4.8 },
-    { "observation_unit_id": "P2", "variable_id": "BRIX", "value": 5.1 },
+    { "observation_unit_id": "P2", "variable_id": "GRAIN_PROTEIN", "value": 5.1 },
     { "observation_unit_id": "P3", "variable_id": "YIELD", "value": 3.7 },
-    { "observation_unit_id": "P3", "variable_id": "BRIX", "value": 5.5 },
+    { "observation_unit_id": "P3", "variable_id": "GRAIN_PROTEIN", "value": 5.5 },
     { "observation_unit_id": "P4", "variable_id": "YIELD", "value": 5.6 },
-    { "observation_unit_id": "P4", "variable_id": "BRIX", "value": 4.2 },
+    { "observation_unit_id": "P4", "variable_id": "GRAIN_PROTEIN", "value": 4.2 },
     { "observation_unit_id": "P5", "variable_id": "YIELD", "value": 5.0 },
-    { "observation_unit_id": "P5", "variable_id": "BRIX", "value": 4.7 },
+    { "observation_unit_id": "P5", "variable_id": "GRAIN_PROTEIN", "value": 4.7 },
     { "observation_unit_id": "P6", "variable_id": "YIELD", "value": 4.6 },
-    { "observation_unit_id": "P6", "variable_id": "BRIX", "value": 5.3 },
+    { "observation_unit_id": "P6", "variable_id": "GRAIN_PROTEIN", "value": 5.3 },
     { "observation_unit_id": "P7", "variable_id": "YIELD", "value": 3.6 },
-    { "observation_unit_id": "P7", "variable_id": "BRIX", "value": 5.6 },
+    { "observation_unit_id": "P7", "variable_id": "GRAIN_PROTEIN", "value": 5.6 },
     { "observation_unit_id": "P8", "variable_id": "YIELD", "value": 5.4 },
-    { "observation_unit_id": "P8", "variable_id": "BRIX", "value": 4.0 }
+    { "observation_unit_id": "P8", "variable_id": "GRAIN_PROTEIN", "value": 4.0 }
   ],
   "design": {
     "declared_design": "rcbd",
@@ -50,7 +50,7 @@
     ],
     "index_weights": [
       { "variable_id": "YIELD", "direction": 1, "weight": 0.6 },
-      { "variable_id": "BRIX", "direction": 1, "weight": 0.4 }
+      { "variable_id": "GRAIN_PROTEIN", "direction": 1, "weight": 0.4 }
     ]
   },
   "options": {

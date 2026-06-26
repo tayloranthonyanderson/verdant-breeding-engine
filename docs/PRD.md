@@ -35,8 +35,8 @@ and operational constraints (DOMAIN-MODEL §1).
 
 ## 2. Target users & jobs-to-be-done
 
-**Beachhead:** tomato breeders at small/mid programs incumbents price out. **Development data:** maize
-(G2F); tomato is the market story (ADR-0008).
+**Beachhead:** maize breeders at small/mid programs incumbents price out. **Development data:** maize
+(G2F); maize is the market story (ADR-0008).
 
 The breeder's recurring jobs the product must serve:
 - **Analyze a trial correctly** — the right mixed model, spatial correction, GxE, heritability — without
@@ -136,7 +136,7 @@ Per the principle in §3 — treated as first-class because it decides adoption.
   behind progressive disclosure and explained in plain language when shown.
 - **Every chart is legible and purposeful** — no decoration, no overwhelming grids. One question per view.
 - **Instant feel** — client-side recompute for live controls; async work behind clear progress.
-- **The AI is a presentation surface** — "show me the lines that dropped in yield but held brix" yields the
+- **The AI is a presentation surface** — "show me the lines that dropped in yield but held grain protein" yields the
   right view, narrated, not a query language.
 - **Consistent design system**; **Next.js 16 / React 19** conventions (read `frontend/AGENTS.md`).
 

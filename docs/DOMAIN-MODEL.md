@@ -267,12 +267,12 @@ The model is parametric over mating system, not hard-coded to one crop (Acquaah)
 
 | System | Examples | Consequences |
 |---|---|---|
-| Self-pollinated | tomato (beachhead), wheat | inbred lines; pedigree/bulk/SSD/backcross; line-mean h² |
+| Self-pollinated | maize (beachhead), wheat | inbred lines; pedigree/bulk/SSD/backcross; line-mean h² |
 | Cross-pollinated | maize (G2F dev set) | populations, recurrent selection, heterotic groups, GCA/SCA |
 | Clonal | potato, cassava | clonal selection; total genetic value (incl. dominance) |
 | Hybrid | maize, vegetables | inbred dev + testcross + combining ability + hybrid prediction |
 
-Building to span self (tomato) and cross/hybrid (maize) forces genuine generality (ADR-0008).
+Building to span self (maize) and cross/hybrid (maize) forces genuine generality (ADR-0008).
 
 ---
 
@@ -317,7 +317,7 @@ germplasm collection (M5) but its data model is shaped now.
 1. **Sub-segment resolution** — is a Segment-level TPP enough, or do you need a target environment
    *within* a segment as a distinct objective?
 2. **The real disposition set** for AdvancementDecision beyond advance/hold/drop/recycle-as-parent.
-3. **Reproductive-biology emphasis for the tomato beachhead** — how much hybrid/combining-ability
+3. **Reproductive-biology emphasis for the maize beachhead** — how much hybrid/combining-ability
    machinery vs. inbred-line workflow for v1? (Drives whether early-stage selection is on combining
    ability vs per-se — §2.4.)
 4. **Germplasm/seed-inventory/nursery logistics depth** needed to be useful vs. academic.

@@ -29,7 +29,7 @@ H2_TOL     <- 0.10   # max |reported h2 - true entry-mean H2| per trait
 
 ## ---- run the kernel through the real seam ---------------------------------------------
 cat("Verdant kernel correctness suite\n")
-d <- simulate_tomato_met(n_geno = 40, n_env = 3, n_rep = 3, seed = 1)
+d <- simulate_maize_met(n_geno = 40, n_env = 3, n_rep = 3, seed = 1)
 truth   <- attr(d, "true_geno_means")
 true_h2 <- attr(d, "true_entry_h2")
 
@@ -50,7 +50,7 @@ ok(identical(bundle$status, "ok"), sprintf("bundle status == 'ok' (got '%s')", b
 
 ## index traits by id for lookup
 traits_by_id <- setNames(bundle$traits, vapply(bundle$traits, function(t) t$variable_id, ""))
-trait_map <- c(YIELD = "yield", BRIX = "brix", FRUIT_WT = "fruit_wt", MATURITY = "maturity")
+trait_map <- c(YIELD = "yield", GRAIN_PROTEIN = "grain_protein", PLANT_HEIGHT = "plant_height", MATURITY = "maturity")
 
 ## ---- HARD GATE 1: BLUPs recover true genetic values -----------------------------------
 cat("\n[recovery] BLUP <-> true genetic value (floor =", ACC_FLOOR, ")\n")
@@ -78,7 +78,7 @@ for (vid in names(trait_map)) {
   ok(near(h, th, H2_TOL), sprintf("%-8s h2 recovers true H2 %.3f (within %.2f)", vid, th, H2_TOL))
 }
 
-## ---- SOFT CHECK: genetic-correlation sign (the yield<->brix trade-off) -----------------
+## ---- SOFT CHECK: genetic-correlation sign (the yield<->grain_protein trade-off) -----------------
 ## Only if the kernel emitted a multi-trait genetic-correlation matrix (BLUPF90 path).
 cat("\n[soft] genetic-correlation recovery (warn-only in v1)\n")
 gc <- bundle$genetic_correlations
@@ -87,9 +87,9 @@ if (is.null(gc)) {
 } else {
   ids <- unlist(gc$variable_ids)
   M <- matrix(unlist(gc$matrix), nrow = length(ids), byrow = TRUE, dimnames = list(ids, ids))
-  if (all(c("YIELD", "BRIX") %in% ids)) {
-    rg <- M["YIELD", "BRIX"]
-    msg <- sprintf("yield<->brix genetic cor = %.2f is negative (true = -0.45)", rg)
+  if (all(c("YIELD", "GRAIN_PROTEIN") %in% ids)) {
+    rg <- M["YIELD", "GRAIN_PROTEIN"]
+    msg <- sprintf("yield<->grain_protein genetic cor = %.2f is negative (true = -0.45)", rg)
     if (rg < 0) cat("  ok  ", msg, "\n") else cat("  warn", msg, "\n")
   }
 }

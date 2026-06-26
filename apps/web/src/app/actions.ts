@@ -8,7 +8,7 @@
 import { revalidatePath } from "next/cache";
 import { and, eq, inArray } from "drizzle-orm";
 import { db, analysisRun, resultBundle, study, advancementDecision } from "@verdant/db";
-import { runMetAnalysis, runTomatoCut, buildCustomCut, fitCustomCut, persistCutBundle, assembleCustom, previewCustomCut, type ModelOverrides, type CutPreview, type CutExclusions } from "@verdant/pipeline";
+import { runMetAnalysis, runMaizeCut, buildCustomCut, fitCustomCut, persistCutBundle, assembleCustom, previewCustomCut, type ModelOverrides, type CutPreview, type CutExclusions } from "@verdant/pipeline";
 import type { AnalysisRequest, ResultBundle } from "@verdant/contracts";
 import { answer, type Answer } from "@verdant/ai";
 import { getLatestResult, getCutResult } from "@/lib/data";
@@ -104,7 +104,7 @@ export async function fitCut(input: { trialIds: string[]; overrides?: ModelOverr
 // then revalidate so the page re-reads it. "Running the analysis on this cut" made literal (ADR-0023).
 export async function analyzeCut(cutId: string): Promise<{ status: "ok" | "error"; error?: string }> {
   try {
-    await runTomatoCut(cutId, { persist: true });
+    await runMaizeCut(cutId, { persist: true });
     revalidatePath("/");
     return { status: "ok" };
   } catch (e) {
@@ -138,7 +138,7 @@ export async function runAnalysis(input: { name: string; trialIds: string[]; ove
     const cached = _fitCache.get(fitSig(input.trialIds, input.overrides, input.exclusions));
     let analysisRunId: number;
     if (cached) {
-      analysisRunId = await persistCutBundle(assembleCustom({ id, name, trialIds: input.trialIds }).cut, cached, "tomato-cut");
+      analysisRunId = await persistCutBundle(assembleCustom({ id, name, trialIds: input.trialIds }).cut, cached, "maize-cut");
     } else {
       ({ analysisRunId } = await buildCustomCut({ id, name, trialIds: input.trialIds }, { overrides: input.overrides, exclusions: input.exclusions }));
     }
@@ -152,7 +152,7 @@ export async function runAnalysis(input: { name: string; trialIds: string[]; ove
 }
 
 // Save + run a BREEDER-DEFINED cut: the breeder picked the market and the exact trials; we fit them and
-// persist a re-runnable preset (a study, source='tomato-cut'). Re-saving the same name re-runs it.
+// persist a re-runnable preset (a study, source='maize-cut'). Re-saving the same name re-runs it.
 export async function saveAndRunCut(input: { name: string; trialIds: string[] }): Promise<{ status: "ok"; cutId: string } | { status: "error"; error: string }> {
   try {
     const name = (input.name ?? "").trim();
@@ -171,7 +171,7 @@ export async function saveAndRunCut(input: { name: string; trialIds: string[] })
 // Delete a saved preset (its study + runs + bundles). Built-in templates aren't deletable here.
 export async function deleteCut(cutId: string): Promise<{ status: "ok" | "error"; error?: string }> {
   try {
-    const [s] = await db.select().from(study).where(and(eq(study.name, cutId), eq(study.source, "tomato-cut")));
+    const [s] = await db.select().from(study).where(and(eq(study.name, cutId), eq(study.source, "maize-cut")));
     if (!s) return { status: "error", error: "Saved cut not found." };
     const runs = await db.select({ id: analysisRun.id }).from(analysisRun).where(eq(analysisRun.studyId, s.id));
     const runIds = runs.map((r) => r.id);

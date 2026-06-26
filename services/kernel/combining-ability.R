@@ -40,7 +40,7 @@ IB <- req$inbred
 ib_pool <- setNames(as.character(IB$pool), as.character(IB$name))
 ib_perse <- setNames(suppressWarnings(as.numeric(IB$per_se)), as.character(IB$name))
 ib_nclb <- setNames(suppressWarnings(as.numeric(IB$nclb)), as.character(IB$name))
-## the native-trait gate's variable id is crop-specific (NCLB for maize, e.g. bacterial-speck for tomato);
+## the native-trait gate's variable id is crop-specific (NCLB for maize, e.g. northern corn leaf blight for maize);
 ## the driver may name it, else default to the maize key for back-compat.
 native_id <- if (!is.null(IB$native_id)) as.character(IB$native_id)[1] else "nctlb_resistant"
 pool_of <- function(l) { p <- ib_pool[l]; ifelse(is.na(p), "Unassigned", p) }

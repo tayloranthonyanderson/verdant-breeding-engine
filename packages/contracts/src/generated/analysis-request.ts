@@ -46,7 +46,7 @@ export interface AnalysisRequest {
        */
       variable_id: string;
       /**
-       * Human-readable trait name (e.g. 'Yield', 'Brix').
+       * Human-readable trait name (e.g. 'Yield', 'grain_protein').
        */
       name: string;
       /**
@@ -68,7 +68,7 @@ export interface AnalysisRequest {
        */
       variable_id: string;
       /**
-       * Human-readable trait name (e.g. 'Yield', 'Brix').
+       * Human-readable trait name (e.g. 'Yield', 'grain_protein').
        */
       name: string;
       /**

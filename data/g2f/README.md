@@ -48,6 +48,6 @@ inbred). Those drive within-pool ranking, the per-se↔GCA divergence, and the n
 So we **synthesize** them — `packages/db` table `inbred_line`, seeded by
 `packages/pipeline/src/seed-inbred.ts` (deterministic; no RNG): pool by a line's dominant tester (opposite
 heterotic group), per-se correlated ~0.6 with testcross performance (so it diverges from GCA), NCLB
-resistance ~38%. **This is scaffolding to wire the engine + UI (ADR-0020); real tomato inbred data replaces
+resistance ~38%. **This is scaffolding to wire the engine + UI (ADR-0020); real maize inbred data replaces
 it.** Run: `seed-inbred.ts` then `combining-ability-build.ts` → persists a `combining_ability` bundle the
 web tier renders.

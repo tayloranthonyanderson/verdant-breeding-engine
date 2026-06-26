@@ -1,18 +1,18 @@
-// Genomic bridge for the tomato corpus (ADR-0017): turn the plain marker CSV (data/tomato/markers.csv,
+// Genomic bridge for the maize corpus (ADR-0017): turn the plain marker CSV (data/maize-sim/markers.csv,
 // genotype × 200 dosage 0/1/2) into the packed dosage the generic genomic kernel expects, then run
 // genomic-analyze.R (rrBLUP) to produce the GRM + CV (identity vs genomic_G) + GEBVs + PCA + heatmap —
 // everything the Genomics tab renders, and the genomic_G GEBVs the selection index can rank on when the
-// breeder chooses relationship = G. The G2F path reads markers from Postgres; tomato's are a flat CSV
+// breeder chooses relationship = G. The G2F path reads markers from Postgres; maize's are a flat CSV
 // with full overlap to the trial genotypes (incl. the 6 checks) and no pedigree.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { runRKernel } from './kernel';
 import { genomicGblup } from './genomic-blupf90';
-import { markerPanel } from './tomato-corpus';
+import { markerPanel } from './maize-corpus';
 
 /** Marker readiness for a cut's cohort (the planner needs this to offer relationship=G and the genomic
- *  engine choice). No pedigree in the tomato corpus, so A/H stay locked; markers + overlap drive G. */
+ *  engine choice). No pedigree in the maize corpus, so A/H stay locked; markers + overlap drive G. */
 export function markerReadiness(cohort: string[]): { markers_present: boolean; pedigree_present: boolean; n_genotyped: number } {
   const mk = markerPanel();
   const n = cohort.filter((id) => mk.byId.has(id)).length;
@@ -43,8 +43,8 @@ export function buildGenomicBlock(input: GenomicBuildInput): Record<string, unkn
     const d = mk.byId.get(id)!;
     for (let j = 0; j < m; j++) { const v = d[j]; buf[i * m + j] = v == null || !Number.isFinite(v) ? MISSING : v; }
   });
-  const binPath = join(tmpdir(), 'verdant-tomato.geno.bin');
-  const metaPath = join(tmpdir(), 'verdant-tomato.geno.meta.json');
+  const binPath = join(tmpdir(), 'verdant-maize.geno.bin');
+  const metaPath = join(tmpdir(), 'verdant-maize.geno.meta.json');
   writeFileSync(binPath, buf);
   writeFileSync(metaPath, JSON.stringify({ samples: cohort, nMarkers: m, missing: MISSING }));
 
@@ -63,7 +63,7 @@ export function buildGenomicBlock(input: GenomicBuildInput): Record<string, unkn
   // match rrBLUP; the index re-points onto gebv_blupf90 when present. Best-effort: failure leaves rrBLUP.
   if (input.engine === 'blupf90' && input.geneticCovariance && input.residualCovariance) {
     try {
-      const snpPath = join(tmpdir(), 'verdant-tomato.snp.txt');
+      const snpPath = join(tmpdir(), 'verdant-maize.snp.txt');
       const idW = Math.max(1, ...cohort.map((s) => s.length));
       const lines = cohort.map((id, i) => {
         let s = id.padEnd(idW) + ' ';

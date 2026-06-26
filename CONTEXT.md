@@ -6,7 +6,7 @@ file is the shared **vocabulary** and a one-screen orientation. Use these terms
 exactly in code, tests, issues, and prose — don't drift to synonyms.
 
 ## What Verdant is
-An **AI-native breeding management + analysis platform**. Beachhead: tomato breeders
+An **AI-native breeding management + analysis platform**. Beachhead: maize breeders
 at small/mid programs the incumbents price out. The promise: *upload your trial, get
 the right answer (correct mixed-model BLUPs, heritability, a ranked selection index),
 and ask your data questions in plain English — without a statistician on staff.*
@@ -221,7 +221,7 @@ decision*: which matings to make. Two modes, not one tool:
   learns the contrast — **usefulness** (`μ + i·σ`, greedy, chases gain, over-uses related elites) vs
   **OCS** (optimal-contribution selection: maximise gain s.t. a cap on group coancestry — genomic, no
   pedigree — spreading parents to hold diversity). The teaching payoff is the gain-vs-coancestry
-  **frontier** + where the two plans diverge. `cross-recycling.R` / `tomato-recycling.ts`. Needs a pool
+  **frontier** + where the two plans diverge. `cross-recycling.R` / `maize-recycling.ts`. Needs a pool
   with **family structure** (so gain and diversity are in tension) — the corpus builds each pool from 16
   founders → 60 descendants for exactly this.
 - **Usefulness criterion** — a cross's value for a SELECTION program: `μ + i·σ`, the expected mean of its
@@ -293,4 +293,4 @@ decision*: which matings to make. Two modes, not one tool:
 - **Breedbase** — open-source incumbent (Perl/Chado). A *reference to learn from and interoperate
   with*, **not** a codebase to fork.
 - **G2F (Genomes to Fields)** — public maize program dataset; our development **north star**
-  (real breeding-program complexity). Tomato is the **beachhead** for marketing (ADR-0008).
+  (real breeding-program complexity). Maize is the **beachhead** for marketing (ADR-0008).

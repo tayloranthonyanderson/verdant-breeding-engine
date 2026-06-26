@@ -3,7 +3,7 @@
 // Marker gates (ADR-0020) — interactive, marker-assisted culling. Pick a locus, pick the desired
 // allele(s), and lines not carrying them are gated out of selection (independent culling, applied
 // before the index ranks survivors — and consistently across every lens). Reads the directly-observed
-// inbred allele calls (synthetic here; real tomato genotyping later), never anything inferred from hybrids.
+// inbred allele calls (synthetic here; real maize genotyping later), never anything inferred from hybrids.
 import { useMemo } from "react";
 import { Dna, ShieldCheck, X } from "lucide-react";
 import { lineFailsGates, activeGateLoci, type CombiningAbility, type MarkerGates } from "@/lib/ca";

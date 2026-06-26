@@ -201,7 +201,7 @@ export const resultBundle = pgTable(
 // resistance) used to GATE inbred advancement. These are inbred-level values keyed to the same
 // parent name the germplasm.parent1/parent2 columns reference. G2F has none of this (its markers
 // are a hybrid build; its phenotypes are hybrid-level), so for the maize dev set this table is
-// seeded SYNTHETICALLY (ADR-0020) purely to wire the engine + UI; real tomato inbred data replaces
+// seeded SYNTHETICALLY (ADR-0020) purely to wire the engine + UI; real maize inbred data replaces
 // it later. Keyed by (program, name) so it joins to cross parentage by name.
 export const inbredLine = pgTable(
   'inbred_line',
@@ -254,7 +254,7 @@ export const advancementDecision = pgTable(
 
 // --- Genotyping layer (ADR-0017) — BrAPI VariantSet / Variant / Sample / CallSet -------------
 // Each marker panel/platform is a VariantSet — the crop/platform heterogeneity axis (a maize 437k
-// hybrid VCF, a tomato GBS run, an Illumina array all coexist as separate sets). A line's dosages
+// hybrid VCF, a maize GBS run, an Illumina array all coexist as separate sets). A line's dosages
 // are stored PACKED on its CallSet (one byte per variant: 0/1/2, 255=missing, ordered by
 // variant.idx), LZ4/TOAST-compressed by Postgres — compact + fast to bulk-load for genomic
 // prediction. The BrAPI long `call` form (one row per variant×callset) is the canonical contract

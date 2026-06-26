@@ -34,6 +34,6 @@ more than a Q&A sidecar to be a real differentiator.
   full undo/redo stack, and AI taking consequential actions.
 
 ## Alternatives rejected
-- **Chat-first:** fights the "beautiful/fun" pillar (typing "set brix weight to 2" is neither)
+- **Chat-first:** fights the "beautiful/fun" pillar (typing "set grain protein weight to 2" is neither)
   and is slower for visual selection work.
 - **Full command-bus + audit + undo stack in the MVP:** more ceremony than v1 needs.

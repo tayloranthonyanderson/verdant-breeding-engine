@@ -58,7 +58,7 @@ export default function DataQuality({
   // checks follow model selection (ADR-0021 trust layer, journey IA).
   phase?: "data" | "fit";
   // reviewOnly hides the exclude-and-re-run action bar (the cut workbench owns the Run, and its
-  // rerun action is tomato-aware — not the G2F path this component's button calls).
+  // rerun action is maize-aware — not the G2F path this component's button calls).
   reviewOnly?: boolean;
 }) {
   const isFit = phase === "fit";

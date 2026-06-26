@@ -31,7 +31,7 @@
       "warnings": []
     },
     {
-      "variable_id": "BRIX",
+      "variable_id": "GRAIN_PROTEIN",
       "status": "ok",
       "effects": [
         { "germplasm_id": "G3", "value": 5.50, "type": "BLUP", "std_error": 0.14, "reliability": 0.83 },
@@ -49,7 +49,7 @@
     }
   ],
   "genetic_correlations": {
-    "variable_ids": ["YIELD", "BRIX"],
+    "variable_ids": ["YIELD", "GRAIN_PROTEIN"],
     "matrix": [
       [1.0, -0.74],
       [-0.74, 1.0]
@@ -59,7 +59,7 @@
   "indices": [
     {
       "kind": "weighted",
-      "segment_id": "fresh-market-us",
+      "segment_id": "corn-belt-us",
       "ranking": [
         { "germplasm_id": "G4", "rank": 1, "score": 0.14, "gated_out": false, "gate_failures": [] },
         { "germplasm_id": "G2", "rank": 2, "score": 0.13, "gated_out": false, "gate_failures": [] },
@@ -68,12 +68,12 @@
       ],
       "weights_used": [
         { "variable_id": "YIELD", "direction": 1, "weight": 0.6 },
-        { "variable_id": "BRIX", "direction": 1, "weight": 0.4 }
+        { "variable_id": "GRAIN_PROTEIN", "direction": 1, "weight": 0.4 }
       ]
     },
     {
       "kind": "smith_hazel",
-      "segment_id": "fresh-market-us",
+      "segment_id": "corn-belt-us",
       "ranking": [
         { "germplasm_id": "G1", "rank": 1, "score": 1.85, "gated_out": false, "gate_failures": [] },
         { "germplasm_id": "G4", "rank": 2, "score": 1.40, "gated_out": false, "gate_failures": [] },
@@ -82,7 +82,7 @@
       ],
       "weights_used": [
         { "variable_id": "YIELD", "direction": 1, "weight": 0.6 },
-        { "variable_id": "BRIX", "direction": 1, "weight": 0.4 }
+        { "variable_id": "GRAIN_PROTEIN", "direction": 1, "weight": 0.4 }
       ]
     }
   ],
@@ -96,7 +96,7 @@
   },
   "warnings": [
     { "code": "single_environment", "message": "One location-season only: genotype-by-environment interaction and stability cannot be estimated. Selections reflect a single environment.", "severity": "info" },
-    { "code": "negative_genetic_correlation", "message": "Yield and Brix are negatively genetically correlated (-0.74) here: the highest-yielding entries tend to be lower in Brix. The two indices disagree most on G1 for this reason.", "severity": "info" }
+    { "code": "negative_genetic_correlation", "message": "Yield and grain protein are negatively genetically correlated (-0.74) here: the highest-yielding entries tend to be lower in grain protein. The two indices disagree most on G1 for this reason.", "severity": "info" }
   ],
   "provenance": {
     "contract_version": "v0",

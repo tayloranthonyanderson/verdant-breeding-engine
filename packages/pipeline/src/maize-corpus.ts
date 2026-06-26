@@ -1,19 +1,19 @@
-// The DATA-CUT model over the synthetic tomato program (ADR-0023, docs/sim-corpus-spec.md).
+// The DATA-CUT model over the synthetic maize program (ADR-0023, docs/sim-corpus-spec.md).
 //
 // Trials are tagged to a node in a MARKET-TARGET HIERARCHY (a tree: All > TPE > specific market). Tags
 // narrow as material advances — early screens are tagged broadly (All), late market-specific trials at
-// the leaf (Brix / Firmness / East). Germplasm is never tagged; a line's markets are derived from the
+// the leaf (Food-grade / Grain-quality / Grain). Germplasm is never tagged; a line's markets are derived from the
 // trials it appears in.
 //
 // A data cut is a breeder-composed COMPOSITE: a SET of selected nodes; the cut is the union of trials
 // tagged to those nodes (no auto-expansion — the UI cascades a parent's checkbox to its subtree, but
-// the cut itself is just "trials whose tag is in the selected set"). So a Brix training set = pick
-// {All, Processing, Brix}; a narrow decision = {Brix}; a cross-strategy cut = {Brix, East}. The rank
-// index is one of the markets (leaf nodes carrying weights).
+// the cut itself is just "trials whose tag is in the selected set"). So a Food-grade training set = pick
+// {All, Dryland, Food-grade}; a narrow decision = {Food-grade}; a cross-strategy cut = {Food-grade, Grain}.
+// The rank index is one of the markets (leaf nodes carrying weights).
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'csv-parse/sync';
-import { tomatoCorpusDir } from './paths';
+import { maizeCorpusDir } from './paths';
 
 export interface TrialMeta {
   trial_id: string; stage: string; stage_label: string; year: number; tpe: string;
@@ -31,11 +31,11 @@ export interface Manifest {
 let _manifest: Manifest | null = null;
 export function loadManifest(): Manifest {
   if (_manifest) return _manifest;
-  return (_manifest = JSON.parse(readFileSync(join(tomatoCorpusDir(), 'manifest.json'), 'utf8')) as Manifest);
+  return (_manifest = JSON.parse(readFileSync(join(maizeCorpusDir(), 'manifest.json'), 'utf8')) as Manifest);
 }
 
 // ---- hierarchy helpers --------------------------------------------------------------------------
-/** Ancestor chain of a node, inclusive: e.g. Proc-Brix → [Proc-Brix, Processing, All]. */
+/** Ancestor chain of a node, inclusive: e.g. Food-grade → [Food-grade, Dryland, All]. */
 export function ancestorChain(node: string, m: Manifest = loadManifest()): string[] {
   const chain: string[] = []; let cur: string | null = node;
   while (cur && m.hierarchy[cur]) { chain.push(cur); cur = m.hierarchy[cur].parent; }
@@ -102,7 +102,7 @@ export interface AssembledCut {
 }
 
 function readTrial(t: TrialMeta, traits: string[]): AssembledCut['records'] {
-  const rows = parse(readFileSync(join(tomatoCorpusDir(), t.file)), { columns: true, skip_empty_lines: true }) as Record<string, string>[];
+  const rows = parse(readFileSync(join(maizeCorpusDir(), t.file)), { columns: true, skip_empty_lines: true }) as Record<string, string>[];
   const num = (v: string | undefined) => (v == null || v === '' || v === 'NA' ? null : Number(v));
   return rows.map((r) => ({
     genotype: r.genotype,
@@ -115,34 +115,34 @@ function readTrial(t: TrialMeta, traits: string[]): AssembledCut['records'] {
 }
 
 // ---- combining-ability inbred fixture (ADR-0019/0020) -------------------------------------------
-export interface InbredFact { name: string; role: string; pool: string; per_se: number | null; per_se_fresh: number | null; nclb: number | null }
+export interface InbredFact { name: string; role: string; pool: string; per_se: number | null; per_se_cb: number | null; nclb: number | null }
 let _inbreds: Map<string, InbredFact> | null = null;
 /** The testcross lines' inbred facts (heterotic pool / per-se merit / native disease trait) from
- *  data/tomato/inbreds.csv — the combining-ability driver's parent-level data. */
+ *  data/maize-sim/inbreds.csv — the combining-ability driver's parent-level data. */
 export function loadInbreds(): Map<string, InbredFact> {
   if (_inbreds) return _inbreds;
-  const path = join(tomatoCorpusDir(), 'inbreds.csv');
+  const path = join(maizeCorpusDir(), 'inbreds.csv');
   const m = new Map<string, InbredFact>();
   try {
     const rows = parse(readFileSync(path), { columns: true, skip_empty_lines: true }) as Record<string, string>[];
     for (const r of rows) m.set(r.name, {
       name: r.name, role: r.role, pool: r.pool,
       per_se: r.per_se === '' || r.per_se === 'NA' ? null : Number(r.per_se),
-      per_se_fresh: r.per_se_fresh === '' || r.per_se_fresh == null || r.per_se_fresh === 'NA' ? null : Number(r.per_se_fresh),
+      per_se_cb: r.per_se_cb === '' || r.per_se_cb == null || r.per_se_cb === 'NA' ? null : Number(r.per_se_cb),
       nclb: r.nclb === '' || r.nclb === 'NA' ? null : Number(r.nclb),
     });
   } catch { /* no inbred fixture → combining ability simply won't run */ }
   return (_inbreds = m);
 }
 
-/** The tomato corpus marker panel: data/tomato/markers.csv read ONCE into a genotype→dosage matrix
+/** The maize corpus marker panel: data/maize-sim/markers.csv read ONCE into a genotype→dosage matrix
  *  (`byId`), the marker-column order (`cols`), and a column→position `index`. The single reader the
  *  genomic, combining-ability and recycling facets share (each used to re-parse the file itself). */
 export interface MarkerPanel { byId: Map<string, number[]>; cols: string[]; nMarkers: number; index: Map<string, number> }
 let _markerPanel: MarkerPanel | null = null;
 export function markerPanel(): MarkerPanel {
   if (_markerPanel) return _markerPanel;
-  const rows = parse(readFileSync(join(tomatoCorpusDir(), 'markers.csv')), { columns: true, skip_empty_lines: true }) as Record<string, string>[];
+  const rows = parse(readFileSync(join(maizeCorpusDir(), 'markers.csv')), { columns: true, skip_empty_lines: true }) as Record<string, string>[];
   const cols = Object.keys(rows[0] ?? {}).filter((c) => c !== 'genotype');
   const index = new Map(cols.map((c, i) => [c, i]));
   const byId = new Map<string, number[]>();

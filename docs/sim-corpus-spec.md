@@ -1,9 +1,9 @@
-# Synthetic tomato pipeline — simulation corpus spec
+# Synthetic maize pipeline — simulation corpus spec
 
-> **BUILT 2026-06-14.** Generator: `services/kernel/sim-corpus.R` → `data/tomato/` (8 trials across
-> S1–S4 over 2 cycles, 446 genotypes, 200 markers, marker-based breeding values with the yield↔brix
-> trade-off and GCA×TPE). Cut model: `packages/pipeline/src/tomato-corpus.ts`; per-cut analysis +
-> persisted bundles: `packages/pipeline/src/tomato-build.ts`; UI: `DataCutPicker` on the tomato front
+> **BUILT 2026-06-14.** Generator: `services/kernel/sim-corpus.R` → `data/maize/` (8 trials across
+> S1–S4 over 2 cycles, 446 genotypes, 200 markers, marker-based breeding values with the yield↔grain protein
+> trade-off and GCA×TPE). Cut model: `packages/pipeline/src/maize-corpus.ts`; per-cut analysis +
+> persisted bundles: `packages/pipeline/src/maize-build.ts`; UI: `DataCutPicker` on the maize front
 > door (`?view=g2f` preserves the maize MET demo). The data-cut model is recorded in ADR-0023's
 > amendment. Deferred from this pass: genomic GBLUP on the wide cut (markers generated, GRM not yet
 > wired), and correlation/covariate weighting of off-target proxy environments.
@@ -11,7 +11,7 @@
 
 **Purpose.** The development + demo + teaching corpus. IP-clean — public/self-funded only, never
 employer germplasm (ADR-0008, BUSINESS-STRATEGY). `services/kernel/sim.R` already generates **one**
-tomato MET with known truth (yield/brix/fruit_wt/maturity, the yield↔brix −0.45 genetic trade-off,
+maize MET with known truth (yield/grain protein/plant_height/maturity, the yield↔grain protein −0.45 genetic trade-off,
 GxE, per-trait h², the true G-correlation). This spec extends it into a **staged, multi-segment
 breeding pipeline** so Verdant demonstrates a *program*, not a single trial.
 
@@ -42,18 +42,18 @@ There are **two** cuts, and the corpus must support both:
 
 ## What to generate
 
-One tomato program across the funnel, **≥2 years / cycles** with carried-over checks and survivors for
+One maize program across the funnel, **≥2 years / cycles** with carried-over checks and survivors for
 connectivity, and a **marker scaffold on the inbreds** so the GRM can glue the wide prediction cut.
 
 | Stage | ~Entries | Locs × Reps | Traits measured (cumulative) | Planner should choose |
 |---|---|---|---|---|
 | S1 — Observation (single-plot) | 600 | 1 × 1 | yield est, maturity, gross fruit type | spatial-only, genotype fixed/BLUP, **no GxE**, single-stage |
-| S2 — PYT | 80 | 3 × 2 | + Brix, firmness, basic disease | spatial + replication; GxE marginal |
+| S2 — PYT | 80 | 3 × 2 | + grain protein, test weight, basic disease | spatial + replication; GxE marginal |
 | S3 — AYT | 20 | 6 × 3 | + full quality + disease panel | **two-stage MET**, GxE, stability |
 | S4 — Pre-commercial / wide | 5 | 12 on-farm strips × — | + shelf-life, processing yield | wide-adaptation MET; stability emphasis |
 | Commercial | 1–2 | — | — | reporting (BLUE) |
 
-*(Counts/design are the breeder-confirmed tomato defaults; tune in one place.)*
+*(Counts/design are the breeder-confirmed maize defaults; tune in one place.)*
 
 ### Funnel dynamics (must-haves — the realism that makes it credible)
 
@@ -71,10 +71,10 @@ connectivity, and a **marker scaffold on the inbreds** so the GRM can glue the w
 
 Three Segments, chosen to exercise **both** definition modes:
 
-- **CA-Processing · Brix** — trait-defined. TPE = arid CA processing locations. TPP index weights Brix.
-- **CA-Processing · Firmness/viscosity** — trait-defined. **Shares the CA-processing TPE** with the
-  above (⇒ one fit, two index lenses). TPP index weights firmness/viscosity.
-- **Fresh-market · East** — environment-defined. **Own TPE** (humid East) → its own fit; carries
+- **Dryland · grain protein** — trait-defined. TPE = western dryland processing locations. TPP index weights grain protein.
+- **Dryland · Test-weight/viscosity** — trait-defined. **Shares the dryland TPE** with the
+  above (⇒ one fit, two index lenses). TPP index weights test weight/viscosity.
+- **Corn-Belt · East** — environment-defined. **Own TPE** (eastern Corn Belt) → its own fit; carries
   GCA×E vs. the processing TPE. TPP weights size/appearance/flavor/shelf-life.
 
 Material is **sorted into Segments across stages**: broad early (scored vs. all three), specific late
@@ -83,7 +83,7 @@ evaluation lens + the decision log + the Study→TPE tag (ADR-0023).
 
 ### Known-truth attributes to expose (validation + teaching)
 
-True genotype means per trait; true G-correlation (incl. the yield↔Brix trade-off already in
+True genotype means per trait; true G-correlation (incl. the yield↔grain protein trade-off already in
 `sim.R`); true entry-mean h² **per stage-design**; true **GCA per inbred** (and **GCA×TPE** where
 env-defined); and the **true selection applied at each stage**, so a demo can show the model
 recovering both the values and the selection.
@@ -92,7 +92,7 @@ recovering both the values and the selection.
 
 Emit as the **generic plot record** the pipeline already consumes (per-stage long CSVs, or a direct
 seed), tagged with **Study→TPE**, flowing through the existing build path (mirroring `met-build.ts` /
-the G2F path) — but onto **tomato**. This moves the whole product off hardcoded G2F maize and onto the
+the G2F path) — but onto **maize**. This moves the whole product off hardcoded G2F maize and onto the
 beachhead/teaching crop.
 
 ## In scope now (pulled in for the prediction cut — decided 2026-06-14)

@@ -56,7 +56,7 @@ simpler because it can assume unit-harmonized input); **Model QC** (post-fit, AD
   Scale) and then taxes every future BrAPI import/export with a translation step. The mixed-unit
   problem it solves is already solved at the variable level; raw-unit audit is preserved by the
   import record without it.
-- **Hardcoded crop preset ladder (`if trait == "Brix" → range 0–25`) — rejected.** Contradicts
+- **Hardcoded crop preset ladder (`if trait == "grain protein" → range 0–25`) — rejected.** Contradicts
   crop-agnostic positioning; every program names traits differently; an infinite curated list that
   still misses each program's idiosyncratic traits.
 - **Live LLM on every upload (stateless) — rejected.** Nondeterministic QC run-to-run (poison for

@@ -75,32 +75,32 @@ Segment's business meaning.
   query), a `study`↔`segment` relevance tag, and Advancement Decisions carry their already-specified
   per-Segment scope. **Mapped now, built with the selection-target work — not the ingestion thread.**
 
-## Amendment (2026-06-14) — the data-cut model, built on the synthetic tomato program
+## Amendment (2026-06-14) — the data-cut model, built on the synthetic maize program
 
-The first concrete realization of "membership = tag + lens, never on germplasm." On the staged tomato
+The first concrete realization of "membership = tag + lens, never on germplasm." On the staged maize
 corpus (`docs/sim-corpus-spec.md`, `services/kernel/sim-corpus.R`), the breeder selects a **data cut**
 without tagging germplasm or checking trials one by one:
 
-- **Trials carry a market tag in a shallow hierarchy** (`All` > `Processing` / `Fresh-East`),
+- **Trials carry a market tag in a shallow hierarchy** (`All` > `Dryland` / `Corn-Belt`),
   **defaulted by stage**: early stages tag the broad parent (`All`), advanced stages tag the TPE node.
   Tagging a parent automatically covers its children — one tag, no per-trial work, "broad early /
   narrow late" emerges from *which level you tagged*, which tracks the stage.
 - **Germplasm is never tagged.** A line's markets are **derived** — the markets of the trials it
   appears in. Early `All`-tagged trials surface a line under every market; once it only appears in a
   TPE-tagged trial, it narrows. No `germplasm.segment_id`, exactly as this ADR requires.
-- **Two purposes assemble two cuts from the same tags** (`packages/pipeline/src/tomato-corpus.ts`):
+- **Two purposes assemble two cuts from the same tags** (`packages/pipeline/src/maize-corpus.ts`):
   - **Prediction (broad)** — relevance is the **TPE, not the stage**: pool every trial tagged with the
     market's node *or an ancestor*, across all stages and years. The TPE is the target you predict
     *into*; testing environments are informants. (Correlation/covariate weighting of off-target
     proxies is the documented next increment — here the tag is the first-order relevance filter.)
   - **Advancement (narrow)** — only the latest-stage trials for that TPE node: the focused
     advance/drop decision set.
-- **Markets sharing a TPE share one fit, differ only by index lens** (Proc·Brix and Proc·Firmness pool
-  identical trials, ranked by different weights); an environment-defined market (Fresh-East) gets its
+- **Markets sharing a TPE share one fit, differ only by index lens** (Proc·grain protein and Proc·Test-weight pool
+  identical trials, ranked by different weights); an environment-defined market (Corn-Belt) gets its
   own fit, carrying GCA×E. Demonstrated end-to-end: the cut's plots → multi-trait AI-REML
-  (`tomato-build.ts`, the same crop-agnostic BLUPF90 engine as the G2F MET) → market index → bundle,
+  (`maize-build.ts`, the same crop-agnostic BLUPF90 engine as the G2F MET) → market index → bundle,
   with the cut's data scope recorded in `data_readiness.cut`. UI: `DataCutPicker` (pick purpose +
-  market; see the full trial catalog with in/out highlighting) on the tomato front door; the grounded
+  market; see the full trial catalog with in/out highlighting) on the maize front door; the grounded
   Q&A answers against the selected cut's bundle.
 
 The durable schema this ADR sketches (a `segment` table, a `study`↔`segment` relevance tag, decisions
@@ -111,7 +111,7 @@ the tags from a manifest. What's proven now is the *model*: tags on trials, lens
 the product. The `DataCutPicker` is a **builder**: seed from a template, then tick/untick the exact
 trials (the breeder's judgement is the relevance model — keep a correlated off-target trial, drop a
 noisy nursery), choose the market to rank on, **name it, and save it as a re-runnable preset**. A saved
-cut persists as its own study (`source='tomato-cut'`) carrying its trial list in the bundle's
+cut persists as its own study (`source='maize-cut'`) carrying its trial list in the bundle's
 `data_readiness.cut`; it re-runs on current data and can be deleted (`saveAndRunCut` / `analyzeCut` /
 `deleteCut` server actions; `buildCustomCut` in the pipeline). This is the "saved trial set" primitive —
 the lightweight precursor to the durable `segment`/study-tag schema, validated against real fits.
@@ -123,13 +123,13 @@ breeder corrected it: markets aren't just lenses, they're **distinct market targ
 
 The corrected model, now built:
 - **Trials are tagged to a node in a market-target tree** (`All` > TPE > specific market) that narrows
-  through the funnel: early screens tagged `All`, mid trials at the TPE (`Processing`/`Fresh-East`),
-  late market-specific trials at the leaf (`Proc-Brix`/`Proc-Firmness`/`East`). The corpus splits the
-  late processing AYT/pre-commercial into a Brix-focused and a Firmness-focused trial — so Brix and
-  Firmness are *separable data*, not one fit two lenses.
+  through the funnel: early screens tagged `All`, mid trials at the TPE (`Dryland`/`Corn-Belt`),
+  late market-specific trials at the leaf (`Food-grade`/`Grain-quality`/`East`). The corpus splits the
+  late processing AYT/pre-commercial into a grain protein-focused and a Test-weight-focused trial — so grain protein and
+  Test-weight are *separable data*, not one fit two lenses.
 - **The cut is a union over a multi-select.** The builder draws the tag tree as checkboxes; the breeder
-  ticks any set of nodes — a broad chain (`All`+`Processing`+`Brix`), a single leaf (`Brix`), or a
-  cross-strategy mix (`Brix`+`East`) — and the cut is the union of trials tagged to the checked nodes.
+  ticks any set of nodes — a broad chain (`All`+`Dryland`+`grain protein`), a single leaf (`grain protein`), or a
+  cross-strategy mix (`grain protein`+`East`) — and the cut is the union of trials tagged to the checked nodes.
   A separate **Rank by** picks which market index ranks the result. Per-trial fine-tuning underneath.
 - `cutTaxonomy()` surfaces the whole tree (each node's depth, whether it's a rankable market, and its
   trial count); `trialsForTags()` / `assembleCustom()` resolve a node/trial set to a fit; templates are
