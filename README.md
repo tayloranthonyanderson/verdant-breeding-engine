@@ -2,6 +2,8 @@
 
 # Verdant — Breeding Analytics (teaching + portfolio project)
 
+[![CI](https://github.com/tayloranthonyanderson/verdant-breeding-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/tayloranthonyanderson/verdant-breeding-engine/actions/workflows/ci.yml)
+
 A free, open-source breeding **management + analysis** project. Upload a trial → get correct
 mixed-model **BLUPs/BLUEs**, **heritability**, genomic **GEBVs**, **combining ability**, and a live,
 re-weightable **selection ranking** — with a pre-fit **data-quality** pass and post-fit **model-QC**
