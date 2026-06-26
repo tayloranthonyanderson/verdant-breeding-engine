@@ -5,11 +5,10 @@
 ## Context
 The M0 walking skeleton (ADR-0010) needs concrete technology choices to realize the
 architecture spine of ADR-0001 (TS web tier + R compute kernel + Postgres behind a durable job
-queue). These are pervasive, expensive-to-reverse decisions. The founder's explicit guidance:
+queue). These are pervasive, expensive-to-reverse decisions. The author's explicit guidance:
 make the *long-term-correct* call now to avoid costly future refactors, since this is a large
 application — but do not over-buy infrastructure (ADR-0010 "buy infrastructure, build science";
-defer-the-tax). Decisions co-decided with the founder (two accepted directly, two delegated to
-the engineer's recommendation).
+defer-the-tax).
 
 ## Decision
 1. **Monorepo via pnpm workspaces.** One repo, strict per-package dependency isolation:

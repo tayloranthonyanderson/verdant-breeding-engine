@@ -3,14 +3,14 @@
 **Status:** Accepted (2026-06-11)
 
 ## Context
-Science-first sequencing means the MVP analysis *is* the moat — it must be deep enough that a
-PhD breeder trusts it over their current workflow (and over incumbents). A naive wrapper around
+Science-first sequencing means the MVP analysis *is* the technical core — it must be deep enough that a
+PhD breeder trusts it over their current workflow (and over existing tools). A naive wrapper around
 three lines of `lme4` is not that.
 
 ## Decision
 **Spatial analysis is in the MVP.** A breeder looking at field-trial BLUPs with no spatial
-correction distrusts them on sight; spatial is where breeders get it wrong or pay a statistician —
-the "automate the expert" promise. Use row–column / AR1×AR1 or `SpATS`/`statgenSTA` splines.
+correction distrusts them on sight; spatial is where breeders get it wrong or need a statistician —
+the kind of expert step the project aims to automate. Use row–column / AR1×AR1 or `SpATS`/`statgenSTA` splines.
 
 **The as-planted layout is a first-class object, decoupled from any design.** Even a
 Verdant-generated design is a *proposal* reality deviates from (you're a guest in a grower's
@@ -41,5 +41,5 @@ field). The bottleneck in practice is *capturing the messy as-planted layout*, n
 
 ## Alternatives rejected
 - **Simple single-trial/MET + z-score index only:** does nothing a breeder couldn't do in `lme4`
-  themselves; can't be the thing they pay for.
+  themselves; can't be the thing that earns their trust.
 - **Coordinate-columns-only layout:** fails on the real-world mess that is the actual bottleneck.

@@ -30,7 +30,7 @@ objective, because **complementation** lets one parent's weakness be covered by 
 G2F provides parent **identity** only — no direct inbred genotype and no inbred per-se phenotype
 (its marker file is a hybrid-level TASSEL build; its trait files are all hybrid-level). So GCA
 modelling and within-pool ranking are demonstrable on G2F, but the native-trait gate is
-**buildable yet unfixturable** there, and it is really a **maize-beachhead** workflow (Ht1 is a
+**buildable yet unfixturable** there, and it is really a **maize lead-crop** workflow (Ht1 is a
 maize gene), not a maize one.
 
 We chose to **build a small synthetic inbred fixture now** — a per-inbred table over the G2F
@@ -39,7 +39,7 @@ parent names carrying a synthetic pool label and one or more presence/absence na
 ranking, the dual-source gate). It is explicitly scaffolding: the native-trait gate is validated
 and shipped for real only against a genuine **maize inbred dataset** (per-se + Ht1-style marker
 scores) later. Rejected alternatives: fabricating maize inbred *genotypes* (a detour from the
-maize go-to-market), and sourcing a maize inbred panel from G2F (same detour).
+maize focus), and sourcing a maize inbred panel from G2F (same detour).
 
 ## Deferred (mapped, not built)
 

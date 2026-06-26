@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-## correctness.R — the kernel's correctness net (the moat made re-runnable).
+## correctness.R — the kernel's correctness net (the core guarantee made re-runnable).
 ##
 ## Generates known-truth MET data (sim.R), feeds it to the REAL kernel through the REAL seam
 ## (analyze.R reads an AnalysisRequest as JSON, writes a ResultBundle as JSON), and asserts the
@@ -23,7 +23,7 @@ ok   <- function(cond, msg) {
 }
 near <- function(a, b, tol) is.finite(a) && is.finite(b) && abs(a - b) <= tol
 
-## ---- tunables (FOUNDER'S CALL — adjust here) ------------------------------------------
+## ---- tunables (author's call — adjust here) ------------------------------------------
 ACC_FLOOR  <- 0.85   # min cor(BLUP, true genetic value) per trait — proven floor from the old suite
 H2_TOL     <- 0.10   # max |reported h2 - true entry-mean H2| per trait
 

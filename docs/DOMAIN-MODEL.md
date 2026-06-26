@@ -9,7 +9,7 @@ structure instead of accreting.
 else is *mapped, not built* — present so the seams anticipate it, absent from the database
 until needed.
 
-**Status:** v0.2 (2026-06-11) — refined through grilling with the founder. Grounded in
+**Status:** v0.2 (2026-06-11) — refined through grilling with the author. Grounded in
 BrAPI v2, the standard QG/breeding texts, and Breedbase's schema. Vocabulary feeds
 [CONTEXT.md](../CONTEXT.md); decisions feed [ADRs](adr/).
 
@@ -28,7 +28,7 @@ capability moves one term of the response-to-selection equation (Falconer & Mack
 
 | Term | Meaning | Platform levers |
 |---|---|---|
-| **r** — accuracy | corr(estimated, true breeding value) | correct mixed models, spatial correction, MET/GxE, heritability, genomic prediction ← **analysis moat** |
+| **r** — accuracy | corr(estimated, true breeding value) | correct mixed models, spatial correction, MET/GxE, heritability, genomic prediction ← **analysis core** |
 | **i** — intensity | selection sharpness | selection index, stage-gate selection fractions |
 | **σ_A** — variation | useful additive variance | germplasm/diversity management, **list/pool-building**, mating designs |
 | **L** — cycle time | years/cycle | genomic selection, speed breeding, trial/logistics efficiency |
@@ -37,7 +37,7 @@ capability moves one term of the response-to-selection equation (Falconer & Mack
 diversity (effective population size) to sustain gain over cycles while still concentrating
 elite material. List/pool-building (§5) operationalizes this.
 
-The commercial objective is really **ΔG per dollar** — gain under budget and operational
+The program objective is really **ΔG per dollar** — gain under budget and operational
 constraints. Maximizing it is a constrained-optimization problem over this whole equation; the
 **decision-support layer** (optimization + simulation; ADR-0011) is where we tackle it
 (mapped, not built).
@@ -120,7 +120,7 @@ reproductive-biology-dependent — §10.)
                                index)        genomics)
 ```
 
-The **analysis → select → advance** arc is the MVP moat; it produces, then *records*, an
+The **analysis → select → advance** arc is the MVP core; it produces, then *records*, an
 AdvancementDecision. Upstream (germplasm/crossing) and downstream (recycle/gain) are mapped,
 built later.
 
@@ -195,7 +195,7 @@ inventory entity when germplasm management is built (M5).
 | **MarkerPosition** | a marker's coordinate on a map/genome |
 | *(genome-browser integration)* | view loci/markers/genes in context (e.g. JBrowse / BrAPI) |
 
-### Analysis, decisions, gain (ours — moat layer)
+### Analysis, decisions, gain (ours — core layer)
 | Entity | What it is |
 |---|---|
 | **AnalysisRun** | one engine execution; records intent + chosen-model rationale (ADR-0002) |
@@ -267,7 +267,7 @@ The model is parametric over mating system, not hard-coded to one crop (Acquaah)
 
 | System | Examples | Consequences |
 |---|---|---|
-| Self-pollinated | maize (beachhead), wheat | inbred lines; pedigree/bulk/SSD/backcross; line-mean h² |
+| Self-pollinated | maize (lead crop), wheat | inbred lines; pedigree/bulk/SSD/backcross; line-mean h² |
 | Cross-pollinated | maize (G2F dev set) | populations, recurrent selection, heterotic groups, GCA/SCA |
 | Clonal | potato, cassava | clonal selection; total genetic value (incl. dominance) |
 | Hybrid | maize, vegetables | inbred dev + testcross + combining ability + hybrid prediction |
@@ -281,8 +281,8 @@ Building to span self (maize) and cross/hybrid (maize) forces genuine generality
 | Milestone | Built | Mapped, not built |
 |---|---|---|
 | **0 — tracer bullet** | Study, ObservationUnit, Observation, AnalysisRun, ResultBundle | rest |
-| **1 — analysis moat** | + Design, Layout, ObservationVariable, market-specific index, **Segment + TPP (light)**, RelationshipStructure(identity) | pedigree, crossing, genomics |
-| **2 — SaaS-ize** | + Program/Trial scoping, Users, persistence, **Stage + AdvancementDecision** | — |
+| **1 — analysis core** | + Design, Layout, ObservationVariable, market-specific index, **Segment + TPP (light)**, RelationshipStructure(identity) | pedigree, crossing, genomics |
+| **2 — deploy** | + Program/Trial scoping, Users, persistence, **Stage + AdvancementDecision** | — |
 | **4 — designer** | + Design generation, SeedLot (light) | — |
 | **5 — germplasm/gain** | + Germplasm, Pedigree, **List + diversity-aware pools**, Population, A-matrix, CrossingProject/Cross, GeneticGainRecord, **elite-collection curation**, **inventory management** (SeedLot depth, increase, safe-discard), market intelligence | — |
 | **post-MVP — operations & compliance** | + Shipment, Payment, Phytosanitary/Permit, DiseaseTest (shipping coordination) | — |
@@ -291,7 +291,7 @@ Building to span self (maize) and cross/hybrid (maize) forces genuine generality
 | **post-MVP — decision-support** | + optimization (allocation) & simulation via Python solver service; Resource/Cost/Budget/Constraint/Plan (ADR-0011) | logistics & crossing/pollination optimization (at scale) |
 
 **Stage + AdvancementDecision + Segment are pulled forward** (M1–2): the analysis→select→advance
-arc is the moat, and recording the decision is what closes it. List/pool diversity work needs the
+arc is the core, and recording the decision is what closes it. List/pool diversity work needs the
 germplasm collection (M5) but its data model is shaped now.
 
 ---
@@ -317,7 +317,7 @@ germplasm collection (M5) but its data model is shaped now.
 1. **Sub-segment resolution** — is a Segment-level TPP enough, or do you need a target environment
    *within* a segment as a distinct objective?
 2. **The real disposition set** for AdvancementDecision beyond advance/hold/drop/recycle-as-parent.
-3. **Reproductive-biology emphasis for the maize beachhead** — how much hybrid/combining-ability
+3. **Reproductive-biology emphasis for the maize lead crop** — how much hybrid/combining-ability
    machinery vs. inbred-line workflow for v1? (Drives whether early-stage selection is on combining
    ability vs per-se — §2.4.)
 4. **Germplasm/seed-inventory/nursery logistics depth** needed to be useful vs. academic.

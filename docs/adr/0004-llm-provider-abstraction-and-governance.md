@@ -3,9 +3,9 @@
 **Status:** Accepted (2026-06-11)
 
 ## Context
-The AI is the differentiator, so its model must not be an accidental structural dependency.
-The founder wants users to choose their model (cost, capability, familiarity), and target
-cloud is GCP with possible Gemini. Enterprises are highly sensitive about data leaving their
+The AI is the project's focus, so its model must not be an accidental structural dependency.
+The author wants users to be able to choose their model (cost, capability, familiarity), and a
+target cloud is GCP with possible Gemini. Organizations are often sensitive about data leaving their
 walls / being used for training.
 
 ## Decision
@@ -16,7 +16,7 @@ walls / being used for training.
 - **Abstraction is "bring-your-own-endpoint," not just bring-your-own-key.** A tenant can point
   Verdant at a hosted API, Claude/Gemini in their own Vertex/Bedrock project, or a self-hosted
   open-weight container — spanning the full data-governance spectrum.
-- **Inference cost: hybrid.** A strong **bundled default** so first-use is delightful with zero
+- **Inference config: hybrid.** A strong **bundled default** so first use works with zero
   setup, **plus** model-choice/BYOK for power users and the governance-sensitive. The model menu
   is **eval-gated** — only models that clear a measured trust floor are offered.
 - **Per-task routing** is allowed (cheap/fast model for low-stakes column-mapping suggestions,
@@ -24,11 +24,11 @@ walls / being used for training.
 
 ## Timing
 - The **abstraction** goes in early (cheap, future-proof). The **user-facing model picker + BYOK**
-  is a multi-tenant, cloud-phase feature; the local single-user MVP just uses the founder's config.
-- The bundled-vs-BYOK *business* decision is settled before cloud launch, not now.
+  is a multi-tenant, cloud-phase feature; the local single-user MVP just uses the author's config.
+- The bundled-vs-BYOK model-config decision is settled before any hosted deployment, not now.
 
 ## Consequences
-- The differentiator isn't locked to one vendor; switching/mixing is a config change.
+- The AI layer isn't locked to one vendor; switching/mixing is a config change.
 - Governance objections ("our data can't leave our walls") are answerable up to full self-hosting.
 - Cost: a small abstraction tax over calling one API directly — accepted for optionality.
 

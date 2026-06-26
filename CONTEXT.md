@@ -6,10 +6,10 @@ file is the shared **vocabulary** and a one-screen orientation. Use these terms
 exactly in code, tests, issues, and prose — don't drift to synonyms.
 
 ## What Verdant is
-An **AI-native breeding management + analysis platform**. Beachhead: maize breeders
-at small/mid programs the incumbents price out. The promise: *upload your trial, get
-the right answer (correct mixed-model BLUPs, heritability, a ranked selection index),
-and ask your data questions in plain English — without a statistician on staff.*
+A free, open-source breeding **management + analysis** project for small/mid programs
+without a statistician on staff. The promise: *upload your trial, get the right answer
+(correct mixed-model BLUPs, heritability, a ranked selection index), and ask your data
+questions in plain English.*
 See [PRODUCT.md](PRODUCT.md), [ROADMAP.md](ROADMAP.md), [docs/MVP-PLAN.md](docs/MVP-PLAN.md).
 
 ## The shape of the system (ADR-0001)
@@ -290,7 +290,7 @@ decision*: which matings to make. Two modes, not one tool:
 ## Ecosystem & standards (ADR-0009)
 - **BrAPI** — the industry-standard breeding data API/model; our data model aligns to it; a
   future import path from Breedbase / Field Book / Phenome.
-- **Breedbase** — open-source incumbent (Perl/Chado). A *reference to learn from and interoperate
-  with*, **not** a codebase to fork.
+- **Breedbase** — established open-source breeding software (Perl/Chado). A *reference to learn from
+  and interoperate with*, **not** a codebase to fork.
 - **G2F (Genomes to Fields)** — public maize program dataset; our development **north star**
-  (real breeding-program complexity). Maize is the **beachhead** for marketing (ADR-0008).
+  (real breeding-program complexity). Maize is the **lead crop / worked example** (ADR-0008).

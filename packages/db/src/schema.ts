@@ -5,7 +5,7 @@
 // ObservationUnit > Observation, plus Germplasm and ObservationVariable, plus the analysis
 // layer (AnalysisRun + ResultBundle stored whole as JSONB, ADR-0001).
 //
-// Scale posture (founder's requirement — efficient interaction with large tables):
+// Scale posture (the author's requirement — efficient interaction with large tables):
 //   - bigint identity primary keys throughout: compact, index-efficient, and the right shape
 //     for the high-cardinality tables coming later (observation today; genotyping `call` at
 //     M6, which is billions of rows). UUID public ids can be layered on for API exposure later.

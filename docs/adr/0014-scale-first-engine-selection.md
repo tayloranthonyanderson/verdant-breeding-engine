@@ -27,8 +27,8 @@ single-step genomic evaluation) is where scale bites hardest.
 | Multi-trait variance components (genetic correlations, the **G** for Smith–Hazel) + large single-step genomic (ssGBLUP) | **BLUPF90 family — `AIREMLF90`** (multi-trait AI-REML), **ssGBLUP** for genomic — compiled Fortran, memory-efficient, the standard for large multi-trait genetic evaluation |
 | Single-trait genomic prediction | **rrBLUP / BGLR** (two-step with relationship matrix K), M6 |
 
-**Explicitly avoided:** **sommer** (memory / scale crashes), **ASReml** (cost + poor support — it is
-what we are replacing), **INLA-as-core** (memory).
+**Explicitly avoided:** **sommer** (memory / scale crashes), **ASReml** (cost + poor support — the
+established tool this improves on), **INLA-as-core** (memory).
 
 **Why BLUPF90 over rrBLUP for the genetic-correlation / Smith–Hazel task specifically:** rrBLUP is a
 *single-trait* tool (`mixed.solve`/`kin.blup` GBLUP, ridge regression) — it does **not** estimate a
@@ -47,8 +47,8 @@ BLUPF90 is the correct engine for this task, not a compromise.
   run the native **Linux (amd64)** binaries inside a container — which *is* production (Linux hosts).
   Local dev runs the same image under Docker emulation; production runs it native. (Decided
   2026-06-11.)
-- **Licensing:** BLUPF90 is free for research/academic use; commercial use needs a license/agreement
-  with the UGA (Misztal) group — gate before shipping (the README's "verify commercial licensing").
+- **Licensing:** BLUPF90 is free for research/academic use; other uses need a license/agreement
+  with the UGA (Misztal) group — note the terms before distributing (the README's "verify licensing").
 - Heavier integration than an R library call (data prep, parameter files, convergence handling);
   accepted as the cost of scalability.
 - The `engine` contract field already allows arbitrary backends; add `blupf90` / `aireml` as values
@@ -56,7 +56,7 @@ BLUPF90 is the correct engine for this task, not a compromise.
 
 ## Alternatives rejected
 - **sommer** — memory/scale crashes; fails the hard scalability requirement.
-- **ASReml** — license cost and difficult support; it is the incumbent we are replacing.
+- **ASReml** — license cost and difficult support; the established tool this improves on.
 - **INLA-as-core** — memory footprint.
 - **Two-step `lme4 + rrBLUP` for genetic correlations** — rrBLUP is single-trait and yields no
   multi-trait **G**; retained for the single-trait genomic-prediction path (M6), not for Smith–Hazel.

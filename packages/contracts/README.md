@@ -68,7 +68,7 @@ Everything else in the schemas is the territory mapped ahead of the track (DOMAI
 
 ## OPEN — operational choices deliberately *not* decided here
 
-These are flagged, not silently resolved, because they are genuine forks to settle with the founder
+These are flagged, not silently resolved, because they are genuine forks to settle with the author
 at scaffolding time (they do not change the *logical* contract above):
 
 - **Payload transport:** embed observations inline in the queued job vs. pass a storage reference the

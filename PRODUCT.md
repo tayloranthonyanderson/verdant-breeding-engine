@@ -1,64 +1,37 @@
-# Product Brief — *(working name: TBD)*
+# Verdant — Product Brief
 
-> A web-native, AI-forward breeding analytics engine for the small and mid-size
-> breeding programs the incumbents price out and over-complicate.
+> An open-source breeding-analytics engine for small breeding programs that have
+> trial data but no statistician on staff. A teaching and portfolio project — not a
+> commercial product.
 
 ## The one-liner
-Upload your trial data, get the right answer — correct mixed-model BLUPs,
-heritabilities, and a ranked selection index — without needing a statistician on
-staff. Then ask your data questions in plain English.
+Upload your trial data, get the right answer — correct mixed-model BLUPs/BLUEs,
+heritabilities, and a ranked selection index — then ask your data questions in plain
+English, answered only from the computed result.
 
-## The problem
-Small breeding programs (specialty crops, CEA, seed startups, university and
-overseas programs) have data but no PhD breeder to:
+## The problem it addresses
+Small breeding programs (specialty crops, controlled-environment ag, university and
+overseas programs) collect good data but often lack a quantitative geneticist to:
 - design sound trials,
-- fit the *correct* linear mixed model (most get fixed/random effects wrong),
-- compute selection indices and interpret GxE/stability,
-- and increasingly, run genomic prediction.
+- fit the *correct* linear mixed model (fixed/random effects are easy to get wrong),
+- compute selection indices and interpret GxE / stability,
+- and, increasingly, run genomic prediction.
 
-The existing tools (Integrated Breeding Platform/BMS, EBS, Phenome, and stats
-engines like ASReml) are expensive, desktop-era, siloed, and assume the user
-already has statistical expertise. That assumption is the opening.
+Established tools (Breedbase, BMS/IBP, EBS, and stats engines like ASReml) are powerful
+but assume the user already has statistical expertise. Verdant explores the opposite
+assumption: encode the modeling choices in the engine so a non-specialist gets a
+correct, explainable answer.
 
-## Target user (beachhead)
-**Maize breeders outside the big-company orbit** — fresh-market, heirloom,
-specialty, organic, and CEA maize programs — then adjacent vegetable programs.
-Maize-first because of the owner's domain depth and a ready demo genome set.
+## What it demonstrates
+- **Automated-correct statistics:** the engine picks and fits the right mixed model and
+  returns BLUPs/BLUEs, heritability, and a ranked, re-weightable selection index.
+- **A grounded AI layer:** an assistant that explains the result in plain language and is
+  tool-constrained so every number traces to the computed bundle — it explains, it never
+  computes.
+- **A clean orchestration layer** over battle-tested solvers (lme4 → rrBLUP → BLUPF90).
 
-## The moat
-Not a dataset (public data is reproducible by anyone). The defensibility is:
-1. **Breeder expertise compiled into software** — the engine makes the *correct*
-   statistical/modeling choices a small program can't make itself. Hard to copy
-   because it takes a breeder, not a developer.
-2. **A clean orchestration/UX layer over battle-tested solvers**
-   (lme4 → rrBLUP two-step → BLUPF90) that small programs can't assemble or
-   afford to operate.
-3. **Founder-led distribution** — the owner teaching the product on video;
-   incumbents can't manufacture that.
-
-**Demo asset (not a moat):** a privately funded, IP-clean library of hundreds of
-variant-called maize whole genomes (public data + owner's own money) — useful
-for compelling demo insights and genomic-prediction showcases, not defensible.
-
-## MVP (the first vertical slice)
-**Analysis engine:** trial/phenotype data in → BLUPs/BLUEs, heritability,
-ranked selection index out, with interactive trait weighting. Everything else
-is roadmap, not v1.
-
-## Why it wins vs. incumbents
-- **Web-native, per-seat SaaS** vs. installed licenses.
-- **Automated statistical pipeline** — picks and fits the right model so the
-  user doesn't have to know what a BLUP is.
-- **Natural-language layer** over results — structurally hard for incumbents to
-  retrofit; native for us.
-- **Genomic prediction built in** for maize via the variant library.
-- **A founder who can teach it** — distribution via content/video, not just sales.
-
-## Business model
-Per-seat SaaS; license the engine to small breeding companies and programs.
-Tiered: analysis-only → + genomics → + team/data management.
-
-## Hard constraints (non-negotiable)
-- **No employer germplasm, data, or IP, ever.** Public + self-funded data only.
-- Built in 8–12 hrs/week (with occasional binges); favor lean, explainable tech.
-- Owner is strong in R, some Python, learning — stack must stay legible to him.
+## Scope
+- **MVP slice (built):** trial/phenotype data in → BLUPs/BLUEs, heritability, ranked
+  selection index out, with interactive trait weighting. Everything else is roadmap.
+- Built part-time, on **public and self-funded data only** — no employer germplasm, data,
+  or IP, ever. Demonstrated on a public/simulated maize corpus.

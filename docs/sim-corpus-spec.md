@@ -10,14 +10,14 @@
 
 
 **Purpose.** The development + demo + teaching corpus. IP-clean — public/self-funded only, never
-employer germplasm (ADR-0008, BUSINESS-STRATEGY). `services/kernel/sim.R` already generates **one**
+employer germplasm (ADR-0008). `services/kernel/sim.R` already generates **one**
 maize MET with known truth (yield/grain protein/plant_height/maturity, the yield↔grain protein −0.45 genetic trade-off,
 GxE, per-trait h², the true G-correlation). This spec extends it into a **staged, multi-segment
 breeding pipeline** so Verdant demonstrates a *program*, not a single trial.
 
 **Why it earns its complexity.** A staged pipeline makes the **Model Planner** visibly do different,
 correct things at each Stage (single-plot / no-GxE early → MET / GxE / stability late). That is the
-clearest on-camera demonstration of the "automate the expert" wedge (ADR-0009), and it falls out of
+clearest on-camera demonstration of "automate the expert" (ADR-0009), and it falls out of
 simulating the **breeding funnel** honestly. It also gives the AI insight layer (target-authoring +
 TPP-scoped Q&A) a realistic program to narrate, and — when the ingestion front door is built later —
 these same per-stage CSVs dogfood it.
@@ -38,7 +38,7 @@ There are **two** cuts, and the corpus must support both:
   **de-biases** variance components (Henderson). Material tested early for multiple markets is in **every**
   relevant market's cut (many-to-many lens, ADR-0023). The user picks a **purpose**; the system proposes
   the cut (pool, connectivity, each block's genetic correlation to the TPE) and lets them include/exclude
-  with the consequence shown — the "automate the expert" wedge.
+  with the consequence shown — "automate the expert" in action.
 
 ## What to generate
 
@@ -92,8 +92,8 @@ recovering both the values and the selection.
 
 Emit as the **generic plot record** the pipeline already consumes (per-stage long CSVs, or a direct
 seed), tagged with **Study→TPE**, flowing through the existing build path (mirroring `met-build.ts` /
-the G2F path) — but onto **maize**. This moves the whole product off hardcoded G2F maize and onto the
-beachhead/teaching crop.
+the G2F path) — but onto **maize**. This moves the whole project off hardcoded G2F maize and onto the
+lead/teaching crop.
 
 ## In scope now (pulled in for the prediction cut — decided 2026-06-14)
 

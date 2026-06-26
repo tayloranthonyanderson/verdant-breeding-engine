@@ -1,4 +1,4 @@
-# Verdant — Build Plan to a Sellable MVP
+# Verdant — Build Plan to a Working MVP
 
 How to read this: [ROADMAP.md](../ROADMAP.md) is the *product* phase list. This is the
 *engineering execution plan*. The **decisions** behind it live as [ADRs](adr/) and the
@@ -16,13 +16,13 @@ shared **vocabulary** in [CONTEXT.md](../CONTEXT.md) — read those first; this 
 |---|---|---|
 | **Trustworthy** | Every number correct *and provably* so; the AI never fabricates. | Validation suite green vs. known truth; AI answers cite tool outputs (ADR-0002). |
 | **AI-native** | You can *talk to* and *direct* your program; the AI advises, explains, narrates, and acts. | A breeder reaches a selection decision through a GUI with a pervasive, action-capable AI (ADR-0003). |
-| **Beautiful & fun** | Premium 2026 SaaS, instant-feeling, alive. | Consistent design system; sub-second perceived response; people *want* to demo it. |
+| **Beautiful & fun** | Premium, instant-feeling, alive. | Consistent design system; sub-second perceived response; people *want* to demo it. |
 | **Rock-solid** | Real data never lost; degrades gracefully; secure by default. | Stateless R kernel + durable queue; no sync request hangs the UI (ADR-0001). |
 | **Makes you a better breeder** | Surfaces insight a non-statistician misses; teaches as it works. | Auto-narrative flags the yield–grain protein trade-off, GxE, unstable lines, design flaws — unprompted and correct. |
 
-**Governing rule (ADR-0010): buy infrastructure, build science.** Don't hand-roll auth,
-billing, or queues. Pour effort into the engine, the validation suite, and AI grounding —
-the only parts no competitor can replicate.
+**Governing rule (ADR-0010): buy infrastructure, build science.** Don't hand-roll auth
+or queues. Pour effort into the engine, the validation suite, and AI grounding —
+the parts that carry the real intellectual weight.
 
 ---
 
@@ -38,7 +38,7 @@ the only parts no competitor can replicate.
  DATA CAPTURE ─▶ QC/CLEAN ─▶ ANALYZE ─▶ SELECT ─▶ ADVANCE/RECYCLE ─────┘
 ```
 
-We start at **Analyze** (the moat) and expand outward. Note **as-planted layout** is its own
+We start at **Analyze** (the technical core) and expand outward. Note **as-planted layout** is its own
 step — capturing the messy real-world field is the practical bottleneck, not the spatial math
 (ADR-0006).
 
@@ -46,9 +46,9 @@ step — capturing the messy real-world field is the practical bottleneck, not t
 
 ## 3. The build model (ADR-0010)
 
-- **Science-first.** Prove the analysis is irresistible on **real public + simulated data**,
-  with the founder as the only user, *before* paying the SaaS-plumbing tax. SaaS-ize a *validated*
-  moat; don't harden infra around an unproven one.
+- **Science-first.** Prove the analysis is convincing on **real public + simulated data**,
+  with the author as the only user, *before* paying the deployment-plumbing tax. Deploy a *validated*
+  core; don't harden infra around an unproven one.
 - **Tracer bullet.** Thinnest end-to-end thread on the *real* architecture first, then thicken
   each station. Shallow the features, never fake the seam.
 - **Defer-the-tax.** Auth, cloud, single-tenant tooling, the user-facing model picker, full BrAPI,
@@ -71,7 +71,7 @@ Effort is relative (S/M/L/XL) at ~8–12 hrs/wk, not a date.
 - **Done when:** that thread runs on the real seam, deployed locally, and the BLUPs look right on a
   real trial. The scary integration (TS→queue→R→bundle→render→grounded-AI) is dead-risked.
 
-### Milestone 1 — The credible analysis MVP (local, single-user) · **XL** · ⟶ **science-validated moat**
+### Milestone 1 — The credible analysis MVP (local, single-user) · **XL** · ⟶ **science-validated core**
 *Thicken every station until a PhD breeder trusts it over their current workflow. Still no auth, no cloud.*
 - **Analysis depth (ADR-0006):** spatial models (row–col / AR1×AR1 / `SpATS`); MET + **GxE**;
   **Cullis heritability**; genetic-correlation matrix; **diagnostics** (residuals, reliability/PEV,
@@ -113,7 +113,7 @@ Effort is relative (S/M/L/XL) at ~8–12 hrs/wk, not a date.
     increment (needs per-Segment BLUPs carried in the bundle).
 - **AI copilot core (ADR-0003):** GUI-first, pervasive; grounded Q&A; **auto-narrative** insight; lightweight
   **action-capable** AI over view-state (re-weight, what-if, filter) — visible + reversible; eval harness for
-  groundedness. Provider-abstracted (ADR-0004), founder's model config only for now.
+  groundedness. Provider-abstracted (ADR-0004), the author's model config only for now.
   - ✅ **Grounded NL Q&A (ADR-0002/0004):** the `@verdant/ai` package — a provider-abstracted LLM seam
     (Anthropic adapter, Claude Sonnet 4.6, adaptive thinking) + `answer(question, bundle)` that may state
     only numbers present in the bundle (the AI explains, never computes); conforms to the
@@ -150,15 +150,15 @@ Effort is relative (S/M/L/XL) at ~8–12 hrs/wk, not a date.
   a battery of public/G2F trials.
 - **Done when:** a real G2F MET produces spatially-adjusted BLUPs, Cullis h², a GxE/stability view, both
   indices with a narrated divergence, and an AI that reaches a defensible selection decision — every number
-  cited. *This is the moat, validated.*
+  cited. *This is the core guarantee, validated.*
 
-### Milestone 2 — SaaS-ize the validated moat · **L** · ⟶ **MVP / first paying user**
-*Cross from "founder's local tool" to "a breeder signs up and uses it on their data, securely." Triggered by user #2.*
+### Milestone 2 — Deploy the validated core · **L** · ⟶ **deployable MVP**
+*Cross from "the author's local tool" to "a breeder signs up and uses it on their data, securely." Triggered by a second user.*
 - **Buy** auth + tenancy (Clerk/Auth.js); enforce program scoping; remove open CORS; authenticate the API (ADR-0005).
 - Persistence-in-UI (save/list/reopen trials, analysis history) — the schema already supports it.
 - Deploy to **GCP** (Cloud Run + Cloud SQL).
 - One-click **breeder-readable report** export from the grounded results.
-- **Done when:** signup → upload → validate → analyze → save → reopen works for a non-founder, nothing lost,
+- **Done when:** signup → upload → validate → analyze → save → reopen works for a second user, nothing lost,
   no unauthenticated endpoint.
 
 ### Milestone 3 — AI copilot, full · **L**
@@ -197,14 +197,14 @@ behind the contract (verify licensing). (ROADMAP Phase 7.)
 **Integrate Field Book via BrAPI** (don't rebuild, ADR-0009); offline capture against the plot plan; a Python
 image service for 1–2 high-value traits. (ROADMAP Phase 5/6.)
 
-### Milestone 8 — Commercialize & scale · **L (ongoing)**
-Stripe per-seat tiers (analysis → +genomics → +team); teams/sharing/roles; onboarding; **BrAPI import** from
-Breedbase/Phenome as a switching-cost lever; **single-tenant/VPC** deployment tier for governance-sensitive
-enterprises (ADR-0004/0005); content/teaching engine; observability/SLOs.
+### Milestone 8 — Multi-user & scale · **L (ongoing)**
+Teams/sharing/roles; onboarding; **BrAPI import** from Breedbase/Phenome for interoperability;
+**single-tenant/VPC** deployment option for governance-sensitive environments (ADR-0004/0005);
+teaching/content; observability/SLOs.
 
 ### Milestone 9 — Decision-support: optimization & simulation · post-MVP differentiator (ADR-0011)
 A **Python solver service** (3rd compute worker behind the queue) for **ΔG-per-dollar**
-decision-support. **Beachhead-relevant first:** resource/strategy **allocation** (budget across
+decision-support. **Highest-value first:** resource/strategy **allocation** (budget across
 stages/traits, entries×locations×reps) on the Stage/SelectionCriteria/cost model. **At-scale later:**
 operational **logistics** (harvester routing, sample-to-lab scheduling under capacity, crossing/
 pollination ops). Both **optimization** (fast) and **simulation** (flexible, slower). Surfaced
@@ -213,7 +213,7 @@ AI-forward, transparent, and easy — never raw OR tooling. Deep, specialized; e
 ---
 
 ## 5. Cross-cutting tracks (every milestone)
-- **Science validation** — grow the testthat suite; benchmark vs. published/known results. The moat made provable.
+- **Science validation** — grow the testthat suite; benchmark vs. published/known results. The core guarantee made provable.
 - **AI groundedness & evals** — every new analysis ships a safe tool + eval; the model never computes a statistic.
 - **Design system & UX polish** — one component library; instant-feel; **Next.js 16 / React 19** conventions
   (read `node_modules/next/dist/docs/` per `frontend/AGENTS.md` — this version differs from older Next.js).
@@ -254,14 +254,14 @@ All captured as ADRs: [spine](adr/0001-architecture-spine.md) ·
 [analysis scope](adr/0006-mvp-analysis-scope.md) ·
 [ingestion/BrAPI](adr/0007-ai-assisted-ingestion-brapi.md) ·
 [data strategy](adr/0008-data-and-validation-strategy.md) ·
-[wedge/incumbents](adr/0009-product-wedge-and-incumbents.md) ·
+[scope & interoperability](adr/0009-relationship-to-existing-tools.md) ·
 [build method](adr/0010-build-methodology.md).
 
 **Open details to settle at design time (not blockers):**
 - Index-screen default: desired-gains vs. economic weights as the primary elicitation (ADR-0006).
 - Confirm G2F plot-spatial columns on first ingestion; pick a clean location-year (ADR-0008).
 - Queue: stay Postgres-backed vs. graduate to pg-boss when volume warrants (ADR-0001).
-- Bundled-vs-BYOK business decision before cloud launch (ADR-0004).
+- Bundled-default vs. BYOK model-config decision before cloud deploy (ADR-0004).
 
 ---
 

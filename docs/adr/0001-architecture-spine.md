@@ -4,11 +4,11 @@
 
 ## Context
 Verdant must be "rock-solid, performant, stable" *and* "legible to an R-strong
-founder." Those pull against each other on the web tier: R is where the breeding
-science and the founder's expertise live, but R is weak at the things a robust web
+author." Those pull against each other on the web tier: R is where the breeding
+science and the author's expertise live, but R is weak at the things a robust web
 service needs (concurrency, sessions/auth, structured errors, streaming, ecosystem).
 Analysis fits (spatial/MET) take seconds-to-minutes; synchronous HTTP would block
-and time out. The AI layer — our differentiator — has its best tooling in TypeScript.
+and time out. The AI layer — the project's focus — has its best tooling in TypeScript.
 
 ## Decision
 Three tiers with one clean seam:
@@ -25,15 +25,14 @@ Three tiers with one clean seam:
   we render and the AI queries the object, rather than SQL-querying individual BLUPs.
 
 ## Consequences
-- The part the founder owns (R science) stays small, pure, legible, and testable.
-- The bulletproof-but-not-his-specialty web/AI tier lives in the language built for it.
+- The part the author owns (R science) stays small, pure, legible, and testable.
+- The bulletproof-but-not-the-author's-specialty web/AI tier lives in the language built for it.
 - Async/performance is solved structurally, not patched later.
-- Cost: two languages. The founder reads the R half fluently, not the TS half — accepted,
-  because the whole point of hiring an engineer is that the web tier isn't hand-maintained
-  by him.
+- Cost: two languages. The author reads the R half fluently, not the TS half — accepted,
+  since the web tier is meant to be maintained with engineering help rather than by hand.
 
 ## Alternatives rejected
-- **R/plumber as the real API server** (spike's approach): optimizes founder-legibility at
+- **R/plumber as the real API server** (spike's approach): optimizes author-legibility at
   the direct expense of the stability/performance pillars and the AI tooling.
-- **Porting the science out of R**: throws away the founder's expertise and the breeding
+- **Porting the science out of R**: throws away the author's expertise and the breeding
   library ecosystem. Never.

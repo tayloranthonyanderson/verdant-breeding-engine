@@ -5,7 +5,7 @@ vision and the build:
 
 | Doc | Answers |
 |---|---|
-| [PRODUCT.md](../PRODUCT.md) | the pitch / positioning (why this exists) |
+| [PRODUCT.md](../PRODUCT.md) | the positioning (why this exists) |
 | **PRD.md** (this) | **the requirements** (what it must do, for whom, to what bar) |
 | [DOMAIN-MODEL.md](DOMAIN-MODEL.md) | the data model / lifecycle (the nouns) |
 | [MVP-PLAN.md](MVP-PLAN.md) | the build sequence (how/when) |
@@ -18,7 +18,7 @@ post-MVP requirements are directional.
 
 ## 1. Vision & pillars
 
-An AI-native breeding management + analysis platform that lets a breeder *upload a trial, get the
+An AI-native breeding management + analysis project that lets a breeder *upload a trial, get the
 right answer, ask in plain English, and act* — without a statistician on staff. Every requirement
 serves five pillars (each testable):
 
@@ -35,14 +35,14 @@ and operational constraints (DOMAIN-MODEL §1).
 
 ## 2. Target users & jobs-to-be-done
 
-**Beachhead:** maize breeders at small/mid programs incumbents price out. **Development data:** maize
-(G2F); maize is the market story (ADR-0008).
+**Primary user:** maize breeders at small/mid programs without dedicated biometrics support.
+**Development data:** maize (G2F); maize is the worked example (ADR-0008).
 
-The breeder's recurring jobs the product must serve:
+The breeder's recurring jobs the project must serve:
 - **Analyze a trial correctly** — the right mixed model, spatial correction, GxE, heritability — without
   knowing the statistics.
-- **Decide what to advance** — rank candidates against a market objective; record the decision.
-- **Organize material** — by Stage (pipeline maturity) and Market/Segment (commercial target).
+- **Decide what to advance** — rank candidates against a defined objective; record the decision.
+- **Organize material** — by Stage (pipeline maturity) and Market/Segment (target profile).
 - **Build lists** — assemble bounded, diversity-aware sets of parents/candidates (a daily task).
 - **Manage germplasm & inventory** — elite collection, seed on hand, what to increase/discard.
 - **See and learn from the data** — visualize, explore, reach decisions fast.
@@ -60,13 +60,14 @@ These constrain *every* feature.
   computes a statistic or commits anything without a human "yes" (ADR-0002/0007).
 - **Visible, Reversible AI Agency.** The AI can pull any lever a user can — always in the open, always
   undoable; never in the dark, never irreversibly (ADR-0003).
-- **Insight-first, not table-first.** *(Your strongest requirement.)* The product must make data easy to
+- **Insight-first, not table-first.** *(The strongest requirement.)* The project must make data easy to
   access, visualize, and learn from. It must **avoid**: walls of huge complicated tables; functions the
   user doesn't understand; raw configuration variables/jargon exposed in the UI. Default to the answer
-  and the picture; reveal detail on request. If we do this well, we win.
+  and the picture; reveal detail on request.
 - **Don't overload the user.** Power (optimization, genomics, simulation) is surfaced through plain-language
   goals the AI formulates and explains — never raw tooling (ADR-0011).
-- **Data sovereignty as a feature.** Clear ownership, export, provenance; no employer germplasm/IP, ever.
+- **Data sovereignty.** Clear ownership, export, provenance; built on public + self-funded data only, with
+  no employer germplasm, data, or IP, ever.
 
 ---
 
@@ -152,7 +153,7 @@ Per the principle in §3 — treated as first-class because it decides adoption.
 - **Security & tenancy:** auth on every endpoint; `program_id` isolation tested; secrets managed;
   data export/ownership guaranteed.
 - **Deployability:** 12-factor, containerized; local-first → GCP (Cloud Run + Cloud SQL); single-tenant/VPC
-  capable for governance-sensitive customers (ADR-0005).
+  capable for governance-sensitive deployments (ADR-0005).
 - **LLM flexibility:** provider-abstracted, endpoint-configurable, eval-gated model menu; bundled default +
   BYOK (ADR-0004).
 - **Legibility:** science in R; web/AI in TS; optimization in Python — each a stateless worker behind the
@@ -179,11 +180,11 @@ Per the principle in §3 — treated as first-class because it decides adoption.
 ## 9. Success metrics
 
 - A real G2F trial yields spatially-adjusted BLUPs, Cullis h², GxE/stability, both indices with a narrated
-  divergence — and a recorded advancement decision — with every number cited (the moat, validated).
-- A discerning breeder prefers Verdant's answer to their current workflow (the adoption test).
+  divergence — and a recorded advancement decision — with every number cited (the core guarantee, validated).
+- A discerning breeder prefers Verdant's answer to their current workflow (the usefulness test).
 - Time-to-decision (upload → defensible, recorded selection) is dramatically shorter than the status quo.
 - AI groundedness: zero fabricated numbers in eval; refuses cleanly when tools can't answer.
-- First non-founder user completes signup → upload → analyze → save → reopen with nothing lost.
+- A second user (beyond the author) completes signup → upload → analyze → save → reopen with nothing lost.
 
 ---
 
@@ -191,5 +192,5 @@ Per the principle in §3 — treated as first-class because it decides adoption.
 
 - **No employer germplasm, data, or IP, ever** — public + self-funded only.
 - Built ~8–12 hrs/week; stack must stay legible (R science / TS web / Python solvers).
-- MVP scope is the analysis→select→advance slice; do **not** rebuild incumbents' management breadth
-  (borrow BrAPI, interoperate, don't fork Breedbase — ADR-0009).
+- MVP scope is the analysis→select→advance slice; do **not** rebuild the full management breadth of
+  existing breeding-software suites (borrow BrAPI, interoperate, don't fork Breedbase — ADR-0009).

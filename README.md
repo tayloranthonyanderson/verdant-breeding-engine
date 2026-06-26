@@ -1,8 +1,8 @@
 <img src="docs/banner.svg" alt="Verdant — plant-breeding analytics: mixed-model BLUPs, genomic prediction, combining ability, and cross planning" width="100%">
 
-# Verdant — Breeding Analytics Platform
+# Verdant — Breeding Analytics (teaching + portfolio project)
 
-A breeding **management + analysis** platform. Upload a trial → get correct
+A free, open-source breeding **management + analysis** project. Upload a trial → get correct
 mixed-model **BLUPs/BLUEs**, **heritability**, genomic **GEBVs**, **combining ability**, and a live,
 re-weightable **selection ranking** — with a pre-fit **data-quality** pass and post-fit **model-QC**
 diagnostics so you can trust the answer, all narratable by a grounded **AI assistant** that only
@@ -72,7 +72,7 @@ corepack pnpm test:kernel     # just the R kernel suites
 ```
 
 The kernel correctness suite (`services/kernel/tests/correctness.R`) feeds known-truth simulated MET data
-through the real seam and asserts the BLUPs recover the true genetic values — the moat, made re-runnable.
+through the real seam and asserts the BLUPs recover the true genetic values — the core guarantee, made re-runnable.
 
 ## Status (2026-06-13)
 
@@ -95,7 +95,7 @@ The analysis engine is built and validated on the **G2F maize MET**, end to end:
   Q-Q, the raw→trend→residual **field triptych**, influential observations) + a breeder-dispositioned
   **`data_overrides`** exclusion overlay that re-plans on re-run and never deletes data (ADR-0021).
 
-**Ahead:** natural-language Q&A over the results (the headline differentiator); the ingestion front door
+**Ahead:** natural-language Q&A over the results; the ingestion front door
 (Trait Library + unit harmonization, ADR-0022); persistence-in-UI + multi-tenancy; trial designer; mobile
 capture; decision-support optimization. See [ROADMAP.md](ROADMAP.md) and [docs/MVP-PLAN.md](docs/MVP-PLAN.md).
 
