@@ -52,7 +52,7 @@ Three load-bearing seams, each independently checked:
   a multi-environment trial with *known* true genetic values and entry-mean heritabilities, runs it through
   the real seam, and asserts the recovered BLUPs correlate with truth (per-trait floor; observed r ≈ 0.89–0.96)
   and that reported h² recovers the true value within tolerance. `data-quality-test.R` and `model-qc-test.R`
-  assert edge-case behavior (outliers, missingness, residual diagnostics). Together ~two dozen assertions —
+  assert edge-case behavior (outliers, missingness, residual diagnostics). Together 23 assertions —
   the science is regression-tested, not asserted by hand.
 - **Groundedness guard.** `packages/ai/src/grounding.ts` verifies that every number and every
   germplasm/trait/market name in an LLM answer is present in the computed result bundle. `answer.ts`
@@ -116,9 +116,9 @@ The analysis engine is built and validated on the **G2F maize MET**, end to end:
   Q-Q, the raw→trend→residual **field triptych**, influential observations) + a breeder-dispositioned
   **`data_overrides`** exclusion overlay that re-plans on re-run and never deletes data (ADR-0021).
 
-**Ahead:** natural-language Q&A over the results; the ingestion front door
-(Trait Library + unit harmonization, ADR-0022); persistence-in-UI + multi-tenancy; trial designer; mobile
-capture; decision-support optimization. See [ROADMAP.md](ROADMAP.md) and [docs/MVP-PLAN.md](docs/MVP-PLAN.md).
+**Ahead:** the ingestion front door (Trait Library + unit harmonization, ADR-0022); persistence-in-UI +
+multi-tenancy; trial designer; mobile capture; decision-support optimization. See [ROADMAP.md](ROADMAP.md)
+and [docs/MVP-PLAN.md](docs/MVP-PLAN.md).
 
 ## License
 

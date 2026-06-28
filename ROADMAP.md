@@ -1,44 +1,23 @@
 # Roadmap
 
-Captured so nothing is lost — but only Phase 1 is "now." Everything below it is
+Captured so nothing is lost, but only Phase 1 is "now." Everything below it is
 deliberately deferred until the slice above it is real and validated.
 
-> **Status (2026-06-14).** The Phase-1 analysis engine is built + validated on G2F,
-> and Phase-7 genomic prediction is now built end-to-end with a full model-selection
-> UI. **Done:** two-stage MET (SpATS → multi-trait AI-REML, validated vs lme4 to 3
-> sig figs); the **deterministic Model Planner** + data-readiness gating (ADR-0016);
-> **crop-agnostic seams** (ADR-0015); **genotype storage + ingestion** (ADR-0017,
-> 437k SNPs × 4,928 genotypes); **genomic prediction** — VanRaden **G**, pedigree
-> **A**, single-step **H** GEBVs (all phenotyped lines, incl. un-genotyped via the
-> pedigree link); **rrBLUP** (fast CV engine) + **native BLUPF90/preGSf90 GBLUP**
-> (scale engine), cross-engine validated (GEBV r≈0.97); the full genomic UI; and
-> **AI-recommended model selection with full breeder override** — the planner
-> recommends every decision (relationship / spatial / staging / GxE / engine), the
-> breeder overrides any of them and re-runs, the kernel validates + refuses
-> infeasible ones (**Model Studio**, ADR-0018). **Combining ability (GCA/SCA)** is now
-> built end-to-end (ADR-0019/0020): the hybrid trial decomposed into parent GCA (random
-> →BLUP, within-pool ranking) + SCA, topology-selected (line×tester here, 614 lines × 13
-> testers), with a breeder-grade workspace — GCA/hybrid ranking, per-se↔GCA divergence,
-> SCA heatmap, native-trait gating, and recorded advancement. The **trust layer (ADR-0021)** is now
-> built end-to-end too: two-pass **Data Quality** (pre-fit — robust MAD outliers, missingness,
-> box-and-whisker by environment) + **Model QC** (post-fit, on the fit's OWN spatially-adjusted
-> residuals — residual-vs-fitted, normal Q-Q, the raw→trend→residual **field triptych**, influential
-> observations), advisory-only, with a breeder-dispositioned **`data_overrides`** exclusion overlay that
-> re-plans on re-run and never deletes data. Split across the journey (**Overview → Data → Model →
-> Understand → Select → Advance → Genomics**: pre-fit checks in the **Data** step, model-dependent
-> diagnostics in the **Model** step's fit-checks) — completing the previously-unchecked Phase-1
-> data-validation item. The **selection-target (Segment) frame (ADR-0023)** is now wired into the
-> **Select** step: the breeder switches **target market** and the same trial re-ranks under that
-> market's objective (its TPP) — *same data, different Segment → different ranking*, live. Trait-defined
-> Segments over one shared TPE are built end-to-end on the MET; the **environment-defined TPE partition**
-> (a Segment with its own fit, so GCA×E falls out) is the next increment. The **grounded NL Q&A layer
-> (Phase 2 / ADR-0002/0004)** is now built end-to-end: an "Ask your results" panel narrates the bundle
-> in plain language and may state *only* numbers present in it (the AI explains, never computes), on a
-> provider-abstracted LLM seam (Claude Sonnet 4.6) with a keyless offline fallback — live on an Anthropic
-> API-key drop. **Next:** wire the answerer into the groundedness eval gate; the **target-authoring
-> assistant** (NL → TPP+TPE) once target markets are persistent; the ingestion front door (Trait Library
-> + unit harmonization, Thread B / ADR-0022); a `relationship_set` cache table + `sample.germplasm_id`
-> mapping; forward-year predictive validation.
+> **Status (2026-06-14).** Phase 1 (analysis engine) and Phase 7 (genomic prediction) are
+> built and validated on G2F; the grounded NL Q&A layer (Phase 2) is live. Per-phase detail below.
+>
+> Done:
+> - **Two-stage MET** — SpATS spatial de-trending → multi-trait AI-REML (BLUPF90), validated vs lme4 to 3 sig figs.
+> - **Deterministic Model Planner** with data-readiness gating, plus crop-agnostic seams (ADR-0015/0016).
+> - **Genotype storage + ingestion** — 437k SNPs × 4,928 genotypes (ADR-0017).
+> - **Genomic prediction** — VanRaden G, pedigree A, single-step H GEBVs; rrBLUP (CV) + native BLUPF90/preGSf90 GBLUP (scale), cross-engine validated (GEBV r≈0.97); G > A > identity on every trait.
+> - **Model Studio** (ADR-0018) — the planner recommends every model decision; the breeder overrides any and re-runs; the kernel validates and refuses infeasible ones.
+> - **Combining ability (GCA/SCA)** (ADR-0019/0020) — topology-selected (line×tester, 614 lines × 13 testers), within-pool ranking, per-se↔GCA divergence, SCA heatmap, recorded advancement.
+> - **Trust layer** (ADR-0021) — pre-fit Data Quality + post-fit Model QC on the fit's own residuals, advisory-only, with a non-destructive `data_overrides` overlay that re-plans on re-run.
+> - **Selection-target (Segment) frame** (ADR-0023) — switch target market and the same trial re-ranks live under that market's objective (TPP). Trait-defined Segments over one shared TPE are built; the environment-defined TPE partition is next.
+> - **Grounded NL Q&A** (Phase 2; ADR-0002/0004) — an "Ask your results" panel narrates the bundle and may state only numbers present in it (the AI explains, never computes), on a provider-abstracted LLM seam with a keyless offline fallback.
+>
+> Next: wire the answerer into the groundedness eval gate; a target-authoring assistant (NL → TPP+TPE); the ingestion front door (Trait Library + unit harmonization, ADR-0022); a `relationship_set` cache table + `sample.germplasm_id` mapping; forward-year predictive validation.
 
 ## Phase 0 — Plan + thin slice  *(current)*
 - Product brief, this roadmap, analysis-engine workflow map.
@@ -48,23 +27,23 @@ deliberately deferred until the slice above it is real and validated.
 
 ## Phase 1 — Analysis engine (the MVP)  *(largely built + validated)*
 - ✅ Single-trial and **multi-environment (MET)** models; genotype as random
-  (BLUPs for selection) vs fixed (BLUEs for comparison). Two-stage MET — SpATS
+  (BLUPs for selection) vs fixed (BLUEs for comparison). Two-stage MET: SpATS
   within-environment spatial de-trending (Stage 1) → multi-trait AI-REML / BLUPF90
   (Stage 2) for the across-environment genetic covariance; validated vs lme4 to
   3 sig figs.
 - ✅ Heritability / repeatability, genetic correlations; **GxE gated by data
-  readiness** — fires only in a one-stage plot-level fit with connectivity +
+  readiness**: fires only in a one-stage plot-level fit with connectivity +
   replication (two-stage-on-means is non-identifiable, and one-stage GxE is
   compute-bound at full G2F scale), surfaced as a readiness unlock (ADR-0016).
 - ✅ Interactive **selection index** with user-set trait weights and directions,
   plus the genetically-aware desired-gains index and the live divergence view.
-- ✅ **Data Quality + Model QC + raw-data selection — the trust layer (ADR-0021).** Two-pass QC: a
+- ✅ **Data Quality + Model QC + raw-data selection: the trust layer (ADR-0021).** Two-pass QC: a
   column-blind **pre-fit** `data_quality` audit (raw MAD outliers, missingness, duplicate plot
   coordinates, near-duplicate genotype names, distribution/skew) and a no-refit **post-fit Model QC**
-  (conditional residuals from the BLUPs → normality, heteroscedasticity, spatial-residual Moran's I,
-  influential observations, h²/varcomp boundary). Advisory only — findings propose; the breeder
+  (conditional residuals from the BLUPs: normality, heteroscedasticity, spatial-residual Moran's I,
+  influential observations, h²/varcomp boundary). Advisory only: findings propose; the breeder
   **disposes** them (review / accept-all / auto, capped per trait) into a `data_overrides` **exclusion
-  overlay** that never deletes stored data and re-plans on re-run (the sole data→model channel). Shipped
+  overlay** that never deletes stored data and re-plans on re-run (the sole data-to-model channel). Shipped
   as the **"Quality" journey step** with one-click excludes + a with/without comparison; validated on G2F
   MET in the browser. Trait-semantic checks (impossible-value ranges, datatype-aware distribution) await
   the Trait Library (Thread B, ADR-0022).
@@ -79,7 +58,7 @@ deliberately deferred until the slice above it is real and validated.
   re-run synchronously; the kernel validates each override against readiness and
   *refuses* infeasible ones with a reason (R still owns the science). Relationship
   / engine changes re-point from precomputed GEBVs in seconds; structural changes
-  refit. The whole option menu is always shown — locked options explain what data
+  refit. The whole option menu is always shown; locked options explain what data
   would unlock them.
 - Engines: `lme4` / `SpATS` / `statgenSTA` / `statgenGxE` for trial-scale fits;
   **BLUPF90** (AIREMLF90 multi-trait REML; ssGBLUP) for multi-trait variance
@@ -111,10 +90,10 @@ deliberately deferred until the slice above it is real and validated.
 ## Phase 7 — Genomics & cross planning  *(genomic prediction built)*
 - ✅ **Genotype storage + ingestion (ADR-0017):** BrAPI VariantSet / Variant /
   Sample / CallSet tables with packed dosage `bytea`; the G2F genotype panel
-  ingested — 437,214 SNPs × 4,928 genotypes (~501 MB compressed); 1,153/1,198 MET
+  ingested: 437,214 SNPs × 4,928 genotypes (~501 MB compressed); 1,153/1,198 MET
   genotypes genotyped.
-- ✅ **Relationship matrices + GEBVs:** `grm.ts` decodes packed CallSets → dosage
-  matrix (+ fixed-width SNP export); `genomic-core.R` builds VanRaden **G** (scaled
+- ✅ **Relationship matrices + GEBVs:** `grm.ts` decodes packed CallSets into a dosage
+  matrix and a fixed-width SNP export; `genomic-core.R` builds VanRaden **G** (scaled
   to mean-diag 1), pedigree **A**, and single-step **H** is blended (Legarra) so
   **all phenotyped lines are ranked, incl. the un-genotyped via the pedigree link**.
 - ✅ **Two engines, cross-validated:** **rrBLUP** is the fast CV / default engine;
@@ -126,12 +105,12 @@ deliberately deferred until the slice above it is real and validated.
 - ✅ **Genomic UI:** GRM canvas heatmap, PCA / population structure, deployment
   diagnostics (reliability / QC / distribution), the field-BLUP-vs-genomic-GEBV
   teaching divergence, and the **Model Studio** relationship + engine selector
-  (ADR-0018) — the planner recommends, the breeder overrides + re-runs.
-- ✅ **Combining ability — GCA / SCA (ADR-0019/0020):** the hybrid trial decomposed
-  into parental **GCA** (random → BLUP, the parent-selection target, shrinkage baked in,
-  cross-degree as the visual trust signal) + **SCA**, in one unified random-effects mixed
+  (ADR-0018): the planner recommends, the breeder overrides and re-runs.
+- ✅ **Combining ability (GCA / SCA, ADR-0019/0020):** the hybrid trial decomposed
+  into parental **GCA** (a random-effect BLUP, the parent-selection target, shrinkage baked in,
+  with cross-degree as the visual trust signal) + **SCA**, in one unified random-effects mixed
   model whose parameterization is **selected from the measured cross-graph topology**
-  (diallel / line×tester / sparse factorial — testers fixed when few in effect; ADR-0019;
+  (diallel / line×tester / sparse factorial; testers fixed when few in effect; ADR-0019;
   no fixed Griffing). Ranking is **within heterotic pool** (ADR-0020). A breeder-grade
   workspace: within-pool GCA ranking, hybrid ranking, the **per-se↔GCA divergence**
   (hidden gems / false promises), the SCA heatmap, Baker's ratio + variance components,
@@ -142,8 +121,8 @@ deliberately deferred until the slice above it is real and validated.
   **facet of the one trial analysis** (attached to the hybrid bundle, not a separate page): the
   web app is one journey-ordered page whose **Selection** workspace switches **level**
   (Hybrids / Parents·GCA) × **lens** (Stated / Genetically-optimal / Compare) over the shared
-  index components — the desired-gains/Smith–Hazel lens runs on GCA too (kernel emits a GCA
-  genetic-covariance). UX architecture: `.scratch/ux-architecture/plan.md`.
+  index components; the desired-gains/Smith–Hazel lens runs on GCA too (kernel emits a GCA
+  genetic-covariance).
 - **Next (genomic):** a `relationship_set` cache table (keep big GRMs out of the
   JSONB bundle); `sample.germplasm_id` mapping; native BLUPF90 ssGBLUP (H) at
   scale; forward-year predictive validation (train year N, predict N+1).

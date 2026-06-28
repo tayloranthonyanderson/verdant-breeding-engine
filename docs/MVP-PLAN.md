@@ -46,13 +46,9 @@ step — capturing the messy real-world field is the practical bottleneck, not t
 
 ## 3. The build model (ADR-0010)
 
-- **Science-first.** Prove the analysis is convincing on **real public + simulated data**,
-  with the author as the only user, *before* paying the deployment-plumbing tax. Deploy a *validated*
-  core; don't harden infra around an unproven one.
-- **Tracer bullet.** Thinnest end-to-end thread on the *real* architecture first, then thicken
-  each station. Shallow the features, never fake the seam.
-- **Defer-the-tax.** Auth, cloud, single-tenant tooling, the user-facing model picker, full BrAPI,
-  and the formal AI audit/undo layer are all *architected-for now, built later*.
+The method is **science-first**, built as a **tracer bullet**, with **defer-the-tax** sequencing.
+See [ADR-0010](adr/0010-build-methodology.md) for the rationale and [CONTEXT.md](../CONTEXT.md) for the
+term definitions; the milestones below apply it.
 
 ---
 
@@ -177,19 +173,10 @@ Germplasm catalog, pedigree → A-matrix, cross-cycle lineage, realized-gain das
 ### Milestone 6 — Genomics at scale · **XL** · *(built)*
 GBLUP (G-matrix), CV accuracy, single-step (H-matrix), marker ingestion/QC; heavy jobs to **BLUPF90**
 behind the contract (verify licensing). (ROADMAP Phase 7.)
-- ✅ **Marker ingestion + storage (ADR-0017):** BrAPI VariantSet / Variant / Sample / CallSet
-  with packed dosage `bytea`; G2F panel ingested — 437,214 SNPs × 4,928 genotypes (~501 MB
-  compressed; per-marker MAF + call-rate at ingest); 1,153/1,198 MET genotypes genotyped.
-- ✅ **Relationship matrices + GEBVs:** `genomic-core.R` builds VanRaden **G** (scaled to mean-diag 1),
-  pedigree **A**, and single-step **H** (Legarra blend) so **all phenotyped lines rank — incl. the 45
-  un-genotyped, via the pedigree link**. `grm.ts` decodes CallSets → dosage matrix + fixed-width SNP export.
-- ✅ **Two engines, cross-validated:** **rrBLUP** (fast CV / default) + **native BLUPF90/preGSf90 GBLUP**
-  (scale); GEBV concordance r≈0.97 (`docs/validation/cross-engine-concordance.md`). 5-fold×2-rep CV shows
-  **G > A > identity** on every trait + LR bias/dispersion (`docs/validation/genomic-prediction.md`).
-- ✅ **Genomic UI + Model Studio (ADR-0018):** GRM heatmap, PCA / population structure, deployment
-  diagnostics, field-BLUP-vs-genomic-GEBV divergence, and the relationship + engine selector — the planner
-  recommends the CV winner, the breeder overrides any decision and re-runs, the kernel validates + refuses
-  infeasible ones. Relationship/engine toggles re-point from precomputed GEBVs in seconds.
+- ✅ **Built and validated.** Marker ingestion (ADR-0017), G/A/H relationship matrices + GEBVs, two
+  cross-validated engines (rrBLUP + BLUPF90, GEBV r≈0.97), and the genomic UI + Model Studio (ADR-0018).
+  The shipped detail lives in [ROADMAP.md](../ROADMAP.md) Phase 7 and the committed
+  [validation reports](validation/), so it isn't repeated here.
 - **Next:** a `relationship_set` cache table (big GRMs out of the JSONB bundle); `sample.germplasm_id`
   mapping; native BLUPF90 ssGBLUP (H) at scale; forward-year predictive validation (train N → predict N+1).
 
