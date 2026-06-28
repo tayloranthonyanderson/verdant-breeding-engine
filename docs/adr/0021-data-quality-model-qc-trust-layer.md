@@ -1,4 +1,4 @@
-# Data Quality & Model QC: an advisory, two-pass trust layer the breeder disposes
+# ADR-0021 — Data Quality & Model QC: an advisory, two-pass trust layer the breeder disposes
 
 **Status:** Accepted (2026-06-12)
 

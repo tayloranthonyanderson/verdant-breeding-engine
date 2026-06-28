@@ -36,8 +36,8 @@ The spatial/MET stages consume a crop-neutral record:
 - **Dataset-specific column mapping is the ingestion adapter's job.** G2F's `Range→row`, `Pass→col`,
   `Replicate→rep`, `Block→block`, `Hybrid→genotype` mapping lives in the g2f layer
   (`packages/pipeline/src/g2f.ts`), never in the kernel or the BLUPF90 adapter. This is the same
-  boundary [ADR-0007](0007-ai-assisted-ingestion-brapi.md) draws (BrAPI-aligned ingestion) and
-  [build-crop-and-user-agnostic] in memory: crop specifics live in adapters, the core stays generic.
+  boundary [ADR-0007](0007-ai-assisted-ingestion-brapi.md) draws (BrAPI-aligned ingestion):
+  crop specifics live in adapters; the core stays generic.
 
 **2. The selection objective is program-owned config, not engine/tracer code.**
 

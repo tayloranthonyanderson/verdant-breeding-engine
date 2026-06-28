@@ -85,7 +85,7 @@ limits recompute instantly — no kernel/pipeline/contract/fixture change.
 
 ## Consequences
 
-- **The Cross step is the cycle-closing surface** and the terminal act of the flagship teaching demo:
+- **The Cross step is the cycle-closing surface** and the terminal act of the teaching demo:
   "from last season's trials to next season's cross plan." Verified end-to-end on `advance-proc-hybrid`
   (12 across-pool crosses ranked on the processing index; requiring Ht1 reshapes the plan so every kept
   cross carries it).

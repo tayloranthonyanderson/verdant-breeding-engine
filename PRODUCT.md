@@ -1,7 +1,7 @@
 # Verdant — Product Brief
 
 > An open-source breeding-analytics engine for small breeding programs that have
-> trial data but no statistician on staff. A teaching and portfolio project — not a
+> trial data but no statistician on staff. A teaching project — not a
 > commercial product.
 
 ## The one-liner
@@ -28,7 +28,7 @@ correct, explainable answer.
 - **A grounded AI layer:** an assistant that explains the result in plain language and is
   tool-constrained so every number traces to the computed bundle — it explains, it never
   computes.
-- **A clean orchestration layer** over battle-tested solvers (lme4 → rrBLUP → BLUPF90).
+- **A clean orchestration layer** over proven solvers (lme4 → rrBLUP → BLUPF90).
 
 ## Scope
 - **MVP slice (built):** trial/phenotype data in → BLUPs/BLUEs, heritability, ranked

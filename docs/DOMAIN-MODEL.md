@@ -98,7 +98,7 @@ Both are functions of **(Segment × Stage)**, not Segment alone:
   An index can only use traits measured at that stage.
 
 So: a **Segment** owns a **TPP** = the commercial-target definition (full gates + full trait priorities;
-the north star). Each **(Segment × Stage)** owns a **SelectionCriteria** = the *operational* {gates, index}
+the guiding target). Each **(Segment × Stage)** owns a **SelectionCriteria** = the *operational* {gates, index}
 applied at that stage, a stage-appropriate realization of the TPP that converges to it as stage advances.
 (Whether early-stage evaluation is on *combining ability* vs *per-se* performance is
 reproductive-biology-dependent — §10.)
@@ -154,7 +154,7 @@ Program
 |---|---|
 | **Stage** *(ours)* | ordered advancement-ladder position; program-defined |
 | **Segment** *(ours)* | program-defined commercial target; faceted (mechanization/climate/season/soil); effective-dated |
-| **TargetProductProfile** *(ours)* | a Segment's commercial-target definition: full gate set + trait priorities (the north star) |
+| **TargetProductProfile** *(ours)* | a Segment's commercial-target definition: full gate set + trait priorities (the guiding target) |
 | **SelectionCriteria** *(ours)* | operational {gates, index} per (Segment × Stage); stage-appropriate realization of the TPP, converging to it as stage advances |
 | **AdvancementDecision** *(ours)* | recorded staging move: candidate, from_stage→to_stage, **disposition** (extensible: advance/hold/drop/recycle-as-parent/…), **per Segment**, rationale, based_on AnalysisRun, date, decided_by |
 | **MarketIntelligence** *(ours)* | market research feeding a Segment's TPP: which markets matter & why, consumer preferences, market size/shifts |

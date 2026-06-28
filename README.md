@@ -1,14 +1,14 @@
 <img src="docs/banner.svg" alt="Verdant — plant-breeding analytics: mixed-model BLUPs, genomic prediction, combining ability, and cross planning" width="100%">
 
-# Verdant — Breeding Analytics (teaching + portfolio project)
+# Verdant — Breeding Analytics (teaching project)
 
 [![CI](https://github.com/tayloranthonyanderson/verdant-breeding-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/tayloranthonyanderson/verdant-breeding-engine/actions/workflows/ci.yml)
 
-A free, open-source breeding **management + analysis** project. Upload a trial → get correct
-mixed-model **BLUPs/BLUEs**, **heritability**, genomic **GEBVs**, **combining ability**, and a live,
-re-weightable **selection ranking** — with a pre-fit **data-quality** pass and post-fit **model-QC**
-diagnostics so you can trust the answer, all narratable by a grounded **AI assistant** that only
-answers from the computed result bundle.
+A free, open-source breeding management and analysis project. Upload a trial and get correct
+mixed-model BLUPs/BLUEs, heritability, genomic GEBVs, combining ability, and a live,
+re-weightable selection ranking — with a pre-fit data-quality pass and post-fit model-QC
+diagnostics so you can trust the answer. A grounded AI assistant explains the results and
+answers only from the computed result bundle.
 
 Read [PRODUCT.md](PRODUCT.md), [ROADMAP.md](ROADMAP.md), [docs/MVP-PLAN.md](docs/MVP-PLAN.md), the
 shared vocabulary in [CONTEXT.md](CONTEXT.md), and the decisions in [docs/adr/](docs/adr/).
@@ -26,21 +26,21 @@ apps/web (Next.js + TS)  ──▶  packages/pipeline (TS orchestrator)  ──�
         └────────── Postgres (result bundles stored whole as JSONB) ──────────────────┘
 ```
 
-The **engine contract** (`packages/contracts/`, versioned JSON Schema) is the language-neutral seam: an
-`analyze()` **request** in, a **result bundle** out. R owns all model selection + science deterministically
+The engine contract (`packages/contracts/`, versioned JSON Schema) is the language-neutral seam: an
+`analyze()` request in, a result bundle out. R owns all model selection and science deterministically
 (ADR-0002); TS owns orchestration, the GUI, and AI; the AI explains the bundle, never computes it.
 
 ## Layout (monorepo)
 
 | Path | Purpose |
 |---|---|
-| `apps/web/` | **The live web tier** — Next.js journey UI (Overview → Data → Model → Understand → Select → Advance → Genomics) + AI assistant. |
+| `apps/web/` | The live web tier — Next.js journey UI (Overview → Data → Model → Understand → Select → Advance → Genomics) + AI assistant. |
 | `packages/contracts/` | Versioned engine contract (JSON Schema → generated TS types). The TS↔R seam. |
 | `packages/pipeline/` | TS orchestrator: parses data, calls the R kernel, assembles + persists the result bundle (`met-build.ts` is the MET entrypoint). |
 | `packages/db/` | Postgres schema (Drizzle): programs, studies, observations, analysis runs, result bundles, genotyping (BrAPI-aligned). |
-| `services/kernel/` | **R compute kernel** — `analyze.R`, `stage1-spatial.R`, `model-qc.R`, `data-quality.R`, `plan.R`, `combining-ability.R`, genomic-`*.R`. Stateless; stdin JSON → stdout JSON. |
+| `services/kernel/` | R compute kernel — `analyze.R`, `stage1-spatial.R`, `model-qc.R`, `data-quality.R`, `plan.R`, `combining-ability.R`, genomic-`*.R`. Stateless; stdin JSON → stdout JSON. |
 | `services/engine-blupf90/` | Native BLUPF90/preGSf90 binaries (AI-REML, GBLUP/ssGBLUP scale engine). |
-| `data/g2f/` | The G2F maize dev fixtures (the development north-star dataset, ADR-0008). |
+| `data/g2f/` | The G2F maize dev fixtures (the primary development dataset, ADR-0008). |
 | `docs/` | ADRs, DOMAIN-MODEL, MVP-PLAN, validation reports, agent guides. |
 | `evals/` | AI groundedness eval harness. |
 

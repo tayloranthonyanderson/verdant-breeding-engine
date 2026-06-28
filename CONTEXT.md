@@ -241,7 +241,7 @@ decision*: which matings to make. Two modes, not one tool:
   but a lens applied to it (see **Segment membership** below). A Segment is two facets:
   a **TPP** (objective) + a **TPE** (analysis frame) — ADR-0023.
 - **Target Product Profile (TPP)** — a Segment's commercial-target definition (full gate set + trait
-  priorities; the north star); drives **market-specific selection** (same data + different Segment ⇒
+  priorities; the guiding target); drives **market-specific selection** (same data + different Segment ⇒
   different ranking). The *objective* facet of a Segment (its Selection Criteria); always present.
 - **Target Population of Environments (TPE)** — a Segment's **analysis frame**: the environment
   envelope its varieties are deployed into, which the trial network *samples* — *what data pools
@@ -292,5 +292,5 @@ decision*: which matings to make. Two modes, not one tool:
   future import path from Breedbase / Field Book / Phenome.
 - **Breedbase** — established open-source breeding software (Perl/Chado). A *reference to learn from
   and interoperate with*, **not** a codebase to fork.
-- **G2F (Genomes to Fields)** — public maize program dataset; our development **north star**
+- **G2F (Genomes to Fields)** — public maize program dataset; our development reference dataset
   (real breeding-program complexity). Maize is the **lead crop / worked example** (ADR-0008).

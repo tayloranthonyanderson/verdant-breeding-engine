@@ -1,4 +1,4 @@
-# ADR-0008 — Data & validation strategy: three sources, G2F north star, maize as lead crop
+# ADR-0008 — Data & validation strategy: three sources, G2F as reference dataset, maize as lead crop
 
 **Status:** Accepted (2026-06-11)
 
@@ -10,7 +10,7 @@ a later stage; see ROADMAP/MVP-PLAN.)
 
 ## Decision
 **Three data sources, three distinct purposes — not one choice:**
-1. **Simulator → correctness proof.** Its superpower is *known ground truth*: prove BLUPs recover true
+1. **Simulator → correctness proof.** Its strength is *known ground truth*: prove BLUPs recover true
    genetic values (real data never can). Bedrock of the validation suite. Extend it to generate mess on
    purpose (unbalanced, missing, spatial gradients, outliers) to test robustness too. **Keep it
    maize-flavored** for the author's gut-check intuition.
@@ -19,7 +19,7 @@ a later stage; see ROADMAP/MVP-PLAN.)
 3. **Real genotypes + simulated phenotypes → the GS showcase (later).** Simulate a trait architecture over
    a real marker matrix for provable genomic-prediction accuracy; pair with public panels when available.
 
-**Development north-star dataset: Genomes to Fields (G2F), maize.** Public, real, ~55k plots across 68
+**Development reference dataset: Genomes to Fields (G2F), maize.** Public, real, ~55k plots across 68
 location-years, with phenotype + genotype + environment + plot/spatial layers. The engine is crop-agnostic,
 so its job — stress-test the architecture/data model on real breeding-program complexity — is crop-independent.
 - **Maize remains the lead crop / worked example;** the maize demo set (the author's self-collected genomes + a

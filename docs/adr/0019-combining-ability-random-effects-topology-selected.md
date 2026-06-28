@@ -1,4 +1,4 @@
-# Combining ability as a topology-selected random-effects decomposition (no Griffing method)
+# ADR-0019 — Combining ability as a topology-selected random-effects decomposition (no Griffing method)
 
 When germplasm are crosses (`parent1`/`parent2` present), the planner can decompose the
 genotype effect into **GCA** (parent main effects) and **SCA** (cross deviation), turning a

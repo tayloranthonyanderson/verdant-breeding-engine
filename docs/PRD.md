@@ -139,7 +139,7 @@ Per the principle in §3 — treated as first-class because it decides adoption.
 - **Instant feel** — client-side recompute for live controls; async work behind clear progress.
 - **The AI is a presentation surface** — "show me the lines that dropped in yield but held grain protein" yields the
   right view, narrated, not a query language.
-- **Consistent design system**; **Next.js 16 / React 19** conventions (read `frontend/AGENTS.md`).
+- **Consistent design system**; **Next.js 16 / React 19** conventions.
 
 ---
 

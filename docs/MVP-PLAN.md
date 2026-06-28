@@ -216,7 +216,7 @@ Surfaced through the AI assistant, transparent, and easy — never raw OR toolin
 - **Science validation** — grow the testthat suite; benchmark vs. published/known results. The core guarantee made provable.
 - **AI groundedness & evals** — every new analysis ships a safe tool + eval; the model never computes a statistic.
 - **Design system & UX polish** — one component library; instant-feel; **Next.js 16 / React 19** conventions
-  (read `node_modules/next/dist/docs/` per `frontend/AGENTS.md` — this version differs from older Next.js).
+  (read `node_modules/next/dist/docs/` — this version differs from older Next.js).
 - **Performance** — async jobs, bundle-size discipline, caching (relationship matrices, fits), client-side recompute
   for live controls.
 - **Security & tenancy** — auth on every endpoint; `program_id` isolation tested; secrets; data-ownership/export.

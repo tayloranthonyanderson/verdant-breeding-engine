@@ -17,7 +17,7 @@ breeding pipeline** so Verdant demonstrates a *program*, not a single trial.
 
 **Why it earns its complexity.** A staged pipeline makes the **Model Planner** visibly do different,
 correct things at each Stage (single-plot / no-GxE early → MET / GxE / stability late). That is the
-clearest on-camera demonstration of "automate the expert" (ADR-0009), and it falls out of
+clearest demonstration of "automate the expert" (ADR-0009), and it falls out of
 simulating the **breeding funnel** honestly. It also gives the AI insight layer (target-authoring +
 TPP-scoped Q&A) a realistic program to narrate, and — when the ingestion front door is built later —
 these same per-stage CSVs dogfood it.

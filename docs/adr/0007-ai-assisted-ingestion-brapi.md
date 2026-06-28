@@ -24,8 +24,8 @@ already exists (BrAPI), adopted by Breedbase, Phenome, CGIAR, and the field-capt
 
 ## Consequences
 - The first experience feels like the software already understands the breeder's trial.
-- We inherit a battle-tested domain model instead of reinventing it, and gain a future interoperability
-  superpower.
+- We inherit a proven domain model instead of reinventing it, and gain a future interoperability
+  advantage.
 - Risk: a confidently-wrong AI mapping the user rubber-stamps could corrupt an analysis. Mitigations: the AI
   shows per-column confidence/reasoning; validation catches structural nonsense; nothing runs until confirmed.
 

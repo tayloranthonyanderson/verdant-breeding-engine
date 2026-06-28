@@ -1,4 +1,4 @@
-# Trait Library + BrAPI-orthodox units (harmonize at ingest, not per-observation)
+# ADR-0022 — Trait Library + BrAPI-orthodox units (harmonize at ingest, not per-observation)
 
 **Status:** Accepted (2026-06-12) — Thread B, scheduled after ADR-0021. Recorded now so the
 near-term Data Quality work (ADR-0021) and the schema do not drift from this decision.

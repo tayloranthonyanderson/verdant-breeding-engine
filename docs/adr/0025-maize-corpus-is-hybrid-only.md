@@ -72,7 +72,7 @@ pools (predictions `A:36 B:36`, advancements `A:8 B:8` / `A:7 B:7`).
 
 ## Consequences
 
-- **The flagship flow is now one continuous story:** compose a cut (grain protein, Test-weight, or both) → the
+- **The full flow is now one continuous story:** compose a cut (grain protein, Test-weight, or both) → the
   engine estimates GCA/SCA off that cut → the Cross step plans the next crosses. No node "isn't like the
   others."
 - **Blast radius was small.** The cut assembler already threaded `parent1`/`parent2` generically; the

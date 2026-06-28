@@ -90,7 +90,7 @@ deliberately deferred until the slice above it is real and validated.
 ## Phase 2 — Natural-language Q&A
 - Ask questions over the analyzed results ("which lines were most stable across
   sites?"). LLM translates to queries/operations on the result objects.
-- The headline differentiator; lighter stats, leans on Phase 1 outputs.
+- The main new capability; lighter stats, leans on Phase 1 outputs.
 
 ## Phase 3 — Trial designer
 - Generate sound designs (RCBD, augmented, alpha-lattice, p-rep) with a layout

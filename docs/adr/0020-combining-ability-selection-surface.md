@@ -1,4 +1,4 @@
-# Combining-ability selection surface: unit/pool-scoped objectives, within-pool ranking, dual-source gates
+# ADR-0020 — Combining-ability selection surface: unit/pool-scoped objectives, within-pool ranking, dual-source gates
 
 ADR-0019 settled how combining ability is *modelled*; this settles how it is *selected on*. The
 GCA decomposition feeds the **existing** transparent + Smith–Hazel index machinery unchanged —
@@ -31,7 +31,7 @@ G2F provides parent **identity** only — no direct inbred genotype and no inbre
 (its marker file is a hybrid-level TASSEL build; its trait files are all hybrid-level). So GCA
 modelling and within-pool ranking are demonstrable on G2F, but the native-trait gate is
 **buildable yet unfixturable** there, and it is really a **maize lead-crop** workflow (Ht1 is a
-maize gene), not a maize one.
+maize gene), not a maize-specific methodology.
 
 We chose to **build a small synthetic inbred fixture now** — a per-inbred table over the G2F
 parent names carrying a synthetic pool label and one or more presence/absence native-trait scores
