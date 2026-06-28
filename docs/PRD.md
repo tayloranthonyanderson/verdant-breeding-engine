@@ -5,7 +5,7 @@ vision and the build:
 
 | Doc | Answers |
 |---|---|
-| [PRODUCT.md](../PRODUCT.md) | the positioning (why this exists) |
+| [README.md](../README.md) | the positioning (why this exists) |
 | **PRD.md** (this) | **the requirements** (what it must do, for whom, to what bar) |
 | [DOMAIN-MODEL.md](DOMAIN-MODEL.md) | the data model / lifecycle (the nouns) |
 | [MVP-PLAN.md](MVP-PLAN.md) | the build sequence (how/when) |

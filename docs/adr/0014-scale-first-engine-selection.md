@@ -10,7 +10,7 @@ the toolkit has to hold up on real, large trials and genomic-scale data.
 Prior notes were inconsistent and I drifted to the wrong side of them:
 - The spike [README](../../README.md) engine-strategy note already said: *"Deliberately avoiding
   sommer (scale crashes), ASReml (cost/support), and INLA-as-core (memory)."*
-- But [MVP-PLAN §6](../MVP-PLAN.md) and [ROADMAP](../../ROADMAP.md) still listed **sommer** for
+- But [MVP-PLAN §6](../MVP-PLAN.md) and [ROADMAP](../ROADMAP.md) still listed **sommer** for
   Milestone-1 "MET + GxE; genetic correlations." This ADR resolves the contradiction in favor of the
   scale-first README position and updates those stale references.
 

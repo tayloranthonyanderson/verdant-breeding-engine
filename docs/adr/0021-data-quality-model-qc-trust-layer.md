@@ -6,7 +6,7 @@
 
 The engine grew sophisticated downstream (two-stage MET, the deterministic Model Planner,
 genomic prediction, combining ability) but the bookend a statistician never skips — *look at
-the data, then check the fit* — was never built. [`ROADMAP.md`](../../ROADMAP.md) line 44
+the data, then check the fit* — was never built. [`ROADMAP.md`](../ROADMAP.md)
 ("Data validation: balance, missingness, outliers, factor-level sanity") is the only unchecked
 Phase-1 item, and the per-trait `diagnostics` the fit emits is a stub (`{converged, n_obs,
 n_genotypes}`). Today the engine will confidently rank genotypes off a column with a

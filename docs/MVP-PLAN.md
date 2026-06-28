@@ -1,8 +1,8 @@
 # Verdant — Build Plan to a Working MVP
 
-How to read this: [ROADMAP.md](../ROADMAP.md) is the *product* phase list. This is the
+How to read this: [ROADMAP.md](ROADMAP.md) is the *product* phase list. This is the
 *engineering execution plan*. The **decisions** behind it live as [ADRs](adr/) and the
-shared **vocabulary** in [CONTEXT.md](../CONTEXT.md) — read those first; this plan assumes them.
+shared **vocabulary** in [CONTEXT.md](CONTEXT.md) — read those first; this plan assumes them.
 
 > This plan was rewritten on 2026-06-11 after a full design-grilling session. It supersedes
 > the earlier platform-first draft. The headline reversal: **science-first, not plumbing-first**
@@ -47,7 +47,7 @@ step — capturing the messy real-world field is the practical bottleneck, not t
 ## 3. The build model (ADR-0010)
 
 The method is **science-first**, built as a **tracer bullet**, with **defer-the-tax** sequencing.
-See [ADR-0010](adr/0010-build-methodology.md) for the rationale and [CONTEXT.md](../CONTEXT.md) for the
+See [ADR-0010](adr/0010-build-methodology.md) for the rationale and [CONTEXT.md](CONTEXT.md) for the
 term definitions; the milestones below apply it.
 
 ---
@@ -175,7 +175,7 @@ GBLUP (G-matrix), CV accuracy, single-step (H-matrix), marker ingestion/QC; heav
 behind the contract (verify licensing). (ROADMAP Phase 7.)
 - ✅ **Built and validated.** Marker ingestion (ADR-0017), G/A/H relationship matrices + GEBVs, two
   cross-validated engines (rrBLUP + BLUPF90, GEBV r≈0.97), and the genomic UI + Model Studio (ADR-0018).
-  The shipped detail lives in [ROADMAP.md](../ROADMAP.md) Phase 7 and the committed
+  The shipped detail lives in [ROADMAP.md](ROADMAP.md) Phase 7 and the committed
   [validation reports](validation/), so it isn't repeated here.
 - **Next:** a `relationship_set` cache table (big GRMs out of the JSONB bundle); `sample.germplasm_id`
   mapping; native BLUPF90 ssGBLUP (H) at scale; forward-year predictive validation (train N → predict N+1).

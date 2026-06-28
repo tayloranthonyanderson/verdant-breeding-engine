@@ -30,7 +30,7 @@ so its job — stress-test the architecture/data model on real breeding-program 
 
 ## Consequences
 - Correctness is provable (simulator) *and* robustness is real-world (G2F/public).
-- Near-term strength is correctness + UX + AI, not data — consistent with PRODUCT.md.
+- Near-term strength is correctness + UX + AI, not data — consistent with the README's positioning.
 - Cost: developing on a different maize set than the author's own day-to-day material loses some domain
   intuition — mitigated by the maize-flavored simulator.
 

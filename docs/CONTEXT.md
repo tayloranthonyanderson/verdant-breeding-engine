@@ -1,7 +1,7 @@
 # Verdant — Context & Glossary
 
 Single-context domain doc for the whole product. Read this and the relevant
-[ADRs](docs/adr/) before exploring or changing code. Decisions live in ADRs; this
+[ADRs](adr/) before exploring or changing code. Decisions live in ADRs; this
 file is the shared **vocabulary** and a one-screen orientation. Use these terms
 exactly in code, tests, issues, and prose. Don't drift to synonyms.
 
@@ -10,7 +10,7 @@ A free, open-source breeding **management + analysis** project for small/mid pro
 without a statistician on staff. The promise: *upload your trial, get the right answer
 (correct mixed-model BLUPs, heritability, a ranked selection index), and ask your data
 questions in plain English.*
-See [PRODUCT.md](PRODUCT.md), [ROADMAP.md](ROADMAP.md), [docs/MVP-PLAN.md](docs/MVP-PLAN.md).
+See [ROADMAP.md](ROADMAP.md) and [MVP-PLAN.md](MVP-PLAN.md).
 
 ## The shape of the system (ADR-0001)
 - **Compute kernel** — R; stateless; the *only* place statistics happen. A worker that
@@ -23,7 +23,7 @@ See [PRODUCT.md](PRODUCT.md), [ROADMAP.md](ROADMAP.md), [docs/MVP-PLAN.md](docs/
 ## Product & architecture vocabulary
 - **Engine contract** — the language-neutral seam between the web tier (TS), the compute
   kernel (R), and the solver service (Python): the `analyze()` **request** in, the **result
-  bundle** out. Source of truth is the versioned JSON Schema under [`packages/contracts/`](packages/contracts/);
+  bundle** out. Source of truth is the versioned JSON Schema under [`packages/contracts/`](../packages/contracts/);
   each runtime binds to it rather than re-deriving the shape (DOMAIN-MODEL §6, ADR-0001).
 - **Result bundle** — the single object an analysis produces: per-trait effects,
   heritability, varcomp, chosen-model rationale, warnings, selection index. Rendered by
@@ -232,7 +232,7 @@ decision* about which matings to make. Two modes, not one tool:
   parental divergence. The product F1 is terminal (no progeny selection) so usefulness is a *recycling*
   concept, not a product-cross one.
 
-## Program organization vocabulary (the two axes; see [DOMAIN-MODEL.md](docs/DOMAIN-MODEL.md))
+## Program organization vocabulary (the two axes; see [DOMAIN-MODEL.md](DOMAIN-MODEL.md))
 - **Stage** — a candidate's position on the program's *ordered* advancement ladder (e.g.
   stage 1 → pre-commercial → commercial). Program-defined; material moves between stages via an
   **Advancement Decision**. R&D/breeders say "stage," commercial says "phase"; we use **Stage**
@@ -282,7 +282,7 @@ decision* about which matings to make. Two modes, not one tool:
   on the survivors (measurement economics). Survivors carry forward as a *selected subset* of the
   prior Stage: correlated, with **compressed genetic variance** (Bulmer). Couples with the
   **segment funnel** (broad early → specific late). Drives the simulation corpus
-  ([docs/sim-corpus-spec.md](docs/sim-corpus-spec.md)) and makes the **Model Planner** correctly do
+  ([sim-corpus-spec.md](sim-corpus-spec.md)) and makes the **Model Planner** correctly do
   different things at each Stage (single-plot / no-GxE early → MET / GxE / stability late).
 - **List** — a built set of germplasm (crossing block, nursery, trial entries, selection candidates),
   saved or dynamic, assembled by querying Stage + Segment + provenance + performance; **diversity-aware**

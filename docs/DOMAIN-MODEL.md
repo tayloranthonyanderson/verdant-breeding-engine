@@ -11,7 +11,7 @@ until needed.
 
 **Status:** v0.2 (2026-06-11) — refined through grilling with the author. Grounded in
 BrAPI v2, the standard QG/breeding texts, and Breedbase's schema. Vocabulary feeds
-[CONTEXT.md](../CONTEXT.md); decisions feed [ADRs](adr/).
+[CONTEXT.md](CONTEXT.md); decisions feed [ADRs](adr/).
 
 ---
 
